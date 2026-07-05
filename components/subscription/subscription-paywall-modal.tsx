@@ -15,8 +15,8 @@ import {
 
 const TESTIMONIAL_LAYOUT = [
   { className: "left-0 top-0 right-5 z-30 -rotate-1" },
-  { className: "left-5 top-[6.7rem] right-0 z-20 rotate-1" },
-  { className: "left-1 top-[13.4rem] right-3 z-10 -rotate-[0.5deg]" },
+  { className: "left-5 top-[4.7rem] right-0 z-20 rotate-1" },
+  { className: "left-1 top-[9.4rem] right-3 z-10 -rotate-[0.5deg]" },
 ] as const
 
 function PlanRadio({ selected }: { selected: boolean }) {
@@ -93,7 +93,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
 
   return (
     <div className="absolute inset-0 z-[80] flex flex-col bg-background">
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[calc(11rem+env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))]">
         <div className="mb-1 flex shrink-0 items-center justify-between">
           <button
             type="button"
@@ -123,7 +123,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           ))}
         </div>
 
-        <div className="relative mx-auto mt-3 h-[18rem] w-full max-w-[21rem] shrink-0">
+        <div className="relative mx-auto mt-3 h-[12.6rem] w-full max-w-[21rem] shrink-0">
           {PAYWALL_TESTIMONIALS.map((review, index) => (
             <article
               key={review.author}
@@ -184,14 +184,8 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
             </div>
           </button>
 
-          <label className="flex items-start gap-2.5 rounded-block-sm border border-border/70 bg-card px-3 py-3">
-            <input
-              type="checkbox"
-              checked={agreedToTerms}
-              onChange={(e) => setAgreedToTerms(e.target.checked)}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
-            />
-            <span className="text-[11px] leading-relaxed text-muted-foreground">
+          <label className="flex items-start justify-between gap-3 rounded-block-sm border border-border/70 bg-card px-3 py-3">
+            <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted-foreground">
               Нажимая «Оплатить», вы соглашаетесь с{" "}
               <Link href="/terms" className="font-semibold text-primary underline-offset-2 hover:underline">
                 Условиями использования
@@ -201,7 +195,23 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
                 Политикой конфиденциальности
               </Link>
             </span>
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              className="mt-0.5 size-6 shrink-0 accent-primary"
+              aria-label="Согласие с условиями использования и политикой конфиденциальности"
+            />
           </label>
+
+          <button
+            type="button"
+            onClick={handlePay}
+            disabled={paying || !agreedToTerms}
+            className="w-full rounded-full bg-primary py-[1.125rem] text-base font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
+          >
+            {paying ? "Создаём платёж…" : "Оплатить"}
+          </button>
 
           {error && (
             <p className="shrink-0 rounded-block-sm bg-destructive/10 px-3 py-2 text-center text-[11px] text-destructive">
@@ -220,17 +230,6 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
             </div>
           )}
         </div>
-      </div>
-
-      <div className="absolute inset-x-0 bottom-0 border-t border-border/60 bg-card/95 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-        <button
-          type="button"
-          onClick={handlePay}
-          disabled={paying || !agreedToTerms}
-          className="w-full rounded-full bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
-        >
-          {paying ? "Создаём платёж…" : "Оплатить"}
-        </button>
       </div>
     </div>
   )
