@@ -17,59 +17,12 @@ import {
 } from "@/lib/onboarding"
 import { formatRub } from "@/lib/format"
 import { parseAmount } from "@/lib/budget-planner"
-import { clearAllAppDataAndReload, resetOnboardingAndReload } from "@/lib/dev-reset"
 import { OnboardingContractStep } from "@/components/onboarding/onboarding-contract-step"
 import { OnboardingGoodNewsStep } from "@/components/onboarding/onboarding-good-news-step"
 import { OnboardingLongTermHabitsStep } from "@/components/onboarding/onboarding-long-term-habits-step"
 import { OnboardingProfileAnalysisStep } from "@/components/onboarding/onboarding-profile-analysis-step"
 import { OnboardingTracking30DaysStep } from "@/components/onboarding/onboarding-tracking-30-days-step"
 import { OnboardingThemeStep } from "@/components/theme/theme-picker"
-
-function OnboardingDevBar() {
-  const handleRestart = () => {
-    if (
-      !window.confirm(
-        "Начать онбординг сначала? Текущий прогресс шагов сбросится.",
-      )
-    ) {
-      return
-    }
-    resetOnboardingAndReload()
-  }
-
-  const handleClearAll = () => {
-    if (
-      !window.confirm(
-        "Удалить все данные приложения? Транзакции, цели и настройки будут стёрты.",
-      )
-    ) {
-      return
-    }
-    clearAllAppDataAndReload()
-  }
-
-  return (
-    <div className="shrink-0 flex items-center justify-center gap-3 border-t border-border/50 bg-background/95 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-xs backdrop-blur">
-      <button
-        type="button"
-        onClick={handleRestart}
-        className="font-semibold text-primary underline-offset-2 hover:underline"
-      >
-        Сбросить онбординг
-      </button>
-      <span className="text-muted-foreground/35" aria-hidden>
-        ·
-      </span>
-      <button
-        type="button"
-        onClick={handleClearAll}
-        className="font-semibold text-destructive underline-offset-2 hover:underline"
-      >
-        Сбросить всё
-      </button>
-    </div>
-  )
-}
 
 function OnboardingProgress({ step }: { step: number }) {
   const progress = ((step + 1) / ONBOARDING_TOTAL_STEPS) * 100
@@ -533,7 +486,6 @@ export function OnboardingFlow() {
         />
       )}
 
-      <OnboardingDevBar />
     </div>
   )
 }

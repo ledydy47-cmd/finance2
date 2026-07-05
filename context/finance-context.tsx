@@ -22,7 +22,8 @@ import {
   resetCurrentMonthSpending,
 } from "@/lib/period-reset"
 import { loadAppData, saveAppData } from "@/lib/storage"
-import { ensureTelegramSdk, waitForTelegramWebApp } from "@/lib/telegram"
+import { getClientUserKey } from "@/lib/client-id"
+import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
 import { isSubscriptionActive } from "@/lib/subscription"
 import type { ThemeId } from "@/lib/themes"
@@ -293,6 +294,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
             subscriptionExpiresAt: subscription.currentPeriodEnd,
             autoRenew: subscription.autoRenew,
             subscriptionStatus: subscription.status,
+            ...(subscription.lastPaymentId
+              ? { lastPaymentId: subscription.lastPaymentId }
+              : {}),
           },
         }))
       } catch {
@@ -303,9 +307,32 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   )
 
   const restoreSubscription = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
+    const userKey = getClientUserKey(getWebApp()?.initDataUnsafe?.user?.id)
+
+    try {
+      const statusResponse = await fetch(
+        `/api/subscription/status?userKey=${encodeURIComponent(userKey)}`,
+      )
+      const statusPayload = await statusResponse.json()
+      const subscription = statusPayload.subscription
+
+      if (subscription?.active) {
+        activateSubscription({
+          plan: subscription.subscriptionType,
+          paymentId: subscription.lastPaymentId ?? data.settings.lastPaymentId ?? "restored",
+          expiresAt: subscription.currentPeriodEnd,
+          autoRenew: subscription.autoRenew ?? true,
+          subscriptionStatus: subscription.status ?? "active",
+        })
+        return { ok: true, message: "Подписка восстановлена" }
+      }
+    } catch {
+      // fall through to payment verification
+    }
+
     const paymentId = data.settings.lastPaymentId
     if (!paymentId) {
-      return { ok: false, message: "Сохранённая покупка не найдена" }
+      return { ok: false, message: "Активная подписка не найдена" }
     }
 
     try {

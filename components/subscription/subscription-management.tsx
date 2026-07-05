@@ -47,7 +47,7 @@ export function SubscriptionManagement() {
         subscriptionExpiresAt: payload.currentPeriodEnd,
       })
       setConfirmCancel(false)
-      await syncSubscriptionFromServer()
+      await syncSubscriptionFromServer(getClientUserKey(user?.id))
     } catch {
       setError("Не удалось отключить автопродление")
     } finally {
@@ -78,7 +78,7 @@ export function SubscriptionManagement() {
         subscriptionStatus: "active",
         subscriptionExpiresAt: payload.currentPeriodEnd,
       })
-      await syncSubscriptionFromServer()
+      await syncSubscriptionFromServer(getClientUserKey(user?.id))
     } catch {
       setError("Не удалось включить автопродление")
     } finally {

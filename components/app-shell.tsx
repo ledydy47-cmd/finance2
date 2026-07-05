@@ -19,10 +19,11 @@ import { StatsScreen } from "@/components/screens/stats-screen"
 import { TransactionsScreen } from "@/components/screens/transactions-screen"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
+import { getClientUserKey } from "@/lib/client-id"
 import { getWebApp } from "@/lib/telegram"
 
 export function AppShell() {
-  const { isTelegram } = useTelegram()
+  const { isTelegram, user } = useTelegram()
   const {
     data,
     activeTab,
@@ -46,6 +47,7 @@ export function AppShell() {
     setShowTransactionsList,
     setShowAddTransaction,
     closeAddToGoal,
+    syncSubscriptionFromServer,
   } = useFinance()
 
   const showOnboarding = !data.settings.onboardingCompleted
@@ -62,6 +64,22 @@ export function AppShell() {
     document.documentElement.classList.add("telegram-mini-app")
     return () => document.documentElement.classList.remove("telegram-mini-app")
   }, [isTelegram])
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    void fetch("/api/user/register-telegram", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        telegramUserId: user.id,
+        username: user.username,
+        firstName: user.first_name,
+      }),
+    })
+
+    void syncSubscriptionFromServer(getClientUserKey(user.id))
+  }, [user?.id, user?.username, user?.first_name, syncSubscriptionFromServer])
 
   useEffect(() => {
     if (!isTelegram) return

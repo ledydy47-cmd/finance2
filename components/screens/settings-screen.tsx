@@ -2,7 +2,6 @@
 
 import { ThemePicker } from "@/components/theme/theme-picker"
 import { LegalLinks } from "@/components/legal/legal-links"
-import { SettingsDevTools } from "@/components/settings/settings-dev-tools"
 import { SubscriptionManagement } from "@/components/subscription/subscription-management"
 import { SupportSection } from "@/components/support/support-section"
 import { useTelegram } from "@/components/telegram/telegram-provider"
@@ -17,7 +16,7 @@ export function SettingsScreen() {
   const isSubscribed = data.settings.isSubscribed
 
   useEffect(() => {
-    if (!isSubscribed) return
+    if (!isSubscribed && !user?.id) return
     void syncSubscriptionFromServer(getClientUserKey(user?.id))
   }, [isSubscribed, syncSubscriptionFromServer, user?.id])
 
@@ -26,7 +25,6 @@ export function SettingsScreen() {
       <header className="shrink-0 px-5 pb-3 pt-4">
         <h1 className="font-serif text-2xl font-bold text-foreground">Настройки</h1>
         <p className="mt-1 text-sm text-muted-foreground">Профиль и параметры месяца</p>
-        <SettingsDevTools />
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-32">

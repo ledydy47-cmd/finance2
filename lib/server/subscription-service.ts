@@ -10,6 +10,7 @@ import {
   parseTelegramUserId,
   upsertSubscription,
 } from "@/lib/server/subscription-store"
+import { findTelegramUserByUsername } from "@/lib/server/telegram-users"
 import type { SubscriptionRecord, SubscriptionStatus } from "@/lib/server/subscription-types"
 import { formatPeriodEnd, sendTelegramNotification } from "@/lib/server/telegram-notify"
 import type { YooKassaPayment } from "@/lib/yookassa/server"
@@ -209,13 +210,69 @@ export async function getServerSubscriptionStatus(userKey: string) {
   const record = await getSubscriptionByUserKey(userKey)
   if (!record) return null
 
+  const active = isSubscriptionActive(record.currentPeriodEnd) && record.status !== "expired"
+
   return {
     subscriptionType: record.subscriptionType,
     currentPeriodEnd: record.currentPeriodEnd,
     autoRenew: record.autoRenew,
     status: record.status,
-    active: isSubscriptionActive(record.currentPeriodEnd) && record.status !== "expired",
+    active,
+    lastPaymentId: record.lastPaymentId,
   }
+}
+
+export async function grantManualSubscription(input: {
+  telegramUserId: number
+  plan?: SubscriptionPlan
+}) {
+  const userKey = `tg-${input.telegramUserId}`
+  const plan = input.plan ?? "yearly"
+  const paymentId = `manual-${randomUUID()}`
+  const currentPeriodEnd = computeSubscriptionExpiry(plan)
+
+  const record: SubscriptionRecord = {
+    userKey,
+    telegramUserId: input.telegramUserId,
+    paymentMethodId: null,
+    subscriptionType: plan,
+    currentPeriodEnd,
+    autoRenew: false,
+    status: "active",
+    renewalAttempts: 0,
+    lastPaymentId: paymentId,
+    updatedAt: nowIso(),
+  }
+
+  await upsertSubscription(record)
+
+  return {
+    userKey,
+    plan,
+    paymentId,
+    currentPeriodEnd,
+    autoRenew: false,
+    status: record.status,
+    active: true,
+  }
+}
+
+export async function resolveTelegramUserId(username: string): Promise<number | null> {
+  const registered = await findTelegramUserByUsername(username)
+  if (registered) return registered.telegramUserId
+
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return null
+
+  const handle = username.replace(/^@/, "")
+  const response = await fetch(
+    `https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(`@${handle}`)}`,
+    { cache: "no-store" },
+  )
+  if (!response.ok) return null
+
+  const payload = (await response.json()) as { ok?: boolean; result?: { id?: number } }
+  return payload.ok && payload.result?.id ? payload.result.id : null
 }
 
 export async function verifyPaymentById(paymentId: string) {
