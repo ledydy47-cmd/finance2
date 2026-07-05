@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { grantManualSubscription } from "@/lib/server/subscription-service"
+import { getSubscriptionByUserKey } from "@/lib/server/subscription-store"
 import { registerTelegramUser } from "@/lib/server/telegram-users"
+import { isSubscriptionActive } from "@/lib/subscription"
 
 function shouldAutoGrantTestSubscription(username?: string | null) {
   if (!username) return false
@@ -30,10 +32,17 @@ export async function POST(request: Request) {
     })
 
     if (shouldAutoGrantTestSubscription(body.username)) {
-      await grantManualSubscription({
-        telegramUserId: body.telegramUserId,
-        plan: "yearly",
-      })
+      const userKey = `tg-${body.telegramUserId}`
+      const existing = await getSubscriptionByUserKey(userKey)
+      const needsTestGrant =
+        !existing || !isSubscriptionActive(existing.currentPeriodEnd)
+
+      if (needsTestGrant) {
+        await grantManualSubscription({
+          telegramUserId: body.telegramUserId,
+          plan: "yearly",
+        })
+      }
     }
 
     return NextResponse.json({ ok: true, userKey: record.userKey })

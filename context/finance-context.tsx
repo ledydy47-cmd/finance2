@@ -25,7 +25,8 @@ import { loadAppData, saveAppData } from "@/lib/storage"
 import { getClientUserKey } from "@/lib/client-id"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
-import { isSubscriptionActive } from "@/lib/subscription"
+import { isSubscriptionActive, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
+import { verifyPaymentWithRetry } from "@/lib/pending-payment-verify"
 import type { ThemeId } from "@/lib/themes"
 import { applyTheme, DEFAULT_THEME_ID } from "@/lib/themes"
 import type {
@@ -70,6 +71,7 @@ interface FinanceContextValue {
     subscriptionStatus?: Settings["subscriptionStatus"]
   }) => void
   restoreSubscription: () => Promise<{ ok: boolean; message: string }>
+  confirmPendingPayment: () => Promise<boolean>
   syncSubscriptionFromServer: (userKey: string) => Promise<void>
   openAddToGoal: (goalId: string) => void
   closeAddToGoal: () => void
@@ -292,7 +294,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
             isSubscribed: subscription.active,
             subscriptionPlan: subscription.subscriptionType,
             subscriptionExpiresAt: subscription.currentPeriodEnd,
-            autoRenew: subscription.autoRenew,
+            autoRenew: subscription.autoRenew ?? true,
             subscriptionStatus: subscription.status,
             ...(subscription.lastPaymentId
               ? { lastPaymentId: subscription.lastPaymentId }
@@ -305,6 +307,24 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     },
     [update],
   )
+
+  const confirmPendingPayment = useCallback(async (): Promise<boolean> => {
+    const paymentId = localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)
+    if (!paymentId) return false
+
+    const verified = await verifyPaymentWithRetry(paymentId)
+    if (!verified) return false
+
+    activateSubscription({
+      plan: verified.plan,
+      paymentId: verified.paymentId,
+      expiresAt: verified.expiresAt,
+      autoRenew: verified.autoRenew,
+      subscriptionStatus: verified.status as Settings["subscriptionStatus"],
+    })
+    localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
+    return true
+  }, [activateSubscription])
 
   const restoreSubscription = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
     const userKey = getClientUserKey(getWebApp()?.initDataUnsafe?.user?.id)
@@ -798,6 +818,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     closePaywall,
     activateSubscription,
     restoreSubscription,
+    confirmPendingPayment,
     syncSubscriptionFromServer,
     openAddToGoal,
     closeAddToGoal,

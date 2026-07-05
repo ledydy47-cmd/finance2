@@ -16,6 +16,10 @@ import { formatPeriodEnd, sendTelegramNotification } from "@/lib/server/telegram
 import type { YooKassaPayment } from "@/lib/yookassa/server"
 import { createRecurringYooKassaPayment, fetchYooKassaPayment } from "@/lib/yookassa/server"
 
+function isManualPaymentId(paymentId: string | null | undefined) {
+  return Boolean(paymentId?.startsWith("manual-"))
+}
+
 function nowIso() {
   return new Date().toISOString()
 }
@@ -40,6 +44,15 @@ export async function activateSubscriptionFromPayment(payment: YooKassaPayment) 
   const currentPeriodEnd = extendPeriodEnd(plan, baseDate)
   const paymentMethodId =
     payment.payment_method?.id ?? existing?.paymentMethodId ?? null
+
+  if (!paymentMethodId) {
+    console.warn(
+      "[subscription] payment succeeded without saved payment_method",
+      payment.id,
+      userKey,
+      payment.payment_method,
+    )
+  }
 
   const record: SubscriptionRecord = {
     userKey,
@@ -227,6 +240,26 @@ export async function grantManualSubscription(input: {
   plan?: SubscriptionPlan
 }) {
   const userKey = `tg-${input.telegramUserId}`
+  const existing = await getSubscriptionByUserKey(userKey)
+
+  if (
+    existing &&
+    isSubscriptionActive(existing.currentPeriodEnd) &&
+    existing.lastPaymentId &&
+    !isManualPaymentId(existing.lastPaymentId)
+  ) {
+    return {
+      userKey,
+      plan: existing.subscriptionType,
+      paymentId: existing.lastPaymentId,
+      currentPeriodEnd: existing.currentPeriodEnd,
+      autoRenew: existing.autoRenew,
+      status: existing.status,
+      active: true,
+      skipped: true as const,
+    }
+  }
+
   const plan = input.plan ?? "yearly"
   const paymentId = `manual-${randomUUID()}`
   const currentPeriodEnd = computeSubscriptionExpiry(plan)
@@ -237,7 +270,7 @@ export async function grantManualSubscription(input: {
     paymentMethodId: null,
     subscriptionType: plan,
     currentPeriodEnd,
-    autoRenew: false,
+    autoRenew: true,
     status: "active",
     renewalAttempts: 0,
     lastPaymentId: paymentId,
@@ -251,7 +284,7 @@ export async function grantManualSubscription(input: {
     plan,
     paymentId,
     currentPeriodEnd,
-    autoRenew: false,
+    autoRenew: true,
     status: record.status,
     active: true,
   }

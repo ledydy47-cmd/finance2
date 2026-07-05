@@ -9,7 +9,7 @@ import { PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
 
 function PaymentSuccessContent() {
   const router = useRouter()
-  const { activateSubscription } = useFinance()
+  const { confirmPendingPayment } = useFinance()
   const [message, setMessage] = useState("Проверяем оплату…")
 
   useEffect(() => {
@@ -22,42 +22,23 @@ function PaymentSuccessContent() {
         return
       }
 
-      try {
-        const response = await fetch(
-          `/api/payments/verify?paymentId=${encodeURIComponent(paymentId)}`,
-        )
-        const data = await response.json()
+      const activated = await confirmPendingPayment()
+      if (cancelled) return
 
-        if (!response.ok || !data.active) {
-          setMessage("Оплата ещё не подтверждена. Подождите минуту и откройте приложение снова.")
-          return
-        }
-
-        activateSubscription({
-          plan: data.plan,
-          paymentId: data.paymentId,
-          expiresAt: data.expiresAt,
-          autoRenew: data.autoRenew ?? true,
-          subscriptionStatus: data.status ?? "active",
-        })
-        localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
-
-        if (!cancelled) {
-          setMessage("Подписка активирована! Перенаправляем…")
-          window.setTimeout(() => router.replace("/"), 1200)
-        }
-      } catch {
-        if (!cancelled) {
-          setMessage("Не удалось проверить оплату. Откройте приложение и нажмите «Восстановить покупки».")
-        }
+      if (!activated) {
+        setMessage("Оплата ещё не подтверждена. Подождите минуту и откройте приложение снова.")
+        return
       }
+
+      setMessage("Подписка активирована! Перенаправляем…")
+      window.setTimeout(() => router.replace("/"), 1200)
     }
 
     void verify()
     return () => {
       cancelled = true
     }
-  }, [activateSubscription, router])
+  }, [confirmPendingPayment, router])
 
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-6">

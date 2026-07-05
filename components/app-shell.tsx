@@ -47,6 +47,7 @@ export function AppShell() {
     setShowTransactionsList,
     setShowAddTransaction,
     closeAddToGoal,
+    confirmPendingPayment,
     syncSubscriptionFromServer,
   } = useFinance()
 
@@ -68,18 +69,22 @@ export function AppShell() {
   useEffect(() => {
     if (!user?.id) return
 
-    void fetch("/api/user/register-telegram", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        telegramUserId: user.id,
-        username: user.username,
-        firstName: user.first_name,
-      }),
-    })
+    void (async () => {
+      await confirmPendingPayment()
 
-    void syncSubscriptionFromServer(getClientUserKey(user.id))
-  }, [user?.id, user?.username, user?.first_name, syncSubscriptionFromServer])
+      void fetch("/api/user/register-telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telegramUserId: user.id,
+          username: user.username,
+          firstName: user.first_name,
+        }),
+      })
+
+      await syncSubscriptionFromServer(getClientUserKey(user.id))
+    })()
+  }, [user?.id, user?.username, user?.first_name, confirmPendingPayment, syncSubscriptionFromServer])
 
   useEffect(() => {
     if (!isTelegram) return
