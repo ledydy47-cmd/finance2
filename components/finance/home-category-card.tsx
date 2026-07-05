@@ -29,10 +29,14 @@ export function HomeCategoryCard({
   bar,
   onQuickAdd,
 }: HomeCategoryCardProps) {
-  const overBudget = budget > 0 && spent > budget
+  const overBudget = spent > budget
   const remaining = budget - spent
   const percent =
-    budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : spent > 0 ? 100 : 0
+    budget > 0
+      ? Math.min(100, Math.round((spent / budget) * 100))
+      : spent > 0
+        ? 100
+        : 0
 
   return (
     <div className="rounded-block bg-card p-4 shadow-sm shadow-primary/5">

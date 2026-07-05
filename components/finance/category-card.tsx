@@ -14,9 +14,9 @@ function formatRub(value: number) {
 }
 
 export function CategoryCard({ icon, name, spent, budget, tint, bar }: CategoryCardProps) {
-  const percent = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0
+  const percent = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : spent > 0 ? 100 : 0
   const remaining = Math.max(0, budget - spent)
-  const overBudget = budget > 0 && spent > budget
+  const overBudget = spent > budget
 
   return (
     <div className="rounded-block bg-card p-4 shadow-sm shadow-primary/5">
