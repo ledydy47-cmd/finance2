@@ -6,7 +6,7 @@ import { formatPercent, formatRub } from "@/lib/format"
 import { CategoryCard } from "@/components/finance/category-card"
 
 export function StatsScreen() {
-  const { data, periodKey, periodLabel, summary } = useFinance()
+  const { data, periodKey, periodLabel, summary, openAddTransactionForCategory } = useFinance()
 
   const totalBudget = data.categories.reduce((sum, c) => sum + c.monthlyLimit, 0)
   const budgetUsed = formatPercent(summary.spent, totalBudget)
@@ -55,12 +55,14 @@ export function StatsScreen() {
               return (
                 <CategoryCard
                   key={category.id}
+                  categoryId={category.id}
                   icon={category.icon}
                   name={category.name}
                   spent={spent}
                   budget={category.monthlyLimit}
                   tint={category.tint}
                   bar={category.bar}
+                  onQuickAdd={openAddTransactionForCategory}
                 />
               )
             })}

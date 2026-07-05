@@ -447,7 +447,7 @@ export function OnboardingFlow() {
       )}
 
       {step === 10 && (
-        <OnboardingStepShell {...shellProps} centered={false}>
+        <OnboardingStepShell {...shellProps}>
           <h2 className="font-serif text-2xl font-bold text-foreground">Выбери валюту</h2>
           <p className="mt-2 text-sm text-muted-foreground">Сейчас доступен российский рубль</p>
           <select

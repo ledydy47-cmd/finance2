@@ -4,6 +4,9 @@ import { useEffect } from "react"
 import { BottomNav } from "@/components/finance/bottom-nav"
 import { HomeWalkthrough } from "@/components/home-walkthrough/home-walkthrough"
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow"
+import { CreateGoalPromptModal } from "@/components/modals/create-goal-prompt-modal"
+import { GoalCelebrationModal } from "@/components/modals/goal-celebration-modal"
+import { NewMonthModal } from "@/components/modals/new-month-modal"
 import { SubscriptionPaywallModal } from "@/components/subscription/subscription-paywall-modal"
 import { AddTransactionSheet } from "@/components/screens/add-transaction-sheet"
 import { BudgetPlannerScreen } from "@/components/screens/budget-planner-screen"
@@ -31,6 +34,14 @@ export function AppShell() {
     showHomeGoalSetup,
     showPaywall,
     closePaywall,
+    showNewMonthModal,
+    celebratingGoal,
+    showCreateGoalPrompt,
+    confirmNewMonthReset,
+    dismissNewMonthUntilLater,
+    dismissGoalCelebration,
+    openCreateGoalFlow,
+    dismissCreateGoalPrompt,
     setShowBudgetPlanner,
     setShowTransactionsList,
     setShowAddTransaction,
@@ -145,6 +156,22 @@ export function AppShell() {
             {showPaywall && (
               <SubscriptionPaywallModal onClose={closePaywall} />
             )}
+
+            <NewMonthModal
+              open={showNewMonthModal}
+              onReset={confirmNewMonthReset}
+              onLater={dismissNewMonthUntilLater}
+            />
+
+            {celebratingGoal && (
+              <GoalCelebrationModal goal={celebratingGoal} onClose={dismissGoalCelebration} />
+            )}
+
+            <CreateGoalPromptModal
+              open={showCreateGoalPrompt}
+              onCreate={openCreateGoalFlow}
+              onDismiss={dismissCreateGoalPrompt}
+            />
           </div>
         )}
 

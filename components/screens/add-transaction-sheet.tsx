@@ -1,13 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { CategoryIconBadge } from "@/components/finance/category-icon"
 import { useFinance } from "@/context/finance-context"
 import type { TransactionType } from "@/lib/types"
 
 export function AddTransactionSheet() {
-  const { data, showAddTransaction, setShowAddTransaction, addTransaction } = useFinance()
+  const {
+    data,
+    showAddTransaction,
+    setShowAddTransaction,
+    addTransaction,
+    addTransactionDraft,
+  } = useFinance()
   const [amount, setAmount] = useState("")
   const [type, setType] = useState<TransactionType>("expense")
   const [categoryId, setCategoryId] = useState<string | null>(data.categories[0]?.id ?? null)
@@ -16,12 +22,21 @@ export function AddTransactionSheet() {
   const parsedAmount = Number(amount.replace(/\s/g, "").replace(",", "."))
   const canSave = parsedAmount > 0 && (type === "income" || categoryId)
 
-  function handleClose() {
-    setShowAddTransaction(false)
+  useEffect(() => {
+    if (!showAddTransaction) return
+    if (addTransactionDraft) {
+      setType(addTransactionDraft.type)
+      setCategoryId(addTransactionDraft.categoryId)
+    } else {
+      setType("expense")
+      setCategoryId(data.categories[0]?.id ?? null)
+    }
     setAmount("")
     setNote("")
-    setType("expense")
-    setCategoryId(data.categories[0]?.id ?? null)
+  }, [showAddTransaction, addTransactionDraft, data.categories])
+
+  function handleClose() {
+    setShowAddTransaction(false)
   }
 
   function handleSave() {
@@ -35,22 +50,26 @@ export function AddTransactionSheet() {
     handleClose()
   }
 
+  const title = addTransactionDraft ? "Расход в категорию" : "Новая операция"
+
   return (
-    <BottomSheet open={showAddTransaction} title="Новая операция" onClose={handleClose}>
-      <div className="mb-5 flex rounded-block-sm bg-secondary p-1">
-        {(["expense", "income"] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setType(value)}
-            className={`flex-1 rounded-block-inner py-2.5 text-sm font-bold transition-colors ${
-              type === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-            }`}
-          >
-            {value === "expense" ? "Расход" : "Доход"}
-          </button>
-        ))}
-      </div>
+    <BottomSheet open={showAddTransaction} title={title} onClose={handleClose}>
+      {!addTransactionDraft && (
+        <div className="mb-5 flex rounded-block-sm bg-secondary p-1">
+          {(["expense", "income"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setType(value)}
+              className={`flex-1 rounded-block-inner py-2.5 text-sm font-bold transition-colors ${
+                type === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              }`}
+            >
+              {value === "expense" ? "Расход" : "Доход"}
+            </button>
+          ))}
+        </div>
+      )}
 
       <label className="mb-1 text-xs font-semibold text-muted-foreground">Сумма</label>
       <input

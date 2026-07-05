@@ -11,9 +11,16 @@ import {
 } from "react"
 import { buildBudgetPlanState, buildCategoriesFromPlan } from "@/lib/budget-planner"
 import type { ApplyBudgetInput } from "@/lib/budget-planner"
-import { buildArchive, getCurrentPeriodKey, getMonthlySummary } from "@/lib/calculations"
+import { getCurrentPeriodKey, getMonthlySummary } from "@/lib/calculations"
 import { createDefaultData } from "@/lib/default-data"
-import { getPeriodLabel, getPeriodLabelFromKey } from "@/lib/period"
+import { getActiveGoals, shouldCelebrateGoal } from "@/lib/goals"
+import { getPeriodLabel } from "@/lib/period"
+import {
+  acknowledgeNewMonthLater,
+  applyNewMonthReset,
+  isNewPeriodPending,
+  resetCurrentMonthSpending,
+} from "@/lib/period-reset"
 import { loadAppData, saveAppData } from "@/lib/storage"
 import { ensureTelegramSdk, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
@@ -37,13 +44,19 @@ interface FinanceContextValue {
   summary: ReturnType<typeof getMonthlySummary>
   activeTab: TabId
   showAddTransaction: boolean
+  addTransactionDraft: { categoryId: string; type: TransactionType } | null
   addToGoalTargetId: string | null
   showBudgetPlanner: boolean
   showTransactionsList: boolean
   showPaywall: boolean
+  showNewMonthModal: boolean
+  celebratingGoal: Goal | null
+  showCreateGoalPrompt: boolean
+  showGoalCreateForm: boolean
   isContentLocked: boolean
   setActiveTab: (tab: TabId) => void
   setShowAddTransaction: (open: boolean) => void
+  openAddTransactionForCategory: (categoryId: string) => void
   setShowBudgetPlanner: (open: boolean) => void
   setShowTransactionsList: (open: boolean) => void
   openPaywall: () => void
@@ -91,6 +104,13 @@ interface FinanceContextValue {
   setShowHomeGoalSetup: (open: boolean) => void
   skipHomeSetup: () => void
   completeHomeWalkthrough: () => void
+  confirmNewMonthReset: () => void
+  dismissNewMonthUntilLater: () => void
+  resetMonthSpendingManual: () => void
+  dismissGoalCelebration: () => void
+  openCreateGoalFlow: () => void
+  dismissCreateGoalPrompt: () => void
+  setShowGoalCreateForm: (open: boolean) => void
   getCategoryById: (id: string | null) => Category | undefined
 }
 
@@ -103,34 +123,33 @@ function isUserSubscribed(settings: Settings) {
   return settings.isSubscribed
 }
 
-function archivePreviousPeriod(data: AppData, previousKey: string): AppData {
-  if (data.archives.some((a) => a.periodKey === previousKey)) {
-    return { ...data, lastPeriodKey: getCurrentPeriodKey(data.settings.monthStartDay) }
-  }
-
-  const label = getPeriodLabelFromKey(previousKey, data.settings.monthStartDay)
-  const archive = buildArchive(
-    data.transactions,
-    data.categories,
-    previousKey,
-    data.settings.monthStartDay,
-    label,
+function markGoalCelebrated(data: AppData, goalId: string): AppData {
+  const goals = data.goals.map((g) =>
+    g.id === goalId
+      ? {
+          ...g,
+          savedAmount: Math.max(g.savedAmount, g.targetAmount),
+          completed: true,
+          completedAt: g.completedAt ?? new Date().toISOString(),
+          completionCelebrated: true,
+        }
+      : g,
   )
-
-  const hasActivity = archive.income > 0 || archive.spent > 0
-  const archives = hasActivity ? [...data.archives, archive] : data.archives
+  const activeGoals = getActiveGoals(goals)
+  const primaryGoalId =
+    data.settings.primaryGoalId === goalId
+      ? (activeGoals[0]?.id ?? null)
+      : data.settings.primaryGoalId
 
   return {
     ...data,
-    archives,
-    lastPeriodKey: getCurrentPeriodKey(data.settings.monthStartDay),
+    goals,
+    settings: { ...data.settings, primaryGoalId },
   }
 }
 
-function syncPeriod(data: AppData): AppData {
-  const currentKey = getCurrentPeriodKey(data.settings.monthStartDay)
-  if (data.lastPeriodKey === currentKey) return data
-  return archivePreviousPeriod(data, data.lastPeriodKey)
+function findGoalToCelebrate(data: AppData): Goal | undefined {
+  return data.goals.find((g) => shouldCelebrateGoal(g))
 }
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
@@ -138,24 +157,39 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>("home")
   const [showAddTransaction, setShowAddTransactionState] = useState(false)
+  const [addTransactionDraft, setAddTransactionDraft] = useState<{
+    categoryId: string
+    type: TransactionType
+  } | null>(null)
   const [addToGoalTargetId, setAddToGoalTargetId] = useState<string | null>(null)
   const [showBudgetPlanner, setShowBudgetPlannerState] = useState(false)
   const [showTransactionsList, setShowTransactionsList] = useState(false)
   const [showHomeGoalSetup, setShowHomeGoalSetup] = useState(false)
   const [showPaywall, setShowPaywall] = useState(false)
+  const [showNewMonthModal, setShowNewMonthModal] = useState(false)
+  const [celebratingGoal, setCelebratingGoal] = useState<Goal | null>(null)
+  const [showCreateGoalPrompt, setShowCreateGoalPrompt] = useState(false)
+  const [showGoalCreateForm, setShowGoalCreateForm] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     const finishHydration = () => {
       if (cancelled) return
-      const loaded = syncPeriod(loadAppData())
+      const loaded = loadAppData()
       const subscribed = isUserSubscribed(loaded.settings)
       if (loaded.settings.isSubscribed !== subscribed) {
         loaded.settings.isSubscribed = subscribed
       }
       setData(loaded)
       applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
+      if (isNewPeriodPending(loaded)) {
+        setShowNewMonthModal(true)
+      }
+      const goalToCelebrate = findGoalToCelebrate(loaded)
+      if (goalToCelebrate) {
+        setCelebratingGoal(goalToCelebrate)
+      }
       setHydrated(true)
     }
 
@@ -198,14 +232,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const homeSetupStep = useMemo((): 1 | 2 | 3 => {
     if (!isHomeSetupActive) return 3
-    if (data.goals.length === 0) return 1
+    const activeGoals = getActiveGoals(data.goals)
+    if (activeGoals.length === 0) return 1
     const flexCount = data.categories.filter((c) => c.kind === "flexible").length
     if (flexCount === 0) return 2
     return 3
   }, [isHomeSetupActive, data.goals.length, data.categories])
 
   const update = useCallback((updater: (prev: AppData) => AppData) => {
-    setData((prev) => syncPeriod(updater(prev)))
+    setData((prev) => updater(prev))
   }, [])
 
   const activateSubscription = useCallback(
@@ -257,7 +292,22 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         setShowPaywall(true)
         return
       }
+      if (!open) {
+        setAddTransactionDraft(null)
+      }
       setShowAddTransactionState(open)
+    },
+    [isContentLocked],
+  )
+
+  const openAddTransactionForCategory = useCallback(
+    (categoryId: string) => {
+      if (isContentLocked) {
+        setShowPaywall(true)
+        return
+      }
+      setAddTransactionDraft({ categoryId, type: "expense" })
+      setShowAddTransactionState(true)
     },
     [isContentLocked],
   )
@@ -393,14 +443,23 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const addToGoal = useCallback(
     (id: string, amount: number) => {
       if (guardLocked()) return
-      update((prev) => ({
-        ...prev,
-        goals: prev.goals.map((g) =>
-          g.id === id ? { ...g, savedAmount: Math.min(g.targetAmount, g.savedAmount + amount) } : g,
-        ),
-      }))
+      update((prev) => {
+        const goals = prev.goals.map((g) =>
+          g.id === id ? { ...g, savedAmount: g.savedAmount + amount } : g,
+        )
+        return { ...prev, goals }
+      })
+      setAddToGoalTargetId(null)
+
+      const goal = data.goals.find((g) => g.id === id)
+      if (goal && goal.savedAmount + amount >= goal.targetAmount && !goal.completionCelebrated) {
+        setCelebratingGoal({
+          ...goal,
+          savedAmount: goal.savedAmount + amount,
+        })
+      }
     },
-    [guardLocked, update],
+    [data.goals, guardLocked, update],
   )
 
   const updateCategory = useCallback(
@@ -480,12 +539,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   )
 
   const getPrimaryGoal = useCallback(() => {
+    const activeGoals = getActiveGoals(data.goals)
     const { primaryGoalId } = data.settings
     if (primaryGoalId) {
-      const goal = data.goals.find((g) => g.id === primaryGoalId)
+      const goal = activeGoals.find((g) => g.id === primaryGoalId)
       if (goal) return goal
     }
-    return data.goals[0]
+    return activeGoals[0]
   }, [data.goals, data.settings])
 
   const applyBudgetPlan = useCallback(
@@ -579,6 +639,38 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }))
   }, [update])
 
+  const confirmNewMonthReset = useCallback(() => {
+    update((prev) => applyNewMonthReset(prev))
+    setShowNewMonthModal(false)
+  }, [update])
+
+  const dismissNewMonthUntilLater = useCallback(() => {
+    update((prev) => acknowledgeNewMonthLater(prev))
+    setShowNewMonthModal(false)
+  }, [update])
+
+  const resetMonthSpendingManual = useCallback(() => {
+    update((prev) => resetCurrentMonthSpending(prev))
+  }, [update])
+
+  const dismissGoalCelebration = useCallback(() => {
+    if (celebratingGoal) {
+      update((prev) => markGoalCelebrated(prev, celebratingGoal.id))
+    }
+    setCelebratingGoal(null)
+    setShowCreateGoalPrompt(true)
+  }, [celebratingGoal, update])
+
+  const openCreateGoalFlow = useCallback(() => {
+    setShowCreateGoalPrompt(false)
+    setShowGoalCreateForm(true)
+    setActiveTab("goals")
+  }, [])
+
+  const dismissCreateGoalPrompt = useCallback(() => {
+    setShowCreateGoalPrompt(false)
+  }, [])
+
   const value: FinanceContextValue = {
     data,
     periodKey,
@@ -586,13 +678,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     summary,
     activeTab,
     showAddTransaction,
+    addTransactionDraft,
     addToGoalTargetId,
     showBudgetPlanner,
     showTransactionsList,
     showPaywall,
+    showNewMonthModal,
+    celebratingGoal,
+    showCreateGoalPrompt,
+    showGoalCreateForm,
     isContentLocked,
     setActiveTab,
     setShowAddTransaction,
+    openAddTransactionForCategory,
     setShowBudgetPlanner,
     setShowTransactionsList,
     openPaywall,
@@ -622,6 +720,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setShowHomeGoalSetup,
     skipHomeSetup,
     completeHomeWalkthrough,
+    confirmNewMonthReset,
+    dismissNewMonthUntilLater,
+    resetMonthSpendingManual,
+    dismissGoalCelebration,
+    openCreateGoalFlow,
+    dismissCreateGoalPrompt,
+    setShowGoalCreateForm,
     getCategoryById,
   }
 

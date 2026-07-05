@@ -10,6 +10,7 @@ import { GhostCategoryRows } from "@/components/home-setup/ghost-category-rows"
 import { GhostGoalCard } from "@/components/home-setup/ghost-goal-card"
 import { HomeGoalSetupSheet } from "@/components/home-setup/home-goal-setup-sheet"
 import { useFinance } from "@/context/finance-context"
+import { getActiveGoals } from "@/lib/goals"
 import { getCategorySpent, getPeriodTransactions } from "@/lib/calculations"
 
 export function DashboardScreen() {
@@ -20,6 +21,7 @@ export function DashboardScreen() {
     summary,
     setActiveTab,
     setShowAddTransaction,
+    openAddTransactionForCategory,
     setShowBudgetPlanner,
     showBudgetPlanner,
     setShowTransactionsList,
@@ -34,7 +36,8 @@ export function DashboardScreen() {
   } = useFinance()
 
   const featuredGoal = getPrimaryGoal()
-  const showGhostGoal = isHomeSetupActive && data.goals.length === 0
+  const activeGoals = getActiveGoals(data.goals)
+  const showGhostGoal = isHomeSetupActive && activeGoals.length === 0
   const showRealGoal = Boolean(featuredGoal)
   const showGhostCategories =
     isHomeSetupActive && data.categories.filter((c) => c.kind === "flexible").length === 0
@@ -170,6 +173,7 @@ export function DashboardScreen() {
               {data.categories.map((category) => (
                 <CategoryCard
                   key={category.id}
+                  categoryId={category.id}
                   icon={category.icon}
                   name={category.name}
                   spent={getCategorySpent(
@@ -181,6 +185,7 @@ export function DashboardScreen() {
                   budget={category.monthlyLimit}
                   tint={category.tint}
                   bar={category.bar}
+                  onQuickAdd={isHomeSetupActive ? undefined : openAddTransactionForCategory}
                 />
               ))}
             </div>

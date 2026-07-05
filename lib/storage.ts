@@ -61,6 +61,11 @@ function migrateData(data: AppData, defaults: AppData): AppData {
     ...data,
     categories: [...categories, ...missingDefaults],
     budgetPlan,
+    goals: data.goals.map((goal) => ({
+      ...goal,
+      completed: goal.completed ?? false,
+      completionCelebrated: goal.completionCelebrated ?? false,
+    })),
     settings: {
       ...data.settings,
       primaryGoalId: data.settings.primaryGoalId ?? data.goals[0]?.id ?? null,

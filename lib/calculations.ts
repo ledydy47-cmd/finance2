@@ -5,8 +5,12 @@ export function getPeriodTransactions(
   transactions: Transaction[],
   periodKey: string,
   monthStartDay: number,
+  options?: { includeExcluded?: boolean },
 ) {
-  return transactions.filter((tx) => isDateInPeriod(tx.date, periodKey, monthStartDay))
+  return transactions.filter((tx) => {
+    if (!options?.includeExcluded && tx.excludedFromBudget) return false
+    return isDateInPeriod(tx.date, periodKey, monthStartDay)
+  })
 }
 
 export function sumByType(transactions: Transaction[], type: Transaction["type"]) {
@@ -47,18 +51,21 @@ export function buildArchive(
   periodKey: string,
   monthStartDay: number,
   label: string,
+  options?: { includeExcluded?: boolean },
 ): PeriodArchive {
-  const periodTx = getPeriodTransactions(transactions, periodKey, monthStartDay)
+  const periodTx = getPeriodTransactions(transactions, periodKey, monthStartDay, options)
   const categorySpent: Record<string, number> = {}
   const categoryBudget: Record<string, number> = {}
 
   for (const category of categories) {
-    categorySpent[category.id] = getCategorySpent(
+    categorySpent[category.id] = getPeriodTransactions(
       transactions,
-      category.id,
       periodKey,
       monthStartDay,
+      options,
     )
+      .filter((tx) => tx.type === "expense" && tx.categoryId === category.id)
+      .reduce((sum, tx) => sum + tx.amount, 0)
     categoryBudget[category.id] = category.monthlyLimit
   }
 

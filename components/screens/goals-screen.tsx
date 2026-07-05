@@ -4,13 +4,26 @@ import { useState } from "react"
 import { Plus, Star, Trash2 } from "lucide-react"
 import { useFinance } from "@/context/finance-context"
 import { GoalCard } from "@/components/finance/goal-card"
+import { getActiveGoals, getCompletedGoals } from "@/lib/goals"
 
 export function GoalsScreen() {
-  const { data, addGoal, updateGoal, deleteGoal, openAddToGoal, setPrimaryGoal } = useFinance()
-  const [showForm, setShowForm] = useState(false)
+  const {
+    data,
+    addGoal,
+    updateGoal,
+    deleteGoal,
+    openAddToGoal,
+    setPrimaryGoal,
+    showGoalCreateForm,
+    setShowGoalCreateForm,
+  } = useFinance()
   const [name, setName] = useState("")
   const [target, setTarget] = useState("")
   const [image, setImage] = useState("/images/goal-sochi.png")
+
+  const activeGoals = getActiveGoals(data.goals)
+  const completedGoals = getCompletedGoals(data.goals)
+  const showForm = showGoalCreateForm
 
   function handleCreate() {
     const targetAmount = Number(target.replace(/\s/g, ""))
@@ -18,8 +31,8 @@ export function GoalsScreen() {
     addGoal({ name: name.trim(), targetAmount, image })
     setName("")
     setTarget("")
-    setImage("/placeholder.svg")
-    setShowForm(false)
+    setImage("/images/goal-sochi.png")
+    setShowGoalCreateForm(false)
   }
 
   function handleImageUpload(file: File | undefined) {
@@ -74,7 +87,7 @@ export function GoalsScreen() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => setShowGoalCreateForm(false)}
                 className="rounded-block-sm bg-secondary px-4 py-3 text-sm font-semibold"
               >
                 Отмена
@@ -84,7 +97,7 @@ export function GoalsScreen() {
         )}
 
         <div className="flex flex-col gap-4">
-          {data.goals.map((goal) => {
+          {activeGoals.map((goal) => {
             const isPrimary = data.settings.primaryGoalId === goal.id
             return (
               <div key={goal.id} className="relative">
@@ -132,10 +145,28 @@ export function GoalsScreen() {
           })}
         </div>
 
+        {completedGoals.length > 0 && (
+          <section className="mt-8">
+            <h2 className="mb-3 font-serif text-lg font-bold text-foreground">Выполненные цели</h2>
+            <div className="flex flex-col gap-4">
+              {completedGoals.map((goal) => (
+                <GoalCard
+                  key={goal.id}
+                  name={goal.name}
+                  saved={goal.savedAmount}
+                  target={goal.targetAmount}
+                  image={goal.image}
+                  completed
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {!showForm && (
           <button
             type="button"
-            onClick={() => setShowForm(true)}
+            onClick={() => setShowGoalCreateForm(true)}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-block border-2 border-dashed border-primary/30 py-4 text-sm font-bold text-primary"
           >
             <Plus className="size-4" />

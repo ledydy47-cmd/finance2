@@ -7,6 +7,7 @@ interface GoalCardProps {
   target: number
   image: string
   isPrimary?: boolean
+  completed?: boolean
   onAdd?: () => void
   onImageChange?: (file: File) => void
 }
@@ -21,10 +22,11 @@ export function GoalCard({
   target,
   image,
   isPrimary,
+  completed,
   onAdd,
   onImageChange,
 }: GoalCardProps) {
-  const percent = Math.min(100, Math.round((saved / target) * 100))
+  const percent = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 100
   const isDataUrl = image.startsWith("data:")
 
   return (
@@ -47,11 +49,17 @@ export function GoalCard({
           aria-hidden="true"
           className="absolute inset-0 bg-gradient-to-t from-foreground/25 to-transparent"
         />
-        {isPrimary && (
+        {isPrimary && !completed && (
           <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground">
             Основная
           </span>
         )}
+        {completed && (
+          <span className="absolute left-3 top-3 rounded-full bg-[color:var(--success)] px-2.5 py-1 text-[10px] font-bold text-white">
+            Достигнута ✨
+          </span>
+        )}
+        {!completed && (
         <label className="absolute bottom-3 right-3 flex size-9 cursor-pointer items-center justify-center rounded-full bg-card/85 text-foreground/80 shadow-sm backdrop-blur-sm transition-transform active:scale-95">
           <Camera className="size-4" strokeWidth={2.2} />
           <input
@@ -64,6 +72,7 @@ export function GoalCard({
             }}
           />
         </label>
+        )}
       </div>
 
       <div className="px-5 pb-5">
@@ -87,6 +96,7 @@ export function GoalCard({
           />
         </div>
 
+        {!completed && (
         <button
           type="button"
           onClick={onAdd}
@@ -95,6 +105,7 @@ export function GoalCard({
           <Plus className="size-4" strokeWidth={2.8} />
           Добавить
         </button>
+        )}
       </div>
     </div>
   )

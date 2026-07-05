@@ -60,3 +60,23 @@ export function iconOptionForCategoryId(categoryId: string): CategoryIconOption 
 export function emojiForCategoryId(categoryId: string, fallbackIcon?: string): string {
   return CATEGORY_EMOJI_BY_ID[categoryId] ?? fallbackIcon ?? "✨"
 }
+
+const EMOJI_PATTERN = /\p{Extended_Pictographic}/u
+
+export function extractFirstEmoji(text: string): string | null {
+  const match = text.match(EMOJI_PATTERN)
+  return match?.[0] ?? null
+}
+
+export function customIconOption(
+  icon: string,
+  base: Pick<CategoryIconOption, "tint" | "bar">,
+): CategoryIconOption {
+  return {
+    key: "custom",
+    label: "Своё",
+    icon,
+    tint: base.tint,
+    bar: base.bar,
+  }
+}

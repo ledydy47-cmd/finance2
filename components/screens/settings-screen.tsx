@@ -6,7 +6,7 @@ import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
 
 export function SettingsScreen() {
-  const { data, updateSettings, openPaywall } = useFinance()
+  const { data, updateSettings, openPaywall, resetMonthSpendingManual } = useFinance()
   const { isTelegram, user } = useTelegram()
 
   return (
@@ -48,6 +48,28 @@ export function SettingsScreen() {
           <h2 className="mb-1 font-serif text-base font-bold">Тема 🎨</h2>
           <p className="mb-4 text-xs text-muted-foreground">Меняется сразу по всему приложению</p>
           <ThemePicker compact showPreview={false} />
+        </section>
+
+        <section className="mb-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
+          <h2 className="mb-1 font-serif text-base font-bold">Месяц</h2>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Обнулить траты по категориям в текущем месяце. Операции сохранятся в истории.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Обнулить траты за текущий месяц? Категории, доход и цели останутся без изменений.",
+                )
+              ) {
+                resetMonthSpendingManual()
+              }
+            }}
+            className="w-full rounded-block-sm border border-primary/25 bg-primary/10 py-3 text-sm font-bold text-primary transition-transform active:scale-[0.98]"
+          >
+            Обнулить траты за месяц
+          </button>
         </section>
 
         <section className="rounded-block bg-card p-4 shadow-sm shadow-primary/5">

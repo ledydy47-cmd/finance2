@@ -31,7 +31,9 @@ export function TransactionsScreen() {
 
   const transactions = useMemo(
     () =>
-      getPeriodTransactions(data.transactions, activeKey, data.settings.monthStartDay),
+      getPeriodTransactions(data.transactions, activeKey, data.settings.monthStartDay, {
+        includeExcluded: true,
+      }),
     [data.transactions, activeKey, data.settings.monthStartDay],
   )
 

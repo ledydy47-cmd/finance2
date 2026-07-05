@@ -1,8 +1,8 @@
-/** Base sizes for emoji category badges */
+/** Base sizes for emoji category badges — compact circle, larger emoji */
 export const categoryIconSizes = {
-  md: { circle: 66, emoji: 30 },
-  sm: { circle: 60, emoji: 27 },
-  lg: { circle: 84, emoji: 36 },
+  md: { circle: 48, emoji: 45 },
+  sm: { circle: 42, emoji: 41 },
+  lg: { circle: 56, emoji: 54 },
 } as const
 
 export type CategoryIconSize = keyof typeof categoryIconSizes

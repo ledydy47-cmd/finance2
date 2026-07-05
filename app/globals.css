@@ -298,9 +298,9 @@
 .onboarding-progress-fill {
   background: linear-gradient(
     90deg,
+    color-mix(in oklch, var(--primary) 45%, var(--secondary)),
     var(--primary),
-    color-mix(in oklch, var(--primary) 55%, var(--chart-5)),
-    var(--chart-5)
+    color-mix(in oklch, var(--primary) 75%, var(--accent))
   );
   box-shadow: 0 0 12px color-mix(in oklch, var(--primary) 35%, transparent);
 }

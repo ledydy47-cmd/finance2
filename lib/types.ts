@@ -12,6 +12,8 @@ export interface Transaction {
   date: string
   categoryId: string | null
   note: string
+  /** Soft-reset: kept in history but excluded from active budget totals */
+  excludedFromBudget?: boolean
 }
 
 export interface Category {
@@ -32,6 +34,9 @@ export interface Goal {
   savedAmount: number
   image: string
   monthlyContribution?: number
+  completed?: boolean
+  completedAt?: string
+  completionCelebrated?: boolean
 }
 
 export interface BudgetEntry {
