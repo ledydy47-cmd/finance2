@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server"
+import { grantManualSubscription } from "@/lib/server/subscription-service"
 import { registerTelegramUser } from "@/lib/server/telegram-users"
+
+function shouldAutoGrantTestSubscription(username?: string | null) {
+  if (!username) return false
+  const allowed = (process.env.TEST_GRANT_SUBSCRIPTION_USERNAMES ?? "dinnetta")
+    .split(",")
+    .map((item) => item.trim().replace(/^@/, "").toLowerCase())
+    .filter(Boolean)
+  return allowed.includes(username.replace(/^@/, "").toLowerCase())
+}
 
 export async function POST(request: Request) {
   try {
@@ -18,6 +28,13 @@ export async function POST(request: Request) {
       username: body.username,
       firstName: body.firstName,
     })
+
+    if (shouldAutoGrantTestSubscription(body.username)) {
+      await grantManualSubscription({
+        telegramUserId: body.telegramUserId,
+        plan: "yearly",
+      })
+    }
 
     return NextResponse.json({ ok: true, userKey: record.userKey })
   } catch (error) {
