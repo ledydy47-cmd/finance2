@@ -53,8 +53,10 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
       const data = await response.json()
       if (!response.ok) {
         setError(
-          data.message ||
-            "Оплата временно недоступна. Проверьте настройки ЮKassa на сервере.",
+          data.error === "YOOKASSA_NOT_CONFIGURED"
+            ? "ЮKassa не настроена на сервере. Добавьте YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY в Vercel → Settings → Environment Variables и пересоберите проект."
+            : data.message ||
+              "Оплата временно недоступна. Проверьте настройки ЮKassa на сервере.",
         )
         return
       }

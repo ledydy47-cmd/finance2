@@ -27,6 +27,7 @@ export function BudgetPlannerCoachMark({
       onDismiss={onDismiss}
       nextLabel="Понятно"
       placement="below"
+      tooltipMaxWidth={540}
     />
   )
 }

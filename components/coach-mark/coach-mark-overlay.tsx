@@ -17,6 +17,8 @@ interface CoachMarkOverlayProps {
   showNext?: boolean
   nextLabel?: string
   placement?: "above" | "below"
+  /** Default 360px; budget hint uses ~540px (1.5×) */
+  tooltipMaxWidth?: number
 }
 
 function measureTarget(target: HTMLElement, shell: Element, pad = 8): Rect {
@@ -37,6 +39,7 @@ export function CoachMarkOverlay({
   showNext = true,
   nextLabel = "Далее",
   placement = "below",
+  tooltipMaxWidth = 360,
 }: CoachMarkOverlayProps) {
   const [hole, setHole] = useState<Rect | null>(null)
   const [ready, setReady] = useState(false)
@@ -87,8 +90,6 @@ export function CoachMarkOverlay({
       ? Math.min(hole.top + hole.height + 16, 520)
       : Math.max(hole.top - 140, 16)
 
-  const arrowLeft = hole.left + hole.width / 2 - 8
-
   return (
     <div className="pointer-events-none absolute inset-0 z-[75]">
       <div
@@ -103,16 +104,14 @@ export function CoachMarkOverlay({
       />
 
       <div
-        className="pointer-events-auto absolute inset-x-5 max-w-[360px] animate-in fade-in zoom-in-95 duration-300"
-        style={{ top: tooltipTop, left: "50%", transform: "translateX(-50%)" }}
+        className="pointer-events-auto absolute inset-x-2 animate-in fade-in zoom-in-95 duration-300"
+        style={{
+          top: tooltipTop,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: `min(calc(100% - 1rem), ${tooltipMaxWidth}px)`,
+        }}
       >
-        {placement === "below" && (
-          <span
-            className="absolute -top-2 size-0 border-x-8 border-b-8 border-x-transparent border-b-card"
-            style={{ left: Math.max(16, Math.min(arrowLeft - 16, 280)) }}
-            aria-hidden
-          />
-        )}
         <div className="rounded-block-sm bg-card p-4 shadow-xl shadow-primary/15">
           <p className="text-sm font-semibold leading-relaxed text-foreground">{text}</p>
           {showNext && (

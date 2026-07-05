@@ -90,11 +90,11 @@ const PROFILE_SETUP_HINT =
 
 function ProfileDots({ activeIndex }: { activeIndex: number }) {
   return (
-    <div className="mb-4 flex justify-center gap-2">
+    <div className="mb-4 flex justify-center gap-3">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className={`flex size-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+          className={`flex size-14 items-center justify-center rounded-full text-xl font-bold transition-colors ${
             i === activeIndex
               ? "bg-primary text-primary-foreground"
               : "bg-secondary text-muted-foreground"
@@ -142,6 +142,7 @@ function OnboardingStepShell({
   onNext,
   footerSubtitle,
   hideButton,
+  centered = true,
   children,
 }: {
   step: number
@@ -151,11 +152,16 @@ function OnboardingStepShell({
   onNext: () => void
   footerSubtitle?: string
   hideButton?: boolean
+  centered?: boolean
   children: ReactNode
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-onboarding-scroll>
-      <div className="flex flex-col items-center px-6 pt-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div
+        className={`flex flex-col items-center px-6 pb-[max(2rem,env(safe-area-inset-bottom))] ${
+          centered ? "min-h-full justify-center py-6" : "pt-6"
+        }`}
+      >
         <div
           key={step}
           className={`flex w-full max-w-sm flex-col items-center text-center ${stepEnterClass}`}
@@ -317,7 +323,7 @@ export function OnboardingFlow() {
       )}
 
       {step === 1 && (
-        <OnboardingStepShell {...shellProps}>
+        <OnboardingStepShell {...shellProps} centered={false}>
           <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-primary/15 shadow-sm shadow-primary/5">
             <Hand className="size-8 text-primary" strokeWidth={2.2} />
           </div>
@@ -358,7 +364,7 @@ export function OnboardingFlow() {
       )}
 
       {step === 3 && (
-        <OnboardingStepShell {...shellProps}>
+        <OnboardingStepShell {...shellProps} centered={false}>
           <OnboardingThemeStep />
         </OnboardingStepShell>
       )}
@@ -441,7 +447,7 @@ export function OnboardingFlow() {
       )}
 
       {step === 10 && (
-        <OnboardingStepShell {...shellProps}>
+        <OnboardingStepShell {...shellProps} centered={false}>
           <h2 className="font-serif text-2xl font-bold text-foreground">Выбери валюту</h2>
           <p className="mt-2 text-sm text-muted-foreground">Сейчас доступен российский рубль</p>
           <select
@@ -463,7 +469,7 @@ export function OnboardingFlow() {
           <h2 className="font-serif text-xl font-bold text-foreground">
             Сколько хочешь откладывать в месяц?
           </h2>
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid w-full grid-cols-3 gap-2">
             {SAVINGS_PRESETS.map((amount) => (
               <button
                 key={amount}
@@ -472,7 +478,7 @@ export function OnboardingFlow() {
                   setCustomSavingsMode(false)
                   patch({ monthlySavings: amount, customSavings: "" })
                 }}
-                className={`rounded-block-sm px-3 py-3 text-sm font-bold transition-all active:scale-[0.98] ${
+                className={`rounded-block-sm px-2 py-3 text-sm font-bold transition-all active:scale-[0.98] ${
                   !customSavingsMode && draft.monthlySavings === amount
                     ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
                     : "bg-card text-foreground shadow-sm shadow-primary/5"
@@ -487,7 +493,7 @@ export function OnboardingFlow() {
                 setCustomSavingsMode(true)
                 patch({ monthlySavings: null })
               }}
-              className={`col-span-2 rounded-block-sm px-3 py-3 text-sm font-bold transition-all active:scale-[0.98] ${
+              className={`col-span-3 rounded-block-sm px-3 py-3 text-sm font-bold transition-all active:scale-[0.98] ${
                 customSavingsMode
                   ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
                   : "bg-card text-foreground shadow-sm shadow-primary/5"

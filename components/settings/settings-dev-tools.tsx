@@ -1,9 +1,19 @@
 "use client"
 
 import { RotateCcw, Trash2 } from "lucide-react"
+import { useEffect, useState } from "react"
 import { clearAllAppDataAndReload, resetOnboardingAndReload } from "@/lib/dev-reset"
 
 export function SettingsDevTools() {
+  const [yookassaConfigured, setYookassaConfigured] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch("/api/payments/status")
+      .then((r) => r.json())
+      .then((data: { configured?: boolean }) => setYookassaConfigured(Boolean(data.configured)))
+      .catch(() => setYookassaConfigured(false))
+  }, [])
+
   const handleResetOnboarding = () => {
     if (
       !window.confirm(
@@ -35,6 +45,15 @@ export function SettingsDevTools() {
       <p className="mt-1 text-xs text-muted-foreground">
         Для разработки и тестирования онбординга
       </p>
+      {yookassaConfigured !== null && (
+        <p
+          className={`mt-2 text-xs font-semibold ${
+            yookassaConfigured ? "text-[color:var(--success)]" : "text-destructive"
+          }`}
+        >
+          ЮKassa на сервере: {yookassaConfigured ? "настроена ✓" : "не настроена — добавьте ключи в Vercel"}
+        </p>
+      )}
       <div className="mt-3 flex flex-col gap-2">
         <button
           type="button"
