@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import type { AnalyticsEventType, MessageCampaign } from "@/lib/server/user-analytics-types"
-import type { UserAnalyticsRecord } from "@/lib/server/user-analytics-service"
+import type {
+  AnalyticsEventType,
+  MessageCampaign,
+  UserAnalyticsRecord,
+} from "@/lib/server/user-analytics-types"
 import type { SupportTicket } from "@/lib/server/support-types"
 
 const SESSION_KEY = "kopilka-admin-support-key"
