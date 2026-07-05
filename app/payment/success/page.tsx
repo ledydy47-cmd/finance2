@@ -37,6 +37,8 @@ function PaymentSuccessContent() {
           plan: data.plan,
           paymentId: data.paymentId,
           expiresAt: data.expiresAt,
+          autoRenew: data.autoRenew ?? true,
+          subscriptionStatus: data.status ?? "active",
         })
         localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
 

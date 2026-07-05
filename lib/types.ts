@@ -66,6 +66,8 @@ export interface Settings {
   subscriptionPlan?: SubscriptionPlan | null
   subscriptionExpiresAt?: string | null
   lastPaymentId?: string | null
+  autoRenew?: boolean
+  subscriptionStatus?: "active" | "canceled" | "expired" | "past_due"
   age?: number
   savingMotivation?: string
   moneyProblem?: string

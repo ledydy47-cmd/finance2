@@ -99,6 +99,8 @@ function migrateData(data: AppData, defaults: AppData): AppData {
       subscriptionPlan: data.settings.subscriptionPlan ?? null,
       subscriptionExpiresAt: data.settings.subscriptionExpiresAt ?? null,
       lastPaymentId: data.settings.lastPaymentId ?? null,
+      autoRenew: data.settings.autoRenew ?? true,
+      subscriptionStatus: data.settings.subscriptionStatus,
     },
   }
 }

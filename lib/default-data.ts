@@ -153,6 +153,8 @@ export function createDefaultData(): AppData {
       firstExpenseAdded: false,
       paywallShown: false,
       isSubscribed: false,
+      autoRenew: true,
+      subscriptionStatus: undefined,
     },
     archives: [],
     lastPeriodKey: getCurrentPeriodKey(1),

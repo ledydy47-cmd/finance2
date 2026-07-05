@@ -2,10 +2,11 @@
 
 import { useMemo } from "react"
 import { Calculator, Plus } from "lucide-react"
-import { TransactionsList } from "@/components/finance/transactions-list"
+import { LegalLinks } from "@/components/legal/legal-links"
 import { BalanceCard } from "@/components/finance/balance-card"
 import { HomeCategoryCard } from "@/components/finance/home-category-card"
 import { GoalCard } from "@/components/finance/goal-card"
+import { TransactionsList } from "@/components/finance/transactions-list"
 import { GhostCategoryRows } from "@/components/home-setup/ghost-category-rows"
 import { GhostGoalCard } from "@/components/home-setup/ghost-goal-card"
 import { HomeGoalSetupSheet } from "@/components/home-setup/home-goal-setup-sheet"
@@ -234,6 +235,8 @@ export function DashboardScreen() {
             />
           )}
         </section>
+
+        <LegalLinks className="mt-8 pb-2" />
       </div>
 
       <button

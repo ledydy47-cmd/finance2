@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { isYooKassaConfigured, fetchYooKassaPayment } from "@/lib/yookassa/server"
-import { mapPaymentToSubscription } from "@/lib/yookassa/verify"
+import { activateSubscriptionFromPayment } from "@/lib/server/subscription-service"
 
 export async function POST(request: Request) {
   if (!isYooKassaConfigured()) {
@@ -14,21 +14,21 @@ export async function POST(request: Request) {
       object?: { id?: string }
     }
 
-    if (body.event !== "payment.succeeded" || !body.object?.id) {
+    const paymentId = body.object?.id
+    if (!paymentId) {
       return NextResponse.json({ ok: true })
     }
 
-    const payment = await fetchYooKassaPayment(body.object.id)
-    const subscription = mapPaymentToSubscription(payment)
-    if (!subscription) {
-      return NextResponse.json({ ok: true })
+    const payment = await fetchYooKassaPayment(paymentId)
+
+    if (body.event === "payment.succeeded") {
+      const subscription = await activateSubscriptionFromPayment(payment)
+      console.info("[payments/webhook] subscription updated", subscription)
     }
 
-    console.info("[payments/webhook] subscription activated", {
-      paymentId: subscription.paymentId,
-      plan: subscription.plan,
-      userKey: payment.metadata?.userKey,
-    })
+    if (body.event === "payment.canceled") {
+      console.info("[payments/webhook] payment canceled", paymentId)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

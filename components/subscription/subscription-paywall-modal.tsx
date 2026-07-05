@@ -1,8 +1,10 @@
 "use client"
 
 import { Check, Shield, Star, X } from "lucide-react"
+import Link from "next/link"
 import { useState } from "react"
 import { useTelegram } from "@/components/telegram/telegram-provider"
+import { SupportSection } from "@/components/support/support-section"
 import { useFinance } from "@/context/finance-context"
 import { getClientUserKey } from "@/lib/client-id"
 import {
@@ -12,9 +14,9 @@ import {
 } from "@/lib/subscription"
 
 const TESTIMONIAL_LAYOUT = [
-  { className: "left-0 top-0 right-5 z-30 -rotate-1", contentClass: "" },
-  { className: "left-5 top-[3.35rem] right-0 z-20 rotate-1", contentClass: "" },
-  { className: "left-1 top-[6.7rem] right-3 z-10 -rotate-[0.5deg]", contentClass: "" },
+  { className: "left-0 top-0 right-5 z-30 -rotate-1" },
+  { className: "left-5 top-[6.7rem] right-0 z-20 rotate-1" },
+  { className: "left-1 top-[13.4rem] right-3 z-10 -rotate-[0.5deg]" },
 ] as const
 
 function PlanRadio({ selected }: { selected: boolean }) {
@@ -34,13 +36,16 @@ interface SubscriptionPaywallModalProps {
 
 export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalProps) {
   const { openLink, user } = useTelegram()
-  const { restoreSubscription } = useFinance()
+  const { data, restoreSubscription } = useFinance()
   const [plan, setPlan] = useState<SubscriptionPlan>("yearly")
   const [paying, setPaying] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isSubscribed = data.settings.isSubscribed
 
   async function handlePay() {
+    if (!agreedToTerms) return
     setError(null)
     setPaying(true)
 
@@ -88,7 +93,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
 
   return (
     <div className="absolute inset-0 z-[80] flex flex-col bg-background">
-      <div className="flex min-h-0 flex-1 flex-col px-4 pb-[calc(9.5rem+env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[calc(11rem+env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))]">
         <div className="mb-1 flex shrink-0 items-center justify-between">
           <button
             type="button"
@@ -118,23 +123,21 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           ))}
         </div>
 
-        <div className="relative mx-auto mt-3 h-[11.25rem] w-full max-w-[21rem] shrink-0">
+        <div className="relative mx-auto mt-3 h-[18rem] w-full max-w-[21rem] shrink-0">
           {PAYWALL_TESTIMONIALS.map((review, index) => (
             <article
               key={review.author}
               className={`absolute rounded-block-sm border border-border/70 bg-card px-3.5 py-2.5 shadow-md shadow-primary/10 ${TESTIMONIAL_LAYOUT[index].className}`}
             >
-              <div className={TESTIMONIAL_LAYOUT[index].contentClass}>
-                <p className="text-[13px] leading-snug text-foreground">«{review.text}»</p>
-                <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
-                  — {review.author}
-                </p>
-              </div>
+              <p className="text-[13px] leading-snug text-foreground">«{review.text}»</p>
+              <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
+                — {review.author}
+              </p>
             </article>
           ))}
         </div>
 
-        <div className="mt-3 flex min-h-0 flex-1 flex-col justify-end gap-2.5">
+        <div className="mt-4 flex flex-col gap-2.5">
           <div className="relative shrink-0">
             <span className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-md bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm">
               Самый выгодный
@@ -150,10 +153,12 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
             >
               <div className="min-w-0">
                 <p className="font-serif text-[15px] font-bold text-foreground">Годовая</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">12 мес · 1 490 ₽</p>
+                <p className="mt-0.5 text-xs font-medium text-muted-foreground">12 мес · 1 490 ₽</p>
               </div>
               <div className="flex shrink-0 items-center gap-2.5">
-                <p className="text-right text-sm font-bold text-foreground">124 ₽/мес</p>
+                <p className="text-right text-lg font-extrabold tracking-tight text-foreground">
+                  124 ₽/мес
+                </p>
                 <PlanRadio selected={plan === "yearly"} />
               </div>
             </button>
@@ -172,10 +177,31 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
               <p className="font-serif text-[15px] font-bold text-foreground">Месячная</p>
             </div>
             <div className="flex shrink-0 items-center gap-2.5">
-              <p className="text-right text-sm font-bold text-foreground">299 ₽/мес</p>
+              <p className="text-right text-lg font-extrabold tracking-tight text-foreground">
+                299 ₽/мес
+              </p>
               <PlanRadio selected={plan === "monthly"} />
             </div>
           </button>
+
+          <label className="flex items-start gap-2.5 rounded-block-sm border border-border/70 bg-card px-3 py-3">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-primary"
+            />
+            <span className="text-[11px] leading-relaxed text-muted-foreground">
+              Нажимая «Оплатить», вы соглашаетесь с{" "}
+              <Link href="/terms" className="font-semibold text-primary underline-offset-2 hover:underline">
+                Условиями использования
+              </Link>{" "}
+              и{" "}
+              <Link href="/privacy" className="font-semibold text-primary underline-offset-2 hover:underline">
+                Политикой конфиденциальности
+              </Link>
+            </span>
+          </label>
 
           {error && (
             <p className="shrink-0 rounded-block-sm bg-destructive/10 px-3 py-2 text-center text-[11px] text-destructive">
@@ -187,6 +213,12 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
             <Shield className="size-3.5 shrink-0 opacity-70" strokeWidth={2.2} />
             Отмена в любой момент · Безопасная оплата
           </p>
+
+          {isSubscribed && (
+            <div className="pb-2">
+              <SupportSection compact />
+            </div>
+          )}
         </div>
       </div>
 
@@ -194,21 +226,11 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
         <button
           type="button"
           onClick={handlePay}
-          disabled={paying}
-          className="w-full rounded-full bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-60"
+          disabled={paying || !agreedToTerms}
+          className="w-full rounded-full bg-primary py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
         >
-          {paying ? "Создаём платёж…" : "Продолжить"}
+          {paying ? "Создаём платёж…" : "Оплатить"}
         </button>
-
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-[10px] text-muted-foreground">
-          <button type="button" className="underline-offset-2 hover:text-primary hover:underline">
-            Условия использования
-          </button>
-          <span aria-hidden>·</span>
-          <button type="button" className="underline-offset-2 hover:text-primary hover:underline">
-            Политика конфиденциальности
-          </button>
-        </div>
       </div>
     </div>
   )

@@ -15,6 +15,11 @@ export interface YooKassaPayment {
     userKey?: string
     orderId?: string
   }
+  payment_method?: {
+    id?: string
+    saved?: boolean
+    type?: string
+  }
   confirmation?: {
     type: string
     confirmation_url?: string
@@ -60,6 +65,7 @@ export async function createYooKassaPayment(input: {
     body: JSON.stringify({
       amount: { value: input.amount, currency: "RUB" },
       capture: true,
+      save_payment_method: true,
       confirmation: {
         type: "redirect",
         return_url: input.returnUrl,
@@ -76,6 +82,42 @@ export async function createYooKassaPayment(input: {
   if (!response.ok) {
     const details = await response.text()
     throw new Error(`YooKassa create failed: ${response.status} ${details}`)
+  }
+
+  return response.json() as Promise<YooKassaPayment>
+}
+
+export async function createRecurringYooKassaPayment(input: {
+  plan: SubscriptionPlan
+  userKey: string
+  orderId: string
+  amount: string
+  description: string
+  paymentMethodId: string
+}): Promise<YooKassaPayment> {
+  const response = await fetch("https://api.yookassa.ru/v3/payments", {
+    method: "POST",
+    headers: {
+      Authorization: authHeader(),
+      "Content-Type": "application/json",
+      "Idempotence-Key": input.orderId,
+    },
+    body: JSON.stringify({
+      amount: { value: input.amount, currency: "RUB" },
+      capture: true,
+      payment_method_id: input.paymentMethodId,
+      description: input.description,
+      metadata: {
+        plan: input.plan,
+        userKey: input.userKey,
+        orderId: input.orderId,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const details = await response.text()
+    throw new Error(`YooKassa recurring create failed: ${response.status} ${details}`)
   }
 
   return response.json() as Promise<YooKassaPayment>

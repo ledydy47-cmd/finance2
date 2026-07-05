@@ -65,8 +65,11 @@ interface FinanceContextValue {
     plan: SubscriptionPlan
     paymentId: string
     expiresAt: string
+    autoRenew?: boolean
+    subscriptionStatus?: Settings["subscriptionStatus"]
   }) => void
   restoreSubscription: () => Promise<{ ok: boolean; message: string }>
+  syncSubscriptionFromServer: (userKey: string) => Promise<void>
   openAddToGoal: (goalId: string) => void
   closeAddToGoal: () => void
   setPrimaryGoal: (goalId: string) => void
@@ -247,7 +250,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const activateSubscription = useCallback(
-    (input: { plan: SubscriptionPlan; paymentId: string; expiresAt: string }) => {
+    (input: {
+      plan: SubscriptionPlan
+      paymentId: string
+      expiresAt: string
+      autoRenew?: boolean
+      subscriptionStatus?: Settings["subscriptionStatus"]
+    }) => {
       update((prev) => ({
         ...prev,
         settings: {
@@ -256,9 +265,39 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           subscriptionPlan: input.plan,
           subscriptionExpiresAt: input.expiresAt,
           lastPaymentId: input.paymentId,
+          autoRenew: input.autoRenew ?? true,
+          subscriptionStatus: input.subscriptionStatus ?? "active",
         },
       }))
       setShowPaywall(false)
+    },
+    [update],
+  )
+
+  const syncSubscriptionFromServer = useCallback(
+    async (userKey: string) => {
+      try {
+        const response = await fetch(
+          `/api/subscription/status?userKey=${encodeURIComponent(userKey)}`,
+        )
+        const payload = await response.json()
+        const subscription = payload.subscription
+        if (!subscription) return
+
+        update((prev) => ({
+          ...prev,
+          settings: {
+            ...prev.settings,
+            isSubscribed: subscription.active,
+            subscriptionPlan: subscription.subscriptionType,
+            subscriptionExpiresAt: subscription.currentPeriodEnd,
+            autoRenew: subscription.autoRenew,
+            subscriptionStatus: subscription.status,
+          },
+        }))
+      } catch {
+        // ignore sync errors in UI
+      }
     },
     [update],
   )
@@ -282,6 +321,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         plan: payload.plan,
         paymentId: payload.paymentId,
         expiresAt: payload.expiresAt,
+        autoRenew: payload.autoRenew ?? true,
+        subscriptionStatus: payload.status ?? "active",
       })
       return { ok: true, message: "Подписка восстановлена" }
     } catch {
@@ -730,6 +771,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     closePaywall,
     activateSubscription,
     restoreSubscription,
+    syncSubscriptionFromServer,
     openAddToGoal,
     closeAddToGoal,
     setPrimaryGoal,

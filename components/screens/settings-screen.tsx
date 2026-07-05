@@ -1,13 +1,25 @@
 "use client"
 
 import { ThemePicker } from "@/components/theme/theme-picker"
+import { LegalLinks } from "@/components/legal/legal-links"
 import { SettingsDevTools } from "@/components/settings/settings-dev-tools"
+import { SubscriptionManagement } from "@/components/subscription/subscription-management"
+import { SupportSection } from "@/components/support/support-section"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
+import { getClientUserKey } from "@/lib/client-id"
+import { useEffect } from "react"
 
 export function SettingsScreen() {
-  const { data, updateSettings, openPaywall, resetMonthSpendingManual } = useFinance()
+  const { data, updateSettings, openPaywall, resetMonthSpendingManual, syncSubscriptionFromServer } =
+    useFinance()
   const { isTelegram, user } = useTelegram()
+  const isSubscribed = data.settings.isSubscribed
+
+  useEffect(() => {
+    if (!isSubscribed) return
+    void syncSubscriptionFromServer(getClientUserKey(user?.id))
+  }, [isSubscribed, syncSubscriptionFromServer, user?.id])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -20,14 +32,17 @@ export function SettingsScreen() {
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-32">
         <section className="mb-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
           <h2 className="mb-1 font-serif text-base font-bold">Подписка</h2>
-          {data.settings.isSubscribed ? (
-            <p className="text-sm text-muted-foreground">
-              Активна
-              {data.settings.subscriptionExpiresAt
-                ? ` до ${new Date(data.settings.subscriptionExpiresAt).toLocaleDateString("ru-RU")}`
-                : ""}{" "}
-              · спасибо, что с нами 💗
-            </p>
+          {isSubscribed ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Активна
+                {data.settings.subscriptionExpiresAt
+                  ? ` до ${new Date(data.settings.subscriptionExpiresAt).toLocaleDateString("ru-RU")}`
+                  : ""}{" "}
+                · спасибо, что с нами 💗
+              </p>
+              <SubscriptionManagement />
+            </>
           ) : (
             <>
               <p className="mb-3 text-sm text-muted-foreground">
@@ -43,6 +58,12 @@ export function SettingsScreen() {
             </>
           )}
         </section>
+
+        {isSubscribed && (
+          <div className="mb-4">
+            <SupportSection />
+          </div>
+        )}
 
         <section className="mb-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
           <h2 className="mb-1 font-serif text-base font-bold">Тема 🎨</h2>
@@ -100,6 +121,11 @@ export function SettingsScreen() {
             className="mb-3 w-full rounded-block-sm border border-border bg-background px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
           />
           <p className="text-xs text-muted-foreground">Валюта: ₽ (рубль)</p>
+        </section>
+
+        <section className="mt-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
+          <h2 className="mb-2 font-serif text-base font-bold">О приложении</h2>
+          <LegalLinks />
         </section>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">

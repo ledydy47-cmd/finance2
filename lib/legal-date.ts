@@ -1,0 +1,1 @@
+export const LEGAL_PUBLICATION_DATE = "05.07.2026"
