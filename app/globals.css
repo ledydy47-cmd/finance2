@@ -295,6 +295,16 @@
   }
 }
 
+.onboarding-progress-fill {
+  background: linear-gradient(
+    90deg,
+    var(--primary),
+    color-mix(in oklch, var(--primary) 55%, var(--chart-5)),
+    var(--chart-5)
+  );
+  box-shadow: 0 0 12px color-mix(in oklch, var(--primary) 35%, transparent);
+}
+
 .onboarding-bar-grow {
   animation: onboarding-bar-grow 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

@@ -1,8 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import Image from "next/image"
 import { Cake, Hand } from "lucide-react"
+import { OnboardingMascot } from "@/components/onboarding/onboarding-mascot"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
 import {
@@ -75,15 +75,18 @@ function OnboardingProgress({ step }: { step: number }) {
   const progress = ((step + 1) / ONBOARDING_TOTAL_STEPS) * 100
   return (
     <div className="shrink-0 px-6 pt-4">
-      <div className="h-2 overflow-hidden rounded-full bg-secondary">
+      <div className="h-2.5 overflow-hidden rounded-full bg-secondary/80">
         <div
-          className="h-full rounded-full bg-primary transition-all duration-300"
+          className="onboarding-progress-fill h-full rounded-full transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
         />
       </div>
     </div>
   )
 }
+
+const PROFILE_SETUP_HINT =
+  "Ответь на пару вопросов, и мы настроим всё специально для тебя"
 
 function ProfileDots({ activeIndex }: { activeIndex: number }) {
   return (
@@ -305,15 +308,8 @@ export function OnboardingFlow() {
 
       {step === 0 && (
         <OnboardingStepShell {...shellProps} centered>
-          <div className="relative mb-6 flex h-44 w-full max-w-[15rem] items-center justify-center">
-            <Image
-              src="/mascot.png"
-              alt="Маниточка — персонаж приложения"
-              width={200}
-              height={200}
-              className="h-44 w-auto object-contain mix-blend-lighten drop-shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
-              priority
-            />
+          <div className="mb-6">
+            <OnboardingMascot size="hero" />
           </div>
           <h1 className="font-serif text-3xl font-bold text-foreground">Добро пожаловать!</h1>
           <p className="mt-2 max-w-[18rem] text-base leading-relaxed text-muted-foreground">
@@ -373,6 +369,7 @@ export function OnboardingFlow() {
         <OnboardingStepShell {...shellProps}>
           <ProfileDots activeIndex={0} />
           <h2 className="font-serif text-xl font-bold text-foreground">Что мотивирует тебя копить?</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{PROFILE_SETUP_HINT}</p>
           <div className="mt-4 flex flex-col gap-2">
             {SAVING_MOTIVATION_OPTIONS.map((opt) => (
               <OptionButton
@@ -391,6 +388,7 @@ export function OnboardingFlow() {
         <OnboardingStepShell {...shellProps}>
           <ProfileDots activeIndex={1} />
           <h2 className="font-serif text-xl font-bold text-foreground">Главная проблема с деньгами?</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{PROFILE_SETUP_HINT}</p>
           <div className="mt-4 flex flex-col gap-2">
             {MONEY_PROBLEM_OPTIONS.map((opt) => (
               <OptionButton
@@ -411,6 +409,7 @@ export function OnboardingFlow() {
           <h2 className="font-serif text-xl font-bold text-foreground">
             Что ты чувствуешь, проверяя финансы?
           </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{PROFILE_SETUP_HINT}</p>
           <div className="mt-4 flex flex-col gap-2">
             {FINANCE_FEELING_OPTIONS.map((opt) => (
               <OptionButton
@@ -426,19 +425,19 @@ export function OnboardingFlow() {
       )}
 
       {step === 7 && (
-        <OnboardingStepShell {...shellProps} buttonLabel="Начать вести учёт 📊">
+        <OnboardingStepShell {...shellProps} centered buttonLabel="Начать вести учёт 📊">
           <OnboardingTracking30DaysStep />
         </OnboardingStepShell>
       )}
 
       {step === 8 && (
-        <OnboardingStepShell {...shellProps}>
+        <OnboardingStepShell {...shellProps} centered>
           <OnboardingGoodNewsStep />
         </OnboardingStepShell>
       )}
 
       {step === 9 && (
-        <OnboardingStepShell {...shellProps}>
+        <OnboardingStepShell {...shellProps} centered>
           <OnboardingLongTermHabitsStep name={draft.name.trim() || data.settings.userName} />
         </OnboardingStepShell>
       )}
@@ -516,6 +515,7 @@ export function OnboardingFlow() {
       {step === 12 && (
         <OnboardingStepShell
           {...shellProps}
+          centered
           buttonLabel="Беру на себя обязательство 💗"
           footerSubtitle="Обещание самой себе помогает довести дело до конца"
         >
