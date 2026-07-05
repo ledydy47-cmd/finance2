@@ -60,3 +60,12 @@ export function getAvailablePeriodKeys(
   }
   return Array.from(keys).sort().reverse()
 }
+
+/** Calendar days left in the current budget period (including today). */
+export function getDaysLeftInPeriod(monthStartDay: number, now = new Date()) {
+  const { end } = getPeriodBounds(now, monthStartDay)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const lastDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  const diff = Math.round((lastDay.getTime() - today.getTime()) / 86400000)
+  return Math.max(0, diff + 1)
+}

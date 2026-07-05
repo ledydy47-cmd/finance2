@@ -30,6 +30,17 @@ export function getCategorySpent(
     .reduce((sum, tx) => sum + tx.amount, 0)
 }
 
+export function getCategoryExpenseCount(
+  transactions: Transaction[],
+  categoryId: string,
+  periodKey: string,
+  monthStartDay: number,
+) {
+  return getPeriodTransactions(transactions, periodKey, monthStartDay).filter(
+    (tx) => tx.type === "expense" && tx.categoryId === categoryId,
+  ).length
+}
+
 export function getMonthlySummary(
   transactions: Transaction[],
   categories: Category[],

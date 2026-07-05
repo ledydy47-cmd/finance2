@@ -4,14 +4,15 @@ import { useMemo } from "react"
 import { Calculator, Plus } from "lucide-react"
 import { TransactionsList } from "@/components/finance/transactions-list"
 import { BalanceCard } from "@/components/finance/balance-card"
-import { CategoryCard } from "@/components/finance/category-card"
+import { HomeCategoryCard } from "@/components/finance/home-category-card"
 import { GoalCard } from "@/components/finance/goal-card"
 import { GhostCategoryRows } from "@/components/home-setup/ghost-category-rows"
 import { GhostGoalCard } from "@/components/home-setup/ghost-goal-card"
 import { HomeGoalSetupSheet } from "@/components/home-setup/home-goal-setup-sheet"
 import { useFinance } from "@/context/finance-context"
 import { getActiveGoals } from "@/lib/goals"
-import { getCategorySpent, getPeriodTransactions } from "@/lib/calculations"
+import { getCategoryExpenseCount, getCategorySpent, getPeriodTransactions } from "@/lib/calculations"
+import { getDaysLeftInPeriod } from "@/lib/period"
 
 export function DashboardScreen() {
   const {
@@ -50,6 +51,7 @@ export function DashboardScreen() {
   )
 
   const hasAnyTransactions = data.transactions.length > 0
+  const daysLeftInPeriod = getDaysLeftInPeriod(data.settings.monthStartDay)
 
   function handleGhostGoalClick() {
     if (isHomeSetupActive && homeSetupStep === 1) {
@@ -171,7 +173,7 @@ export function DashboardScreen() {
               }`}
             >
               {data.categories.map((category) => (
-                <CategoryCard
+                <HomeCategoryCard
                   key={category.id}
                   categoryId={category.id}
                   icon={category.icon}
@@ -183,6 +185,13 @@ export function DashboardScreen() {
                     data.settings.monthStartDay,
                   )}
                   budget={category.monthlyLimit}
+                  transactionCount={getCategoryExpenseCount(
+                    data.transactions,
+                    category.id,
+                    periodKey,
+                    data.settings.monthStartDay,
+                  )}
+                  daysLeft={daysLeftInPeriod}
                   tint={category.tint}
                   bar={category.bar}
                   onQuickAdd={isHomeSetupActive ? undefined : openAddTransactionForCategory}
