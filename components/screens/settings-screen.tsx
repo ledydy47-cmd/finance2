@@ -27,7 +27,7 @@ export function SettingsScreen() {
         <p className="mt-1 text-sm text-muted-foreground">Профиль и параметры месяца</p>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-32">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(8rem,env(safe-area-inset-bottom))]">
         <section className="mb-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
           <h2 className="mb-1 font-serif text-base font-bold">Подписка</h2>
           {isSubscribed ? (
@@ -57,11 +57,9 @@ export function SettingsScreen() {
           )}
         </section>
 
-        {isSubscribed && (
-          <div className="mb-4">
-            <SupportSection />
-          </div>
-        )}
+        <div className="mb-4">
+          <SupportSection />
+        </div>
 
         <section className="mb-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
           <h2 className="mb-1 font-serif text-base font-bold">Тема 🎨</h2>

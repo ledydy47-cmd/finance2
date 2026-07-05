@@ -224,11 +224,9 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
             Отмена в любой момент · Безопасная оплата
           </p>
 
-          {isSubscribed && (
-            <div className="pb-2">
-              <SupportSection compact />
-            </div>
-          )}
+          <div className="pb-2">
+            <SupportSection compact />
+          </div>
         </div>
       </div>
     </div>
