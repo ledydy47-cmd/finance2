@@ -1,6 +1,7 @@
 "use client"
 
 import { ThemePicker } from "@/components/theme/theme-picker"
+import { SettingsDevTools } from "@/components/settings/settings-dev-tools"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
 
@@ -9,17 +10,24 @@ export function SettingsScreen() {
   const { isTelegram, user } = useTelegram()
 
   return (
-    <>
-      <header className="px-5 pb-2 pt-4">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="shrink-0 px-5 pb-3 pt-4">
         <h1 className="font-serif text-2xl font-bold text-foreground">Настройки</h1>
         <p className="mt-1 text-sm text-muted-foreground">Профиль и параметры месяца</p>
+        <SettingsDevTools />
       </header>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-28">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-32">
         <section className="mb-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
           <h2 className="mb-1 font-serif text-base font-bold">Подписка</h2>
           {data.settings.isSubscribed ? (
-            <p className="text-sm text-muted-foreground">Активна · спасибо, что с нами 💗</p>
+            <p className="text-sm text-muted-foreground">
+              Активна
+              {data.settings.subscriptionExpiresAt
+                ? ` до ${new Date(data.settings.subscriptionExpiresAt).toLocaleDateString("ru-RU")}`
+                : ""}{" "}
+              · спасибо, что с нами 💗
+            </p>
           ) : (
             <>
               <p className="mb-3 text-sm text-muted-foreground">
@@ -80,6 +88,6 @@ export function SettingsScreen() {
           Данные хранятся локально в браузере · работает офлайн
         </p>
       </div>
-    </>
+    </div>
   )
 }

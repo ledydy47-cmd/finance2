@@ -1,6 +1,22 @@
 export type SubscriptionPlan = "yearly" | "monthly"
 
-export const YOOMONEY_PAYMENT_URL = "https://yoomoney.ru/"
+export const PLAN_CONFIG: Record<
+  SubscriptionPlan,
+  { amount: string; description: string; durationDays: number; label: string }
+> = {
+  yearly: {
+    amount: "1490.00",
+    description: "Копилка — годовая подписка",
+    durationDays: 365,
+    label: "Годовая",
+  },
+  monthly: {
+    amount: "299.00",
+    description: "Копилка — месячная подписка",
+    durationDays: 30,
+    label: "Месячная",
+  },
+}
 
 export const PAYWALL_TESTIMONIALS = [
   {
@@ -24,3 +40,16 @@ export const PAYWALL_TESTIMONIALS = [
     author: "Аня К.",
   },
 ] as const
+
+export function computeSubscriptionExpiry(plan: SubscriptionPlan, from = new Date()) {
+  const expires = new Date(from)
+  expires.setDate(expires.getDate() + PLAN_CONFIG[plan].durationDays)
+  return expires.toISOString()
+}
+
+export function isSubscriptionActive(expiresAt: string | null | undefined) {
+  if (!expiresAt) return false
+  return new Date(expiresAt).getTime() > Date.now()
+}
+
+export const PENDING_PAYMENT_STORAGE_KEY = "kopilka-pending-payment-id"

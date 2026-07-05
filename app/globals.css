@@ -245,3 +245,75 @@
     transform: translateX(0) translateY(0);
   }
 }
+
+@keyframes onboarding-analysis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes onboarding-analysis-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 40%, transparent);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 6px color-mix(in oklch, var(--primary) 0%, transparent);
+  }
+}
+
+.onboarding-analysis-spinner {
+  animation: onboarding-analysis-spin 1.1s linear infinite;
+}
+
+.onboarding-analysis-pulse {
+  animation: onboarding-analysis-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes onboarding-bar-rise {
+  from {
+    height: 0;
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.onboarding-bar-rise {
+  animation: onboarding-bar-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes onboarding-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.onboarding-bar-grow {
+  animation: onboarding-bar-grow 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes onboarding-line-draw {
+  from {
+    stroke-dashoffset: 320;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.onboarding-line-draw {
+  stroke-dasharray: 320;
+  animation: onboarding-line-draw 1.2s ease-out both;
+}
+
+.onboarding-line-draw-delayed {
+  stroke-dasharray: 280;
+  animation: onboarding-line-draw 1.2s ease-out 0.25s both;
+}

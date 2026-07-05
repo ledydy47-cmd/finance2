@@ -3,9 +3,11 @@
 import { Check, Star, X } from "lucide-react"
 import { useState } from "react"
 import { useTelegram } from "@/components/telegram/telegram-provider"
+import { useFinance } from "@/context/finance-context"
+import { getClientUserKey } from "@/lib/client-id"
 import {
   PAYWALL_TESTIMONIALS,
-  YOOMONEY_PAYMENT_URL,
+  PENDING_PAYMENT_STORAGE_KEY,
   type SubscriptionPlan,
 } from "@/lib/subscription"
 
@@ -22,21 +24,60 @@ function PlanRadio({ selected }: { selected: boolean }) {
 
 interface SubscriptionPaywallModalProps {
   onClose: () => void
-  onSubscribe: (plan: SubscriptionPlan) => void
 }
 
-export function SubscriptionPaywallModal({ onClose, onSubscribe }: SubscriptionPaywallModalProps) {
-  const { openLink } = useTelegram()
+export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalProps) {
+  const { openLink, user } = useTelegram()
+  const { restoreSubscription } = useFinance()
   const [plan, setPlan] = useState<SubscriptionPlan>("yearly")
   const [reviewIndex, setReviewIndex] = useState(0)
+  const [paying, setPaying] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const review = PAYWALL_TESTIMONIALS[reviewIndex]
 
-  function handlePay() {
-    openLink(YOOMONEY_PAYMENT_URL)
+  async function handlePay() {
+    setError(null)
+    setPaying(true)
+
+    try {
+      const orderId = crypto.randomUUID()
+      const userKey = getClientUserKey(user?.id)
+
+      const response = await fetch("/api/payments/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan, userKey, orderId }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        setError(
+          data.message ||
+            "Оплата временно недоступна. Проверьте настройки ЮKassa на сервере.",
+        )
+        return
+      }
+
+      localStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, data.paymentId)
+      openLink(data.confirmationUrl)
+    } catch {
+      setError("Не удалось создать платёж. Попробуйте ещё раз.")
+    } finally {
+      setPaying(false)
+    }
   }
 
-  function handleRestore() {
-    onSubscribe(plan)
+  async function handleRestore() {
+    setError(null)
+    setRestoring(true)
+    const result = await restoreSubscription()
+    setRestoring(false)
+    if (!result.ok) {
+      setError(result.message)
+      return
+    }
+    onClose()
   }
 
   return (
@@ -54,9 +95,10 @@ export function SubscriptionPaywallModal({ onClose, onSubscribe }: SubscriptionP
           <button
             type="button"
             onClick={handleRestore}
-            className="text-xs font-semibold text-muted-foreground underline-offset-2 hover:text-primary hover:underline"
+            disabled={restoring}
+            className="text-xs font-semibold text-muted-foreground underline-offset-2 hover:text-primary hover:underline disabled:opacity-50"
           >
-            Восстановить покупки
+            {restoring ? "Проверяем…" : "Восстановить покупки"}
           </button>
         </div>
 
@@ -125,6 +167,12 @@ export function SubscriptionPaywallModal({ onClose, onSubscribe }: SubscriptionP
           </button>
         </div>
 
+        {error && (
+          <p className="mt-4 rounded-block-sm bg-destructive/10 px-3 py-2 text-center text-xs text-destructive">
+            {error}
+          </p>
+        )}
+
         <p className="mt-4 text-center text-xs text-muted-foreground">
           Отмена в любой момент · Безопасная оплата через ЮMoney
         </p>
@@ -134,9 +182,10 @@ export function SubscriptionPaywallModal({ onClose, onSubscribe }: SubscriptionP
         <button
           type="button"
           onClick={handlePay}
-          className="w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98]"
+          disabled={paying}
+          className="w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-60"
         >
-          Оплатить через ЮMoney
+          {paying ? "Создаём платёж…" : "Оплатить через ЮMoney"}
         </button>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-[10px] text-muted-foreground">

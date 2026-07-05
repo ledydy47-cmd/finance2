@@ -31,7 +31,6 @@ export function AppShell() {
     showHomeGoalSetup,
     showPaywall,
     closePaywall,
-    completeSubscription,
     setShowBudgetPlanner,
     setShowTransactionsList,
     setShowAddTransaction,
@@ -125,7 +124,7 @@ export function AppShell() {
     <main className={mainClassName}>
       <div data-app-shell className={shellClassName}>
         {showMainApp && (
-          <>
+          <div className="flex min-h-0 flex-1 flex-col">
             {activeTab === "home" && <DashboardScreen />}
             {activeTab === "stats" && <StatsScreen />}
             {activeTab === "goals" && <GoalsScreen />}
@@ -144,12 +143,9 @@ export function AppShell() {
             {showHomeWalkthrough && <HomeWalkthrough />}
 
             {showPaywall && (
-              <SubscriptionPaywallModal
-                onClose={closePaywall}
-                onSubscribe={completeSubscription}
-              />
+              <SubscriptionPaywallModal onClose={closePaywall} />
             )}
-          </>
+          </div>
         )}
 
         {showOnboarding && <OnboardingFlow />}

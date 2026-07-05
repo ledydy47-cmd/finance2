@@ -17,6 +17,7 @@ import { getPeriodLabel, getPeriodLabelFromKey } from "@/lib/period"
 import { loadAppData, saveAppData } from "@/lib/storage"
 import { ensureTelegramSdk } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
+import { isSubscriptionActive } from "@/lib/subscription"
 import type { ThemeId } from "@/lib/themes"
 import { applyTheme, DEFAULT_THEME_ID } from "@/lib/themes"
 import type {
@@ -47,7 +48,12 @@ interface FinanceContextValue {
   setShowTransactionsList: (open: boolean) => void
   openPaywall: () => void
   closePaywall: () => void
-  completeSubscription: (plan: SubscriptionPlan) => void
+  activateSubscription: (input: {
+    plan: SubscriptionPlan
+    paymentId: string
+    expiresAt: string
+  }) => void
+  restoreSubscription: () => Promise<{ ok: boolean; message: string }>
   openAddToGoal: (goalId: string) => void
   closeAddToGoal: () => void
   setPrimaryGoal: (goalId: string) => void
@@ -88,7 +94,12 @@ interface FinanceContextValue {
   getCategoryById: (id: string | null) => Category | undefined
 }
 
-const FinanceContext = createContext<FinanceContextValue | null>(null)
+function isUserSubscribed(settings: Settings) {
+  if (settings.subscriptionExpiresAt) {
+    return isSubscriptionActive(settings.subscriptionExpiresAt)
+  }
+  return settings.isSubscribed
+}
 
 function archivePreviousPeriod(data: AppData, previousKey: string): AppData {
   if (data.archives.some((a) => a.periodKey === previousKey)) {
@@ -137,6 +148,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     void ensureTelegramSdk().then(() => {
       if (cancelled) return
       const loaded = syncPeriod(loadAppData())
+      const subscribed = isUserSubscribed(loaded.settings)
+      if (loaded.settings.isSubscribed !== subscribed) {
+        loaded.settings.isSubscribed = subscribed
+      }
       setData(loaded)
       applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
       setHydrated(true)
@@ -163,7 +178,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     data.settings.onboardingCompleted && !data.settings.homeWalkthroughCompleted
 
   const isContentLocked =
-    data.settings.paywallShown && !data.settings.isSubscribed
+    data.settings.paywallShown && !isUserSubscribed(data.settings)
 
   const openPaywall = useCallback(() => setShowPaywall(true), [])
   const closePaywall = useCallback(() => setShowPaywall(false), [])
@@ -180,16 +195,48 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setData((prev) => syncPeriod(updater(prev)))
   }, [])
 
-  const completeSubscription = useCallback(
-    (_plan: SubscriptionPlan) => {
+  const activateSubscription = useCallback(
+    (input: { plan: SubscriptionPlan; paymentId: string; expiresAt: string }) => {
       update((prev) => ({
         ...prev,
-        settings: { ...prev.settings, isSubscribed: true },
+        settings: {
+          ...prev.settings,
+          isSubscribed: true,
+          subscriptionPlan: input.plan,
+          subscriptionExpiresAt: input.expiresAt,
+          lastPaymentId: input.paymentId,
+        },
       }))
       setShowPaywall(false)
     },
     [update],
   )
+
+  const restoreSubscription = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
+    const paymentId = data.settings.lastPaymentId
+    if (!paymentId) {
+      return { ok: false, message: "Сохранённая покупка не найдена" }
+    }
+
+    try {
+      const response = await fetch(
+        `/api/payments/verify?paymentId=${encodeURIComponent(paymentId)}`,
+      )
+      const payload = await response.json()
+      if (!response.ok || !payload.active) {
+        return { ok: false, message: "Активная подписка не найдена" }
+      }
+
+      activateSubscription({
+        plan: payload.plan,
+        paymentId: payload.paymentId,
+        expiresAt: payload.expiresAt,
+      })
+      return { ok: true, message: "Подписка восстановлена" }
+    } catch {
+      return { ok: false, message: "Не удалось проверить оплату" }
+    }
+  }, [activateSubscription, data.settings.lastPaymentId])
 
   const setShowAddTransaction = useCallback(
     (open: boolean) => {
@@ -537,7 +584,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setShowTransactionsList,
     openPaywall,
     closePaywall,
-    completeSubscription,
+    activateSubscription,
+    restoreSubscription,
     openAddToGoal,
     closeAddToGoal,
     setPrimaryGoal,

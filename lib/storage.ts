@@ -79,6 +79,9 @@ function migrateData(data: AppData, defaults: AppData): AppData {
       firstExpenseAdded: data.settings.firstExpenseAdded ?? false,
       paywallShown: data.settings.paywallShown ?? false,
       isSubscribed: data.settings.isSubscribed ?? false,
+      subscriptionPlan: data.settings.subscriptionPlan ?? null,
+      subscriptionExpiresAt: data.settings.subscriptionExpiresAt ?? null,
+      lastPaymentId: data.settings.lastPaymentId ?? null,
     },
   }
 }

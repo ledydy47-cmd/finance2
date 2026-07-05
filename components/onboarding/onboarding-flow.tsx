@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import Image from "next/image"
 import { Cake, Hand } from "lucide-react"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
@@ -16,7 +17,59 @@ import {
 } from "@/lib/onboarding"
 import { formatRub } from "@/lib/format"
 import { parseAmount } from "@/lib/budget-planner"
+import { clearAllAppDataAndReload, resetOnboardingAndReload } from "@/lib/dev-reset"
+import { OnboardingContractStep } from "@/components/onboarding/onboarding-contract-step"
+import { OnboardingGoodNewsStep } from "@/components/onboarding/onboarding-good-news-step"
+import { OnboardingLongTermHabitsStep } from "@/components/onboarding/onboarding-long-term-habits-step"
+import { OnboardingProfileAnalysisStep } from "@/components/onboarding/onboarding-profile-analysis-step"
+import { OnboardingTracking30DaysStep } from "@/components/onboarding/onboarding-tracking-30-days-step"
 import { OnboardingThemeStep } from "@/components/theme/theme-picker"
+
+function OnboardingDevBar() {
+  const handleRestart = () => {
+    if (
+      !window.confirm(
+        "Начать онбординг сначала? Текущий прогресс шагов сбросится.",
+      )
+    ) {
+      return
+    }
+    resetOnboardingAndReload()
+  }
+
+  const handleClearAll = () => {
+    if (
+      !window.confirm(
+        "Удалить все данные приложения? Транзакции, цели и настройки будут стёрты.",
+      )
+    ) {
+      return
+    }
+    clearAllAppDataAndReload()
+  }
+
+  return (
+    <div className="shrink-0 flex items-center justify-center gap-3 border-t border-border/50 bg-background/95 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-xs backdrop-blur">
+      <button
+        type="button"
+        onClick={handleRestart}
+        className="font-semibold text-primary underline-offset-2 hover:underline"
+      >
+        Сбросить онбординг
+      </button>
+      <span className="text-muted-foreground/35" aria-hidden>
+        ·
+      </span>
+      <button
+        type="button"
+        onClick={handleClearAll}
+        className="font-semibold text-destructive underline-offset-2 hover:underline"
+      >
+        Сбросить всё
+      </button>
+    </div>
+  )
+}
 
 function OnboardingProgress({ step }: { step: number }) {
   const progress = ((step + 1) / ONBOARDING_TOTAL_STEPS) * 100
@@ -85,6 +138,8 @@ function OnboardingStepShell({
   canContinue,
   buttonLabel,
   onNext,
+  footerSubtitle,
+  hideButton,
   children,
 }: {
   step: number
@@ -93,6 +148,8 @@ function OnboardingStepShell({
   canContinue: boolean
   buttonLabel: string
   onNext: () => void
+  footerSubtitle?: string
+  hideButton?: boolean
   children: ReactNode
 }) {
   return (
@@ -103,14 +160,23 @@ function OnboardingStepShell({
           className={`w-full max-w-sm ${centered ? "flex flex-col items-center text-center" : ""} ${stepEnterClass}`}
         >
           {children}
-          <button
-            type="button"
-            disabled={!canContinue}
-            onClick={onNext}
-            className="mt-8 w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.97] disabled:opacity-40"
-          >
-            {buttonLabel}
-          </button>
+          {!hideButton && (
+            <>
+              <button
+                type="button"
+                disabled={!canContinue}
+                onClick={onNext}
+                className="mt-8 w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.97] disabled:opacity-40"
+              >
+                {buttonLabel}
+              </button>
+              {footerSubtitle && (
+                <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">
+                  {footerSubtitle}
+                </p>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -135,7 +201,7 @@ export function OnboardingFlow() {
   }, [step])
 
   useEffect(() => {
-    if (step !== 1 && step !== 8) return
+    if (step !== 1 && step !== 11) return
     const viewport = window.visualViewport
     if (!viewport) return
 
@@ -170,10 +236,16 @@ export function OnboardingFlow() {
       case 6:
         return Boolean(draft.financeFeeling)
       case 7:
-        return true
       case 8:
+      case 9:
+        return true
+      case 10:
+        return true
+      case 11:
         if (customSavingsMode) return parseAmount(draft.customSavings) > 0
         return draft.monthlySavings !== null
+      case 12:
+        return true
       default:
         return false
     }
@@ -195,16 +267,27 @@ export function OnboardingFlow() {
     })
   }
 
+  const finishOnboardingRef = useRef(finishOnboarding)
+  finishOnboardingRef.current = finishOnboarding
+
+  const handleAnalysisComplete = useCallback(() => {
+    finishOnboardingRef.current()
+  }, [])
+
   function handleNext() {
     if (!canContinue) return
-    if (step === ONBOARDING_TOTAL_STEPS - 1) {
-      finishOnboarding()
-      return
-    }
+    if (step >= ONBOARDING_TOTAL_STEPS - 1) return
     setStep((s) => s + 1)
   }
 
-  const buttonLabel = step === 0 ? "Начать" : step === ONBOARDING_TOTAL_STEPS - 1 ? "Готово!" : "Далее"
+  const buttonLabel =
+    step === 0
+      ? "Начать"
+      : step === 7
+        ? "Начать вести учёт 📊"
+        : step === 12
+          ? "Беру на себя обязательство 💗"
+          : "Далее"
   const stepEnterClass =
     direction > 0 ? "onboarding-step-enter-forward" : "onboarding-step-enter-back"
 
@@ -222,11 +305,15 @@ export function OnboardingFlow() {
 
       {step === 0 && (
         <OnboardingStepShell {...shellProps} centered>
-          <div className="relative mb-6 flex size-36 items-center justify-center rounded-full bg-primary/15 shadow-sm shadow-primary/10">
-            <span className="text-6xl leading-none" aria-hidden>
-              🐰
-            </span>
-            <span className="absolute -right-1 -top-1 text-2xl">✨</span>
+          <div className="relative mb-6 flex h-44 w-full max-w-[15rem] items-center justify-center">
+            <Image
+              src="/mascot.png"
+              alt="Маниточка — персонаж приложения"
+              width={200}
+              height={200}
+              className="h-44 w-auto object-contain mix-blend-lighten drop-shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+              priority
+            />
           </div>
           <h1 className="font-serif text-3xl font-bold text-foreground">Добро пожаловать!</h1>
           <p className="mt-2 max-w-[18rem] text-base leading-relaxed text-muted-foreground">
@@ -339,6 +426,24 @@ export function OnboardingFlow() {
       )}
 
       {step === 7 && (
+        <OnboardingStepShell {...shellProps} buttonLabel="Начать вести учёт 📊">
+          <OnboardingTracking30DaysStep />
+        </OnboardingStepShell>
+      )}
+
+      {step === 8 && (
+        <OnboardingStepShell {...shellProps}>
+          <OnboardingGoodNewsStep />
+        </OnboardingStepShell>
+      )}
+
+      {step === 9 && (
+        <OnboardingStepShell {...shellProps}>
+          <OnboardingLongTermHabitsStep name={draft.name.trim() || data.settings.userName} />
+        </OnboardingStepShell>
+      )}
+
+      {step === 10 && (
         <OnboardingStepShell {...shellProps}>
           <h2 className="font-serif text-2xl font-bold text-foreground">Выбери валюту</h2>
           <p className="mt-2 text-sm text-muted-foreground">Сейчас доступен российский рубль</p>
@@ -356,7 +461,7 @@ export function OnboardingFlow() {
         </OnboardingStepShell>
       )}
 
-      {step === 8 && (
+      {step === 11 && (
         <OnboardingStepShell {...shellProps}>
           <h2 className="font-serif text-xl font-bold text-foreground">
             Сколько хочешь откладывать в месяц?
@@ -407,6 +512,25 @@ export function OnboardingFlow() {
           )}
         </OnboardingStepShell>
       )}
+
+      {step === 12 && (
+        <OnboardingStepShell
+          {...shellProps}
+          buttonLabel="Беру на себя обязательство 💗"
+          footerSubtitle="Обещание самой себе помогает довести дело до конца"
+        >
+          <OnboardingContractStep name={draft.name.trim() || data.settings.userName} />
+        </OnboardingStepShell>
+      )}
+
+      {step === 13 && (
+        <OnboardingProfileAnalysisStep
+          onComplete={handleAnalysisComplete}
+          stepEnterClass={stepEnterClass}
+        />
+      )}
+
+      <OnboardingDevBar />
     </div>
   )
 }

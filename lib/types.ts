@@ -1,4 +1,5 @@
 import type { ThemeId } from "@/lib/themes"
+import type { SubscriptionPlan } from "@/lib/subscription"
 
 export type TransactionType = "expense" | "income"
 
@@ -57,6 +58,9 @@ export interface Settings {
   firstExpenseAdded: boolean
   paywallShown: boolean
   isSubscribed: boolean
+  subscriptionPlan?: SubscriptionPlan | null
+  subscriptionExpiresAt?: string | null
+  lastPaymentId?: string | null
   age?: number
   savingMotivation?: string
   moneyProblem?: string
