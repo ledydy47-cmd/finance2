@@ -18,7 +18,6 @@ export function GhostCategoryRows() {
             <div className="flex items-center gap-3">
               <CategoryIconBadge
                 icon={icon.icon}
-                iconImage={icon.iconImage}
                 bar={icon.bar}
                 tint={icon.tint}
                 size="md"

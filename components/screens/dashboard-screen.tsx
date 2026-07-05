@@ -171,7 +171,6 @@ export function DashboardScreen() {
                 <CategoryCard
                   key={category.id}
                   icon={category.icon}
-                  iconImage={category.iconImage}
                   name={category.name}
                   spent={getCategorySpent(
                     data.transactions,

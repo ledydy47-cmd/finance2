@@ -1,6 +1,5 @@
 import type { AppData } from "./types"
 import { getCurrentPeriodKey } from "./calculations"
-import { CATEGORY_ICON_IMAGES } from "./category-icons"
 import { DEFAULT_THEME_ID } from "./themes"
 import {
   buildCategoriesFromPlan,
@@ -51,8 +50,7 @@ export function createDefaultData(): AppData {
     {
       id: "cat-products",
       name: "Продукты",
-      icon: "Carrot",
-      iconImage: CATEGORY_ICON_IMAGES["cat-products"],
+      icon: "🛒",
       tint: "oklch(0.93 0.06 40)",
       bar: "oklch(0.72 0.14 45)",
       monthlyLimit: 14000,
@@ -61,8 +59,7 @@ export function createDefaultData(): AppData {
     {
       id: "cat-cafe",
       name: "Кафе и доставка",
-      icon: "Coffee",
-      iconImage: CATEGORY_ICON_IMAGES["cat-cafe"],
+      icon: "☕",
       tint: "oklch(0.93 0.05 355)",
       bar: "oklch(0.72 0.13 355)",
       monthlyLimit: 8500,
@@ -71,8 +68,7 @@ export function createDefaultData(): AppData {
     {
       id: "cat-beauty",
       name: "Косметика",
-      icon: "Sparkles",
-      iconImage: CATEGORY_ICON_IMAGES["cat-beauty"],
+      icon: "💄",
       tint: "oklch(0.93 0.06 160)",
       bar: "oklch(0.68 0.12 160)",
       monthlyLimit: 5500,
@@ -81,7 +77,7 @@ export function createDefaultData(): AppData {
     {
       id: "cat-entertainment",
       name: "Развлечения",
-      icon: "Ticket",
+      icon: "🎬",
       tint: "oklch(0.92 0.05 280)",
       bar: "oklch(0.68 0.13 280)",
       monthlyLimit: 4000,
@@ -90,8 +86,7 @@ export function createDefaultData(): AppData {
     {
       id: "cat-transport",
       name: "Транспорт",
-      icon: "Bus",
-      iconImage: CATEGORY_ICON_IMAGES["cat-transport"],
+      icon: "🚌",
       tint: "oklch(0.92 0.05 200)",
       bar: "oklch(0.68 0.12 210)",
       monthlyLimit: 3000,

@@ -56,7 +56,6 @@ export function StatsScreen() {
                 <CategoryCard
                   key={category.id}
                   icon={category.icon}
-                  iconImage={category.iconImage}
                   name={category.name}
                   spent={spent}
                   budget={category.monthlyLimit}

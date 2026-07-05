@@ -74,7 +74,7 @@ function OnboardingDevBar() {
 function OnboardingProgress({ step }: { step: number }) {
   const progress = ((step + 1) / ONBOARDING_TOTAL_STEPS) * 100
   return (
-    <div className="shrink-0 px-6 pt-4">
+    <div className="shrink-0 px-6 pt-1.5">
       <div className="h-2.5 overflow-hidden rounded-full bg-secondary/80">
         <div
           className="onboarding-progress-fill h-full rounded-full transition-all duration-500 ease-out"
@@ -155,7 +155,7 @@ function OnboardingStepShell({
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-onboarding-scroll>
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center px-6 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div className="flex flex-col items-center px-6 pt-3 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div
           key={step}
           className={`flex w-full max-w-sm flex-col items-center text-center ${stepEnterClass}`}

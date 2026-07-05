@@ -43,14 +43,14 @@ export function createDefaultMandatoryExpenses(): BudgetEntry[] {
 }
 
 const CATEGORY_PALETTE = [
-  { tint: "oklch(0.93 0.06 40)", bar: "oklch(0.72 0.14 45)", icon: "Carrot" },
-  { tint: "oklch(0.93 0.05 355)", bar: "oklch(0.72 0.13 355)", icon: "Coffee" },
-  { tint: "oklch(0.93 0.06 160)", bar: "oklch(0.68 0.12 160)", icon: "Sparkles" },
-  { tint: "oklch(0.92 0.05 280)", bar: "oklch(0.68 0.13 280)", icon: "Ticket" },
-  { tint: "oklch(0.92 0.05 200)", bar: "oklch(0.68 0.12 210)", icon: "Bus" },
-  { tint: "oklch(0.92 0.05 300)", bar: "oklch(0.68 0.13 300)", icon: "ShoppingBag" },
-  { tint: "oklch(0.93 0.04 350)", bar: "oklch(0.78 0.115 355)", icon: "Heart" },
-  { tint: "oklch(0.92 0.05 120)", bar: "oklch(0.68 0.12 140)", icon: "Home" },
+  { tint: "oklch(0.93 0.06 40)", bar: "oklch(0.72 0.14 45)", icon: "🛒" },
+  { tint: "oklch(0.93 0.05 355)", bar: "oklch(0.72 0.13 355)", icon: "☕" },
+  { tint: "oklch(0.93 0.06 160)", bar: "oklch(0.68 0.12 160)", icon: "💄" },
+  { tint: "oklch(0.92 0.05 280)", bar: "oklch(0.68 0.13 280)", icon: "🎬" },
+  { tint: "oklch(0.92 0.05 200)", bar: "oklch(0.68 0.12 210)", icon: "🚌" },
+  { tint: "oklch(0.92 0.05 300)", bar: "oklch(0.68 0.13 300)", icon: "🛍️" },
+  { tint: "oklch(0.93 0.04 350)", bar: "oklch(0.78 0.115 355)", icon: "💗" },
+  { tint: "oklch(0.92 0.05 120)", bar: "oklch(0.68 0.12 140)", icon: "🏠" },
 ]
 
 export function paletteForIndex(index: number) {
@@ -70,7 +70,6 @@ export function buildCategoryFromEntry(
     monthlyLimit: entry.amount,
     kind,
     icon: entry.icon ?? existing?.icon ?? palette.icon,
-    iconImage: entry.iconImage ?? existing?.iconImage,
     tint: entry.tint ?? existing?.tint ?? palette.tint,
     bar: entry.bar ?? existing?.bar ?? palette.bar,
   }
@@ -85,7 +84,6 @@ export interface ApplyBudgetInput {
 
 export interface CategoryDraftMeta {
   icon: string
-  iconImage?: string
   tint: string
   bar: string
 }

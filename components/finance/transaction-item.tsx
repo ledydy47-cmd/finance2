@@ -4,7 +4,6 @@ import type { TransactionType } from "@/lib/types"
 
 interface TransactionItemProps {
   icon: string
-  iconImage?: string
   title: string
   category: string
   amount: number
@@ -20,7 +19,6 @@ function formatRub(value: number) {
 
 export function TransactionItem({
   icon,
-  iconImage,
   title,
   category,
   amount,
@@ -33,7 +31,7 @@ export function TransactionItem({
 
   return (
     <div className="flex items-center gap-3 py-2.5">
-      <CategoryIconBadge icon={icon} iconImage={iconImage} bar={bar} tint={tint} size="sm" />
+      <CategoryIconBadge icon={icon} bar={bar} tint={tint} size="sm" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-card-foreground">{title}</p>
         <p className="truncate text-xs text-muted-foreground">{category}</p>

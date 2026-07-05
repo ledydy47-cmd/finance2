@@ -2,7 +2,6 @@ import { CategoryIconBadge } from "@/components/finance/category-icon"
 
 interface CategoryCardProps {
   icon: string
-  iconImage?: string
   name: string
   spent: number
   budget: number
@@ -16,7 +15,6 @@ function formatRub(value: number) {
 
 export function CategoryCard({
   icon,
-  iconImage,
   name,
   spent,
   budget,
@@ -30,7 +28,7 @@ export function CategoryCard({
   return (
     <div className="rounded-block bg-card p-4 shadow-sm shadow-primary/5">
       <div className="flex items-center gap-3">
-        <CategoryIconBadge icon={icon} iconImage={iconImage} bar={bar} tint={tint} size="md" />
+        <CategoryIconBadge icon={icon} bar={bar} tint={tint} size="md" />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">

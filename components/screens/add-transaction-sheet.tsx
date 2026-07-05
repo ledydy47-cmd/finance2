@@ -80,7 +80,6 @@ export function AddTransactionSheet() {
                 >
                   <CategoryIconBadge
                     icon={category.icon}
-                    iconImage={category.iconImage}
                     bar={category.bar}
                     tint={category.tint}
                     size="lg"

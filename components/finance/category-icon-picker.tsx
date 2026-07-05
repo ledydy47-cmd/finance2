@@ -4,7 +4,7 @@ import { CategoryIconBadge } from "@/components/finance/category-icon"
 import { CATEGORY_ICON_OPTIONS, type CategoryIconOption } from "@/lib/category-icons"
 
 interface CategoryIconPickerProps {
-  value: Pick<CategoryIconOption, "icon" | "iconImage" | "tint" | "bar">
+  value: Pick<CategoryIconOption, "icon" | "tint" | "bar">
   onChange: (option: CategoryIconOption) => void
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -26,13 +26,7 @@ export function CategoryIconPicker({
         aria-label="Выбрать иконку"
         className="rounded-full transition-transform active:scale-95"
       >
-        <CategoryIconBadge
-          icon={value.icon}
-          iconImage={value.iconImage}
-          bar={value.bar}
-          tint={value.tint}
-          size={size}
-        />
+        <CategoryIconBadge icon={value.icon} bar={value.bar} tint={value.tint} size={size} />
       </button>
       {open && (
         <>
@@ -55,7 +49,6 @@ export function CategoryIconPicker({
               >
                 <CategoryIconBadge
                   icon={option.icon}
-                  iconImage={option.iconImage}
                   bar={option.bar}
                   tint={option.tint}
                   size="sm"

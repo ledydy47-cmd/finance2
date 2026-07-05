@@ -151,7 +151,6 @@ function draftFromOption(option: CategoryIconOption, id: string, name: string, a
     amount,
     iconKey: option.key,
     icon: option.icon,
-    iconImage: option.iconImage,
     tint: option.tint,
     bar: option.bar,
   }
@@ -236,7 +235,6 @@ export function BudgetPlannerScreen() {
                 id: cat.id,
                 name: cat.name,
                 icon: option.icon,
-                iconImage: option.iconImage,
                 tint: option.tint,
                 bar: option.bar,
                 monthlyLimit: 0,
@@ -302,7 +300,6 @@ export function BudgetPlannerScreen() {
           name: c.name.trim(),
           amount: parseAmount(c.amount),
           icon: c.icon,
-          iconImage: c.iconImage,
           tint: c.tint,
           bar: c.bar,
         })),
@@ -417,7 +414,6 @@ export function BudgetPlannerScreen() {
                               ...c,
                               iconKey: option.key,
                               icon: option.icon,
-                              iconImage: option.iconImage,
                               tint: option.tint,
                               bar: option.bar,
                             }

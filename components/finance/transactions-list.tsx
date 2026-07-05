@@ -44,8 +44,7 @@ export function TransactionsList({
         return (
           <TransactionItem
             key={tx.id}
-            icon={category?.icon ?? "Sparkles"}
-            iconImage={category?.iconImage}
+            icon={category?.icon ?? "✨"}
             title={tx.note || (tx.type === "income" ? "Доход" : "Расход")}
             category={
               category

@@ -1,6 +1,6 @@
 import type { AppData } from "./types"
 import { createDefaultData } from "./default-data"
-import { CATEGORY_ICON_IMAGES } from "./category-icons"
+import { emojiForCategoryId } from "./category-icons"
 import { DEFAULT_THEME_ID, isThemeId } from "./themes"
 import {
   buildCategoriesFromPlan,
@@ -33,12 +33,12 @@ function migrateData(data: AppData, defaults: AppData): AppData {
     defaults.budgetPlan
 
   let categories = data.categories.map((category) => {
-    const iconImage = CATEGORY_ICON_IMAGES[category.id]
     const kind = category.kind ?? "flexible"
+    const { iconImage: _removed, ...rest } = category
     return {
-      ...category,
+      ...rest,
       kind,
-      ...(iconImage ? { iconImage } : {}),
+      icon: emojiForCategoryId(category.id, category.icon),
       ...(category.id === "cat-beauty" ? { name: "Косметика" } : {}),
     }
   })
