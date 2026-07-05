@@ -177,6 +177,7 @@ export function BudgetPlannerScreen() {
   const [flexibleCategories, setFlexibleCategories] = useState<FlexibleDraft[]>([])
   const [coachMarkDismissed, setCoachMarkDismissed] = useState(false)
   const [openIconPickerId, setOpenIconPickerId] = useState<string | null>(null)
+  const budgetIntroRef = useRef<HTMLElement>(null)
   const firstCategoryAmountRef = useRef<HTMLInputElement>(null)
 
   const primaryGoal = getPrimaryGoal()
@@ -252,14 +253,6 @@ export function BudgetPlannerScreen() {
     )
   }, [showBudgetPlanner, data.budgetPlan, data.categories, summary.income, isHomeSetupActive])
 
-  useEffect(() => {
-    if (!showBudgetPlanner || coachMarkDismissed || !isHomeSetupActive) return
-    const t = window.setTimeout(() => {
-      firstCategoryAmountRef.current?.scrollIntoView({ block: "center", behavior: "smooth" })
-    }, 120)
-    return () => window.clearTimeout(t)
-  }, [showBudgetPlanner, coachMarkDismissed, isHomeSetupActive, flexibleCategories.length])
-
   const incomeNumeric = useMemo(() => toEntries(incomeSources), [incomeSources])
   const mandatoryNumeric = useMemo(() => toEntries(mandatoryExpenses), [mandatoryExpenses])
   const flexibleNumeric = useMemo(() => toEntries(flexibleCategories), [flexibleCategories])
@@ -322,7 +315,7 @@ export function BudgetPlannerScreen() {
 
   return (
     <div className="absolute inset-0 z-[70] flex flex-col bg-background">
-      <header className="flex items-center gap-3 px-4 pb-2 pt-4">
+      <header ref={budgetIntroRef} className="flex items-center gap-3 px-4 pb-2 pt-4">
         <button
           type="button"
           onClick={() => setShowBudgetPlanner(false)}
@@ -437,9 +430,6 @@ export function BudgetPlannerScreen() {
                   dataTour={index === 0 ? "budget-first-category-amount" : undefined}
                   value={category.amount}
                   onChange={(amount) => handleCategoryAmountChange(category.id, amount)}
-                  onFocus={() => {
-                    if (isHomeSetupActive && !coachMarkDismissed) dismissCoachMark()
-                  }}
                   placeholder="0"
                   numericOnly
                   className="w-24 text-right"
@@ -495,7 +485,7 @@ export function BudgetPlannerScreen() {
       </div>
 
       <BudgetPlannerCoachMark
-        firstCategoryAmountRef={firstCategoryAmountRef}
+        introTargetRef={budgetIntroRef}
         dismissed={coachMarkDismissed}
         onDismiss={dismissCoachMark}
       />

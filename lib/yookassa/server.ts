@@ -22,8 +22,8 @@ export interface YooKassaPayment {
 }
 
 function getCredentials() {
-  const shopId = process.env.YOOKASSA_SHOP_ID
-  const secretKey = process.env.YOOKASSA_SECRET_KEY
+  const shopId = process.env.YOOKASSA_SHOP_ID ?? process.env.YUKASSA_SHOP_ID
+  const secretKey = process.env.YOOKASSA_SECRET_KEY ?? process.env.YUKASSA_SECRET_KEY
   if (!shopId || !secretKey) {
     throw new Error("YOOKASSA_NOT_CONFIGURED")
   }
@@ -37,7 +37,9 @@ function authHeader() {
 }
 
 export function isYooKassaConfigured() {
-  return Boolean(process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY)
+  const shopId = process.env.YOOKASSA_SHOP_ID ?? process.env.YUKASSA_SHOP_ID
+  const secretKey = process.env.YOOKASSA_SECRET_KEY ?? process.env.YUKASSA_SECRET_KEY
+  return Boolean(shopId && secretKey)
 }
 
 export async function createYooKassaPayment(input: {

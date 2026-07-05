@@ -3,15 +3,16 @@
 import type { RefObject } from "react"
 import { CoachMarkOverlay } from "@/components/coach-mark/coach-mark-overlay"
 import { useFinance } from "@/context/finance-context"
+import { SETUP_TOUR_BUDGET_HINT } from "@/lib/setup-tour"
 
 interface BudgetPlannerCoachMarkProps {
-  firstCategoryAmountRef: RefObject<HTMLInputElement | null>
+  introTargetRef: RefObject<HTMLElement | null>
   dismissed: boolean
   onDismiss: () => void
 }
 
 export function BudgetPlannerCoachMark({
-  firstCategoryAmountRef,
+  introTargetRef,
   dismissed,
   onDismiss,
 }: BudgetPlannerCoachMarkProps) {
@@ -21,10 +22,10 @@ export function BudgetPlannerCoachMark({
 
   return (
     <CoachMarkOverlay
-      targetRef={firstCategoryAmountRef}
-      text="Распланируй, сколько планируешь потратить в этой категории. Остаток пойдёт на мечту ✈️"
+      targetRef={introTargetRef}
+      text={SETUP_TOUR_BUDGET_HINT}
       onDismiss={onDismiss}
-      nextLabel="Далее"
+      nextLabel="Понятно"
       placement="below"
     />
   )

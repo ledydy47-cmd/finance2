@@ -155,7 +155,7 @@ function OnboardingStepShell({
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-onboarding-scroll>
-      <div className="flex flex-col items-center px-6 pt-3 pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div className="flex flex-col items-center px-6 pt-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div
           key={step}
           className={`flex w-full max-w-sm flex-col items-center text-center ${stepEnterClass}`}

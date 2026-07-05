@@ -2,6 +2,9 @@ import type { BudgetEntry } from "./types"
 
 export const SETUP_TOUR_TOTAL_STEPS = 3
 
+export const SETUP_TOUR_BUDGET_HINT =
+  "Укажи свои доходы и обязательные платежи, спланируй траты по категориям. Всё сэкономленное пойдёт в копилку твоей мечты ❤️"
+
 export const SETUP_TOUR_CATEGORIES: BudgetEntry[] = [
   { id: "cat-products", name: "Продукты", amount: 0 },
   { id: "cat-cafe", name: "Кафе и доставка", amount: 0 },

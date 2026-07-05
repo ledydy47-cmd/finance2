@@ -41,7 +41,7 @@ export function OnboardingProfileAnalysisStep({
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-onboarding-scroll>
-      <div className="flex flex-col items-center px-6 pt-3 pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div className="flex flex-col items-center px-6 pt-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div className={`w-full max-w-sm text-center ${stepEnterClass}`}>
           <h2 className="font-serif text-2xl font-bold text-foreground">
             Настраиваем приложение под тебя
