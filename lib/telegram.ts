@@ -47,7 +47,11 @@ export function ensureTelegramSdk(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve()
   if (window.Telegram?.WebApp) return Promise.resolve()
   if (!sdkLoadPromise) {
-    sdkLoadPromise = import("@twa-dev/sdk").then(() => undefined)
+    sdkLoadPromise = import("@twa-dev/sdk")
+      .then(() => undefined)
+      .catch((error) => {
+        console.warn("[telegram] SDK import failed", error)
+      })
   }
   return sdkLoadPromise
 }

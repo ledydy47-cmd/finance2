@@ -1,4 +1,4 @@
-import type { SubscriptionPlan } from "./subscription"
+import type { SubscriptionPlan } from "@/lib/subscription"
 
 export interface YooKassaAmount {
   value: string

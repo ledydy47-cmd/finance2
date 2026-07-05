@@ -145,7 +145,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    void ensureTelegramSdk().then(() => {
+    const finishHydration = () => {
       if (cancelled) return
       const loaded = syncPeriod(loadAppData())
       const subscribed = isUserSubscribed(loaded.settings)
@@ -155,10 +155,20 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setData(loaded)
       applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
       setHydrated(true)
-    })
+    }
+
+    const timeoutId = window.setTimeout(finishHydration, 3000)
+
+    void ensureTelegramSdk()
+      .catch(() => undefined)
+      .finally(() => {
+        window.clearTimeout(timeoutId)
+        finishHydration()
+      })
 
     return () => {
       cancelled = true
+      window.clearTimeout(timeoutId)
     }
   }, [])
 

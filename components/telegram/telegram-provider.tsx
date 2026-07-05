@@ -36,17 +36,19 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    void ensureTelegramSdk().then(() => {
-      if (cancelled) return
-      initTelegramWebApp()
-      const webApp = getWebApp()
-      setSnapshot({
-        isTelegram: Boolean(webApp?.initData),
-        user: webApp?.initDataUnsafe?.user ?? null,
-        platform: webApp?.platform ?? "unknown",
+    void ensureTelegramSdk()
+      .catch(() => undefined)
+      .finally(() => {
+        if (cancelled) return
+        initTelegramWebApp()
+        const webApp = getWebApp()
+        setSnapshot({
+          isTelegram: Boolean(webApp?.initData),
+          user: webApp?.initDataUnsafe?.user ?? null,
+          platform: webApp?.platform ?? "unknown",
+        })
+        setIsReady(true)
       })
-      setIsReady(true)
-    })
 
     return () => {
       cancelled = true
