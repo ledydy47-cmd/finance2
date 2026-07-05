@@ -28,9 +28,20 @@ export function loadAppData(): AppData {
 }
 
 function migrateData(data: AppData, defaults: AppData): AppData {
-  const budgetPlan =
+  const budgetPlanRaw =
     migrateLegacyBudgetPlan(data.budgetPlan as Record<string, unknown> | undefined, data.categories) ??
     defaults.budgetPlan
+
+  const budgetPlan = budgetPlanRaw
+    ? {
+        ...budgetPlanRaw,
+        mandatoryExpenses: budgetPlanRaw.mandatoryExpenses.map((entry) =>
+          entry.id === "cat-rent" && entry.name === "Аренда"
+            ? { ...entry, name: "Жилье" }
+            : entry,
+        ),
+      }
+    : budgetPlanRaw
 
   let categories = data.categories.map((category) => {
     const kind = category.kind ?? "flexible"
@@ -40,6 +51,7 @@ function migrateData(data: AppData, defaults: AppData): AppData {
       kind,
       icon: emojiForCategoryId(category.id, category.icon),
       ...(category.id === "cat-beauty" ? { name: "Косметика" } : {}),
+      ...(category.id === "cat-rent" && category.name === "Аренда" ? { name: "Жилье" } : {}),
     }
   })
 

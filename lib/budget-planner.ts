@@ -37,7 +37,7 @@ export function createDefaultIncomeSources(): BudgetEntry[] {
 
 export function createDefaultMandatoryExpenses(): BudgetEntry[] {
   return [
-    { id: "cat-rent", name: "Аренда", amount: 0 },
+    { id: "cat-rent", name: "Жилье", amount: 0 },
     { id: "cat-utilities", name: "ЖКХ", amount: 0 },
   ]
 }
@@ -77,7 +77,7 @@ export function buildCategoryFromEntry(
 
 export interface ApplyBudgetInput {
   incomeSources: BudgetEntry[]
-  mandatoryExpenses: BudgetEntry[]
+  mandatoryExpenses: FlexibleCategoryEntry[]
   flexibleCategories: FlexibleCategoryEntry[]
   goalContribution: number
 }

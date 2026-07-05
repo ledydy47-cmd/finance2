@@ -17,12 +17,11 @@ export function OnboardingMascot({ size = "hero" }: { size?: keyof typeof SIZE_M
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/mascot.png"
+        src="/mascot.png?v=2"
         alt="Маниточка"
         width={image}
         height={image}
-        className="h-[92%] w-[92%] object-contain object-center"
-        style={{ backgroundColor: "transparent" }}
+        className="h-[92%] w-[92%] bg-white object-contain object-center"
         decoding="async"
       />
     </div>

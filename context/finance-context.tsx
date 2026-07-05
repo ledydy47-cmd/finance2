@@ -169,7 +169,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [showNewMonthModal, setShowNewMonthModal] = useState(false)
   const [celebratingGoal, setCelebratingGoal] = useState<Goal | null>(null)
   const [showCreateGoalPrompt, setShowCreateGoalPrompt] = useState(false)
-  const [showGoalCreateForm, setShowGoalCreateForm] = useState(false)
+  const [showGoalCreateForm, setShowGoalCreateFormState] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -226,6 +226,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const isContentLocked =
     data.settings.paywallShown && !isUserSubscribed(data.settings)
+
+  const requiresPremiumAfterWalkthrough =
+    data.settings.homeWalkthroughCompleted && !isUserSubscribed(data.settings)
 
   const openPaywall = useCallback(() => setShowPaywall(true), [])
   const closePaywall = useCallback(() => setShowPaywall(false), [])
@@ -331,6 +334,25 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return false
   }, [isContentLocked])
 
+  const guardPremiumGoalCreation = useCallback(() => {
+    if (
+      requiresPremiumAfterWalkthrough &&
+      getActiveGoals(data.goals).length >= 1
+    ) {
+      setShowPaywall(true)
+      return true
+    }
+    return false
+  }, [data.goals, requiresPremiumAfterWalkthrough])
+
+  const guardPremiumGoalEdit = useCallback(() => {
+    if (requiresPremiumAfterWalkthrough) {
+      setShowPaywall(true)
+      return true
+    }
+    return false
+  }, [requiresPremiumAfterWalkthrough])
+
   const addTransaction = useCallback(
     (input: {
       amount: number
@@ -396,6 +418,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const addGoal = useCallback(
     (input: Omit<Goal, "id" | "savedAmount">) => {
+      if (guardPremiumGoalCreation()) return
       if (guardLocked()) return
       const goal: Goal = { ...input, id: crypto.randomUUID(), savedAmount: 0 }
       update((prev) => ({
@@ -407,18 +430,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         },
       }))
     },
-    [guardLocked, update],
+    [guardLocked, guardPremiumGoalCreation, update],
   )
 
   const updateGoal = useCallback(
     (id: string, patch: Partial<Omit<Goal, "id">>) => {
+      if (guardPremiumGoalEdit()) return
       if (guardLocked()) return
       update((prev) => ({
         ...prev,
         goals: prev.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)),
       }))
     },
-    [guardLocked, update],
+    [guardLocked, guardPremiumGoalEdit, update],
   )
 
   const deleteGoal = useCallback(
@@ -661,11 +685,20 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setShowCreateGoalPrompt(true)
   }, [celebratingGoal, update])
 
+  const setShowGoalCreateForm = useCallback(
+    (open: boolean) => {
+      if (open && guardPremiumGoalCreation()) return
+      setShowGoalCreateFormState(open)
+    },
+    [guardPremiumGoalCreation],
+  )
+
   const openCreateGoalFlow = useCallback(() => {
+    if (guardPremiumGoalCreation()) return
     setShowCreateGoalPrompt(false)
     setShowGoalCreateForm(true)
     setActiveTab("goals")
-  }, [])
+  }, [guardPremiumGoalCreation, setShowGoalCreateForm])
 
   const dismissCreateGoalPrompt = useCallback(() => {
     setShowCreateGoalPrompt(false)

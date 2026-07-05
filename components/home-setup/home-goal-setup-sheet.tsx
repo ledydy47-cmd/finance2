@@ -15,6 +15,7 @@ export function HomeGoalSetupSheet() {
 
   const targetAmount = parseAmount(target)
   const canSave = name.trim().length > 0 && targetAmount > 0
+  const hasCustomPhoto = image.startsWith("data:")
 
   function handleImageUpload(file: File | undefined) {
     if (!file) return
@@ -46,16 +47,26 @@ export function HomeGoalSetupSheet() {
           </button>
         </div>
 
-        <label className="relative mb-4 block h-32 overflow-hidden rounded-block-inner bg-secondary">
+        <label className="relative mb-4 block h-36 overflow-hidden rounded-block-inner bg-secondary">
           {image.startsWith("data:") ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={image} alt="Фото цели" className="size-full object-cover" />
           ) : (
             <Image src={image} alt="Фото цели" fill className="object-cover" sizes="360px" />
           )}
-          <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-foreground/10 text-xs font-semibold text-foreground/80">
-            <Camera className="size-5" strokeWidth={2.2} />
-            Добавить фото
+          <span
+            className={`absolute inset-0 flex flex-col items-center justify-center gap-2 ${
+              hasCustomPhoto
+                ? "bg-gradient-to-t from-black/55 via-black/20 to-transparent"
+                : "bg-black/45"
+            }`}
+          >
+            <span className="flex size-11 items-center justify-center rounded-full bg-white text-primary shadow-lg">
+              <Camera className="size-5" strokeWidth={2.4} />
+            </span>
+            <span className="rounded-full bg-white px-4 py-1.5 text-sm font-bold text-foreground shadow-md">
+              {hasCustomPhoto ? "Изменить фото" : "Добавить фото"}
+            </span>
           </span>
           <input
             type="file"

@@ -20,6 +20,8 @@ export interface CategoryIconOption {
 }
 
 const ICON_KEYS = [
+  "cat-rent",
+  "cat-utilities",
   "cat-products",
   "cat-cafe",
   "cat-beauty",
@@ -28,6 +30,8 @@ const ICON_KEYS = [
 ] as const
 
 const ICON_LABELS: Record<(typeof ICON_KEYS)[number], string> = {
+  "cat-rent": "Жилье",
+  "cat-utilities": "ЖКХ",
   "cat-products": "Продукты",
   "cat-cafe": "Кафе",
   "cat-beauty": "Косметика",

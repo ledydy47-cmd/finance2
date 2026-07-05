@@ -28,7 +28,7 @@ interface EntryDraft {
   amount: string
 }
 
-interface FlexibleDraft extends EntryDraft, CategoryDraftMeta {
+interface CategoryEntryDraft extends EntryDraft, CategoryDraftMeta {
   iconKey: string
 }
 
@@ -144,7 +144,7 @@ function EntryListSection({
   )
 }
 
-function draftFromOption(option: CategoryIconOption, id: string, name: string, amount: string): FlexibleDraft {
+function draftFromOption(option: CategoryIconOption, id: string, name: string, amount: string): CategoryEntryDraft {
   return {
     id,
     name,
@@ -156,7 +156,7 @@ function draftFromOption(option: CategoryIconOption, id: string, name: string, a
   }
 }
 
-function categoryToFlexibleDraft(category: Category, amount: string): FlexibleDraft {
+function categoryToEntryDraft(category: Category, amount: string): CategoryEntryDraft {
   const option = iconOptionForCategoryId(category.id)
   return draftFromOption(option, category.id, category.name, amount)
 }
@@ -173,10 +173,11 @@ export function BudgetPlannerScreen() {
   } = useFinance()
 
   const [incomeSources, setIncomeSources] = useState<EntryDraft[]>([])
-  const [mandatoryExpenses, setMandatoryExpenses] = useState<EntryDraft[]>([])
-  const [flexibleCategories, setFlexibleCategories] = useState<FlexibleDraft[]>([])
+  const [mandatoryExpenses, setMandatoryExpenses] = useState<CategoryEntryDraft[]>([])
+  const [flexibleCategories, setFlexibleCategories] = useState<CategoryEntryDraft[]>([])
   const [coachMarkDismissed, setCoachMarkDismissed] = useState(false)
   const [openIconPickerId, setOpenIconPickerId] = useState<string | null>(null)
+  const [openMandatoryIconPickerId, setOpenMandatoryIconPickerId] = useState<string | null>(null)
   const budgetIntroRef = useRef<HTMLElement>(null)
   const firstCategoryAmountRef = useRef<HTMLInputElement>(null)
 
@@ -186,6 +187,7 @@ export function BudgetPlannerScreen() {
     if (!showBudgetPlanner) {
       setCoachMarkDismissed(false)
       setOpenIconPickerId(null)
+      setOpenMandatoryIconPickerId(null)
       return
     }
 
@@ -218,11 +220,22 @@ export function BudgetPlannerScreen() {
     )
 
     setMandatoryExpenses(
-      mandatory.map((e) => ({
-        id: e.id,
-        name: e.name,
-        amount: e.amount > 0 ? String(e.amount) : "",
-      })),
+      mandatory.map((e) => {
+        const category = mandatoryCats.find((c) => c.id === e.id)
+        if (category) {
+          return categoryToEntryDraft(
+            category,
+            e.amount > 0 ? String(e.amount) : "",
+          )
+        }
+        const option = iconOptionForCategoryId(e.id)
+        return draftFromOption(
+          option,
+          e.id,
+          e.name,
+          e.amount > 0 ? String(e.amount) : "",
+        )
+      }),
     )
 
     const flexList =
@@ -248,7 +261,7 @@ export function BudgetPlannerScreen() {
       flexList.map((category) => {
         const fromPlan = plan?.categoryAllocations[category.id]
         const amount = fromPlan ?? category.monthlyLimit
-        return categoryToFlexibleDraft(category, amount > 0 ? String(amount) : "")
+        return categoryToEntryDraft(category, amount > 0 ? String(amount) : "")
       }),
     )
   }, [showBudgetPlanner, data.budgetPlan, data.categories, summary.income, isHomeSetupActive])
@@ -285,7 +298,16 @@ export function BudgetPlannerScreen() {
     if (overspent || incomeTotal <= 0) return
     applyBudgetPlan({
       incomeSources: incomeNumeric.filter((e) => e.name && e.amount > 0),
-      mandatoryExpenses: mandatoryNumeric.filter((e) => e.name && e.amount > 0),
+      mandatoryExpenses: mandatoryExpenses
+        .filter((c) => c.name.trim())
+        .map((c) => ({
+          id: c.id,
+          name: c.name.trim(),
+          amount: parseAmount(c.amount),
+          icon: c.icon,
+          tint: c.tint,
+          bar: c.bar,
+        })),
       flexibleCategories: flexibleCategories
         .filter((c) => c.name.trim())
         .map((c) => ({
@@ -298,6 +320,17 @@ export function BudgetPlannerScreen() {
         })),
       goalContribution: dreamAmount,
     })
+  }
+
+  function addMandatoryExpense() {
+    const usedKeys = new Set(mandatoryExpenses.map((c) => c.iconKey))
+    const option =
+      CATEGORY_ICON_OPTIONS.find((o) => !usedKeys.has(o.key)) ??
+      CATEGORY_ICON_OPTIONS[mandatoryExpenses.length % CATEGORY_ICON_OPTIONS.length]
+    setMandatoryExpenses((prev) => [
+      ...prev,
+      draftFromOption(option, crypto.randomUUID(), "", ""),
+    ])
   }
 
   function addFlexibleCategory() {
@@ -344,25 +377,82 @@ export function BudgetPlannerScreen() {
         />
 
         <div className="mt-4">
-          <EntryListSection
-            title="Обязательные расходы"
-            subtotalLabel="Обязательные"
-            subtotal={mandatoryTotal}
-            entries={mandatoryExpenses}
-            onAdd={() =>
-              setMandatoryExpenses((prev) => [
-                ...prev,
-                { id: crypto.randomUUID(), name: "", amount: "" },
-              ])
-            }
-            onUpdate={(id, patch) =>
-              setMandatoryExpenses((prev) =>
-                prev.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-              )
-            }
-            onRemove={(id) => setMandatoryExpenses((prev) => prev.filter((e) => e.id !== id))}
-            addLabel="Добавить расход"
-          />
+          <section className="rounded-block bg-card p-4 shadow-sm shadow-primary/5">
+            <div className="mb-3 flex items-baseline justify-between gap-2">
+              <h2 className="font-serif text-base font-bold text-foreground">Обязательные расходы</h2>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Обязательные: {formatRub(mandatoryTotal)}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {mandatoryExpenses.map((entry) => (
+                <div key={entry.id} className="flex items-center gap-2">
+                  <CategoryIconPicker
+                    value={entry}
+                    open={openMandatoryIconPickerId === entry.id}
+                    onOpenChange={(open) =>
+                      setOpenMandatoryIconPickerId(open ? entry.id : null)
+                    }
+                    onChange={(option) =>
+                      setMandatoryExpenses((prev) =>
+                        prev.map((e) =>
+                          e.id === entry.id
+                            ? {
+                                ...e,
+                                iconKey: option.key,
+                                icon: option.icon,
+                                tint: option.tint,
+                                bar: option.bar,
+                              }
+                            : e,
+                        ),
+                      )
+                    }
+                  />
+                  <PillInput
+                    value={entry.name}
+                    onChange={(name) =>
+                      setMandatoryExpenses((prev) =>
+                        prev.map((e) => (e.id === entry.id ? { ...e, name } : e)),
+                      )
+                    }
+                    placeholder="Название"
+                    className="min-w-0 flex-1"
+                  />
+                  <PillInput
+                    value={entry.amount}
+                    onChange={(amount) =>
+                      setMandatoryExpenses((prev) =>
+                        prev.map((e) => (e.id === entry.id ? { ...e, amount } : e)),
+                      )
+                    }
+                    placeholder="0"
+                    numericOnly
+                    className="w-24 text-right"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMandatoryExpenses((prev) => prev.filter((e) => e.id !== entry.id))
+                    }
+                    aria-label="Удалить"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full border border-primary/20 text-sm font-bold text-muted-foreground"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={addMandatoryExpense}
+              className="mt-3 flex w-full items-center justify-center rounded-block-sm border-2 border-dashed border-primary/30 py-2.5 text-sm font-bold text-primary"
+            >
+              + Добавить расход
+            </button>
+          </section>
           <p className="mt-2 px-1 text-xs text-muted-foreground">
             Станут категориями на главной после применения бюджета
           </p>
