@@ -51,9 +51,33 @@ export function ensureTelegramSdk(): Promise<void> {
       .then(() => undefined)
       .catch((error) => {
         console.warn("[telegram] SDK import failed", error)
+        // Official script from layout may already expose window.Telegram.WebApp
       })
   }
   return sdkLoadPromise
+}
+
+export function waitForTelegramWebApp(timeoutMs = 2500): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve()
+  if (window.Telegram?.WebApp) return Promise.resolve()
+
+  return new Promise((resolve) => {
+    const startedAt = Date.now()
+
+    const check = () => {
+      if (window.Telegram?.WebApp) {
+        resolve()
+        return
+      }
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve()
+        return
+      }
+      window.setTimeout(check, 50)
+    }
+
+    check()
+  })
 }
 
 export function getWebApp(): TelegramWebApp | null {

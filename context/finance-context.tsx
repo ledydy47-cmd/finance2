@@ -15,7 +15,7 @@ import { buildArchive, getCurrentPeriodKey, getMonthlySummary } from "@/lib/calc
 import { createDefaultData } from "@/lib/default-data"
 import { getPeriodLabel, getPeriodLabelFromKey } from "@/lib/period"
 import { loadAppData, saveAppData } from "@/lib/storage"
-import { ensureTelegramSdk } from "@/lib/telegram"
+import { ensureTelegramSdk, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
 import { isSubscriptionActive } from "@/lib/subscription"
 import type { ThemeId } from "@/lib/themes"
@@ -94,6 +94,8 @@ interface FinanceContextValue {
   getCategoryById: (id: string | null) => Category | undefined
 }
 
+const FinanceContext = createContext<FinanceContextValue | null>(null)
+
 function isUserSubscribed(settings: Settings) {
   if (settings.subscriptionExpiresAt) {
     return isSubscriptionActive(settings.subscriptionExpiresAt)
@@ -157,9 +159,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setHydrated(true)
     }
 
-    const timeoutId = window.setTimeout(finishHydration, 3000)
+    const timeoutId = window.setTimeout(finishHydration, 1500)
 
-    void ensureTelegramSdk()
+    void waitForTelegramWebApp(1500)
+      .then(() => ensureTelegramSdk())
       .catch(() => undefined)
       .finally(() => {
         window.clearTimeout(timeoutId)
@@ -620,14 +623,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     skipHomeSetup,
     completeHomeWalkthrough,
     getCategoryById,
-  }
-
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="font-serif text-lg text-muted-foreground">Загрузка…</p>
-      </div>
-    )
   }
 
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>

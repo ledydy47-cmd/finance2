@@ -1,5 +1,4 @@
 import { Analytics } from '@vercel/analytics/next'
-import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
 import { Quicksand, Nunito } from 'next/font/google'
 import './globals.css'
@@ -58,7 +57,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className={`light bg-background ${quicksand.variable} ${nunito.variable}`} data-theme="lavender" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
+        <script src="https://telegram.org/js/telegram-web-app.js" />
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

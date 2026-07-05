@@ -6,6 +6,7 @@ import {
   getWebApp,
   initTelegramWebApp,
   openExternalLink,
+  waitForTelegramWebApp,
   type TelegramUser,
 } from "@/lib/telegram"
 
@@ -36,7 +37,8 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    void ensureTelegramSdk()
+    void waitForTelegramWebApp(1500)
+      .then(() => ensureTelegramSdk())
       .catch(() => undefined)
       .finally(() => {
         if (cancelled) return
