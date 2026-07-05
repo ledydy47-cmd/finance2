@@ -11,10 +11,10 @@ import {
   type SubscriptionPlan,
 } from "@/lib/subscription"
 
-const TESTIMONIAL_OFFSETS = [
-  { shift: "-translate-x-3 rotate-[-1.5deg]", z: "z-30" },
-  { shift: "translate-x-4 rotate-[1.5deg]", z: "z-20" },
-  { shift: "-translate-x-2 rotate-[-0.5deg]", z: "z-10" },
+const TESTIMONIAL_LAYOUT = [
+  { className: "left-0 top-0 right-5 z-30 -rotate-1", contentClass: "" },
+  { className: "left-5 top-[3.35rem] right-0 z-20 rotate-1", contentClass: "" },
+  { className: "left-1 top-[6.7rem] right-3 z-10 -rotate-[0.5deg]", contentClass: "" },
 ] as const
 
 function PlanRadio({ selected }: { selected: boolean }) {
@@ -118,18 +118,18 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           ))}
         </div>
 
-        <div className="relative mx-auto mt-3 w-full max-w-[20rem] shrink-0 pb-1">
+        <div className="relative mx-auto mt-3 h-[11.25rem] w-full max-w-[21rem] shrink-0">
           {PAYWALL_TESTIMONIALS.map((review, index) => (
             <article
               key={review.author}
-              className={`relative rounded-block-sm border border-border/70 bg-card px-3.5 py-3 shadow-md shadow-primary/10 ${TESTIMONIAL_OFFSETS[index].shift} ${TESTIMONIAL_OFFSETS[index].z} ${
-                index > 0 ? "-mt-5" : ""
-              }`}
+              className={`absolute rounded-block-sm border border-border/70 bg-card px-3.5 py-2.5 shadow-md shadow-primary/10 ${TESTIMONIAL_LAYOUT[index].className}`}
             >
-              <p className="text-[13px] leading-snug text-foreground">«{review.text}»</p>
-              <p className="mt-1.5 text-[11px] font-semibold text-muted-foreground">
-                — {review.author}
-              </p>
+              <div className={TESTIMONIAL_LAYOUT[index].contentClass}>
+                <p className="text-[13px] leading-snug text-foreground">«{review.text}»</p>
+                <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
+                  — {review.author}
+                </p>
+              </div>
             </article>
           ))}
         </div>
