@@ -22,13 +22,13 @@ export function ThemePicker({ compact, showPreview = true }: ThemePickerProps) {
 
 export function OnboardingThemeStep() {
   return (
-    <div className="flex w-full flex-col">
+    <div className="flex w-full flex-col items-center text-center">
       <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/15 text-3xl">
         🎨
       </div>
       <h2 className="font-serif text-2xl font-bold text-foreground">Выбери свою тему 🎨</h2>
       <p className="mt-2 text-sm text-muted-foreground">Настрой приложение под себя</p>
-      <div className="mt-5">
+      <div className="mt-5 w-full">
         <ThemePicker />
       </div>
     </div>

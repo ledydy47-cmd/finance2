@@ -137,7 +137,6 @@ function OptionButton({
 function OnboardingStepShell({
   step,
   stepEnterClass,
-  centered,
   canContinue,
   buttonLabel,
   onNext,
@@ -147,7 +146,6 @@ function OnboardingStepShell({
 }: {
   step: number
   stepEnterClass: string
-  centered?: boolean
   canContinue: boolean
   buttonLabel: string
   onNext: () => void
@@ -160,7 +158,7 @@ function OnboardingStepShell({
       <div className="flex min-h-[100dvh] flex-col items-center justify-center px-6 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div
           key={step}
-          className={`w-full max-w-sm ${centered ? "flex flex-col items-center text-center" : ""} ${stepEnterClass}`}
+          className={`flex w-full max-w-sm flex-col items-center text-center ${stepEnterClass}`}
         >
           {children}
           {!hideButton && (
@@ -307,7 +305,7 @@ export function OnboardingFlow() {
       <OnboardingProgress step={step} />
 
       {step === 0 && (
-        <OnboardingStepShell {...shellProps} centered>
+        <OnboardingStepShell {...shellProps}>
           <div className="mb-6">
             <OnboardingMascot size="hero" />
           </div>
@@ -320,7 +318,7 @@ export function OnboardingFlow() {
 
       {step === 1 && (
         <OnboardingStepShell {...shellProps}>
-          <div className="mb-6 flex size-16 items-center justify-center rounded-full bg-primary/15 shadow-sm shadow-primary/5">
+          <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-primary/15 shadow-sm shadow-primary/5">
             <Hand className="size-8 text-primary" strokeWidth={2.2} />
           </div>
           <h2 className="font-serif text-2xl font-bold text-foreground">Как тебя зовут?</h2>
@@ -339,7 +337,7 @@ export function OnboardingFlow() {
 
       {step === 2 && (
         <OnboardingStepShell {...shellProps}>
-          <div className="mb-6 flex size-16 items-center justify-center rounded-full bg-primary/15">
+          <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-primary/15">
             <Cake className="size-8 text-primary" strokeWidth={2.2} />
           </div>
           <h2 className="font-serif text-2xl font-bold text-foreground">Сколько тебе лет?</h2>
@@ -425,19 +423,19 @@ export function OnboardingFlow() {
       )}
 
       {step === 7 && (
-        <OnboardingStepShell {...shellProps} centered buttonLabel="Начать вести учёт 📊">
+        <OnboardingStepShell {...shellProps} buttonLabel="Начать вести учёт 📊">
           <OnboardingTracking30DaysStep />
         </OnboardingStepShell>
       )}
 
       {step === 8 && (
-        <OnboardingStepShell {...shellProps} centered>
+        <OnboardingStepShell {...shellProps}>
           <OnboardingGoodNewsStep />
         </OnboardingStepShell>
       )}
 
       {step === 9 && (
-        <OnboardingStepShell {...shellProps} centered>
+        <OnboardingStepShell {...shellProps}>
           <OnboardingLongTermHabitsStep name={draft.name.trim() || data.settings.userName} />
         </OnboardingStepShell>
       )}
@@ -515,7 +513,6 @@ export function OnboardingFlow() {
       {step === 12 && (
         <OnboardingStepShell
           {...shellProps}
-          centered
           buttonLabel="Беру на себя обязательство 💗"
           footerSubtitle="Обещание самой себе помогает довести дело до конца"
         >

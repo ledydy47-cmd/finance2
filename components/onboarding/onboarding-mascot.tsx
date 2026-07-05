@@ -15,14 +15,14 @@ export function OnboardingMascot({ size = "hero" }: { size?: keyof typeof SIZE_M
 
   return (
     <div
-      className={`flex ${box} items-center justify-center rounded-full bg-white p-2 shadow-lg shadow-primary/15 ring-1 ring-black/[0.04]`}
+      className={`relative flex ${box} shrink-0 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 shadow-lg shadow-primary/15 ring-1 ring-black/[0.04]`}
     >
       <Image
         src="/mascot.png"
         alt="Маниточка"
         width={image}
         height={image}
-        className="h-full w-full object-contain mix-blend-multiply"
+        className="h-[92%] w-[92%] object-contain"
         priority
       />
     </div>

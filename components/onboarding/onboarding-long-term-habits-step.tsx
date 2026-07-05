@@ -1,5 +1,8 @@
 "use client"
 
+import { TrendingDown, TrendingUp } from "lucide-react"
+import { ManiTochka } from "@/components/brand/mani-tochka"
+
 interface OnboardingLongTermHabitsStepProps {
   name: string
 }
@@ -8,16 +11,15 @@ export function OnboardingLongTermHabitsStep({ name }: OnboardingLongTermHabitsS
   const displayName = name.trim() || "друг"
 
   return (
-    <div className="w-full">
-      <h2 className="text-center font-serif text-xl font-bold leading-snug tracking-tight text-foreground">
-        {displayName}, <span className="text-primary">мани.точка</span> формирует привычку копить
-        надолго
+    <div className="flex w-full flex-col items-center text-center">
+      <h2 className="max-w-[20rem] font-serif text-xl font-bold leading-snug tracking-tight text-foreground">
+        {displayName}, <ManiTochka /> формирует привычку копить надолго
       </h2>
 
-      <div className="mt-5 overflow-hidden rounded-[1.35rem] bg-white p-5 shadow-lg shadow-primary/10 ring-1 ring-black/[0.04]">
+      <div className="mt-5 w-full overflow-hidden rounded-[1.35rem] bg-white p-5 text-left shadow-lg shadow-primary/10 ring-1 ring-black/[0.04]">
         <p className="font-serif text-base font-semibold text-foreground/85">Ваши финансы</p>
 
-        <div className="relative mt-4">
+        <div className="relative mt-4 min-h-[11rem]">
           <svg
             viewBox="0 0 300 140"
             className="h-auto w-full"
@@ -30,6 +32,18 @@ export function OnboardingLongTermHabitsStep({ name }: OnboardingLongTermHabitsS
                 <stop offset="100%" stopColor="var(--success)" stopOpacity="0.05" />
               </linearGradient>
             </defs>
+            {[28, 52, 76, 100, 124].map((y) => (
+              <line
+                key={y}
+                x1="28"
+                y1={y}
+                x2="272"
+                y2={y}
+                stroke="var(--border)"
+                strokeWidth="0.75"
+                opacity="0.55"
+              />
+            ))}
             <line x1="28" y1="108" x2="272" y2="108" stroke="var(--border)" strokeWidth="1" />
             <path
               d="M 28 100 L 76 92 L 124 78 L 172 58 L 220 38 L 272 22 L 272 108 L 28 108 Z"
@@ -44,6 +58,8 @@ export function OnboardingLongTermHabitsStep({ name }: OnboardingLongTermHabitsS
               strokeLinejoin="round"
               className="onboarding-line-draw"
             />
+            <circle cx="272" cy="22" r="5" fill="var(--success)" />
+            <circle cx="272" cy="22" r="2.5" fill="white" />
             <polyline
               points="28,96 272,92"
               fill="none"
@@ -51,7 +67,7 @@ export function OnboardingLongTermHabitsStep({ name }: OnboardingLongTermHabitsS
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeDasharray="7 5"
-              opacity="0.4"
+              opacity="0.45"
               className="onboarding-line-draw-delayed"
             />
             <text x="28" y="128" fill="var(--muted-foreground)" fontSize="10" fontWeight="600">
@@ -62,13 +78,16 @@ export function OnboardingLongTermHabitsStep({ name }: OnboardingLongTermHabitsS
             </text>
           </svg>
 
-          <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-            <span className="rounded-full bg-muted-foreground/15 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
-              Обычные методы
+          <div className="absolute left-[4%] top-[46%] flex max-w-[42%] items-center gap-1 rounded-full bg-secondary px-2.5 py-1.5 shadow-sm">
+            <TrendingDown className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={2.5} />
+            <span className="text-[10px] font-semibold leading-tight text-muted-foreground">
+              обычные методы
             </span>
-            <span className="rounded-full bg-[var(--success)] px-3 py-1 text-[11px] font-bold text-white shadow-sm shadow-[var(--success)]/30">
-              С мани.точкой
-            </span>
+          </div>
+
+          <div className="absolute right-[1%] top-[2%] flex max-w-[48%] items-center gap-1 rounded-full bg-[var(--success)] px-2.5 py-1.5 shadow-md shadow-[var(--success)]/25">
+            <TrendingUp className="size-3.5 shrink-0 text-white" strokeWidth={2.5} />
+            <span className="text-[10px] font-bold leading-tight text-white">с Мани.точкой</span>
           </div>
         </div>
 
@@ -76,8 +95,8 @@ export function OnboardingLongTermHabitsStep({ name }: OnboardingLongTermHabitsS
           <span className="text-xl leading-none" aria-hidden>
             ✨
           </span>
-          <p className="text-left text-sm font-medium leading-relaxed text-foreground">
-            82% пользователей мани.точки продолжают регулярно откладывать деньги даже спустя 6
+          <p className="text-sm font-medium leading-relaxed text-foreground">
+            82% пользователей <ManiTochka /> продолжают регулярно откладывать деньги даже спустя 6
             месяцев.
           </p>
         </div>
