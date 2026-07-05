@@ -47,6 +47,49 @@ export function isYooKassaConfigured() {
   return Boolean(shopId && secretKey)
 }
 
+function buildReceipt(input: {
+  userKey: string
+  amount: string
+  description: string
+}) {
+  const email =
+    process.env.YOOKASSA_RECEIPT_EMAIL?.trim() ||
+    `receipt+${input.userKey.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48)}@clients.local`
+
+  const receipt: Record<string, unknown> = {
+    customer: { email },
+    items: [
+      {
+        description: input.description.slice(0, 128),
+        quantity: "1.00",
+        amount: { value: input.amount, currency: "RUB" },
+        vat_code: Number(process.env.YOOKASSA_VAT_CODE ?? "1"),
+        payment_mode: "full_payment",
+        payment_subject: "service",
+      },
+    ],
+  }
+
+  const taxSystemCode = process.env.YOOKASSA_TAX_SYSTEM_CODE?.trim()
+  if (taxSystemCode) {
+    receipt.tax_system_code = Number(taxSystemCode)
+  }
+
+  return receipt
+}
+
+export function parseYooKassaErrorMessage(error: unknown): string | null {
+  if (!(error instanceof Error)) return null
+  const match = error.message.match(/YooKassa (?:recurring )?create failed: \d+ (.+)/)
+  if (!match?.[1]) return null
+  try {
+    const body = JSON.parse(match[1]) as { description?: string }
+    return body.description ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function createYooKassaPayment(input: {
   plan: SubscriptionPlan
   userKey: string
@@ -71,6 +114,11 @@ export async function createYooKassaPayment(input: {
         return_url: input.returnUrl,
       },
       description: input.description,
+      receipt: buildReceipt({
+        userKey: input.userKey,
+        amount: input.amount,
+        description: input.description,
+      }),
       metadata: {
         plan: input.plan,
         userKey: input.userKey,
@@ -107,6 +155,11 @@ export async function createRecurringYooKassaPayment(input: {
       capture: true,
       payment_method_id: input.paymentMethodId,
       description: input.description,
+      receipt: buildReceipt({
+        userKey: input.userKey,
+        amount: input.amount,
+        description: input.description,
+      }),
       metadata: {
         plan: input.plan,
         userKey: input.userKey,

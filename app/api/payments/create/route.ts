@@ -4,6 +4,7 @@ import {
   createYooKassaPayment,
   getAppBaseUrl,
   isYooKassaConfigured,
+  parseYooKassaErrorMessage,
 } from "@/lib/yookassa/server"
 
 export async function POST(request: Request) {
@@ -52,6 +53,15 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error("[payments/create]", error)
-    return NextResponse.json({ error: "PAYMENT_CREATE_FAILED" }, { status: 500 })
+    const yookassaMessage = parseYooKassaErrorMessage(error)
+    return NextResponse.json(
+      {
+        error: "PAYMENT_CREATE_FAILED",
+        message:
+          yookassaMessage ||
+          "Не удалось создать платёж. Попробуйте ещё раз или напишите в поддержку.",
+      },
+      { status: 500 },
+    )
   }
 }

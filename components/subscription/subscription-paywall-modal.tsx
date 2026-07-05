@@ -14,9 +14,9 @@ import {
 } from "@/lib/subscription"
 
 const TESTIMONIAL_LAYOUT = [
-  { className: "left-0 top-0 right-5 z-30 -rotate-1" },
-  { className: "left-5 top-[4.7rem] right-0 z-20 rotate-1" },
-  { className: "left-1 top-[9.4rem] right-3 z-10 -rotate-[0.5deg]" },
+  { className: "-rotate-1 mr-5" },
+  { className: "rotate-1 ml-5 -mt-1" },
+  { className: "-rotate-[0.5deg] mx-2 -mt-1" },
 ] as const
 
 function PlanRadio({ selected }: { selected: boolean }) {
@@ -123,11 +123,11 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           ))}
         </div>
 
-        <div className="relative mx-auto mt-3 h-[12.6rem] w-full max-w-[21rem] shrink-0">
+        <div className="mx-auto mt-3 flex w-full max-w-[21rem] shrink-0 flex-col">
           {PAYWALL_TESTIMONIALS.map((review, index) => (
             <article
               key={review.author}
-              className={`absolute rounded-block-sm border border-border/70 bg-card px-3.5 py-2.5 shadow-md shadow-primary/10 ${TESTIMONIAL_LAYOUT[index].className}`}
+              className={`rounded-block-sm border border-border/70 bg-card px-3.5 py-2.5 shadow-md shadow-primary/10 ${TESTIMONIAL_LAYOUT[index].className}`}
             >
               <p className="text-[13px] leading-snug text-foreground">«{review.text}»</p>
               <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
@@ -137,8 +137,8 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           ))}
         </div>
 
-        <div className="mt-4 flex flex-col gap-2.5">
-          <div className="relative shrink-0">
+        <div className="mt-6 flex flex-col gap-2.5">
+          <div className="relative shrink-0 pt-2">
             <span className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-md bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm">
               Самый выгодный
             </span>
