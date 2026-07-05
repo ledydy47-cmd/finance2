@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-export default async function AdminIndexPage({
+export default async function PanelAliasPage({
   searchParams,
 }: {
   searchParams: Promise<{ key?: string; tab?: string }>
