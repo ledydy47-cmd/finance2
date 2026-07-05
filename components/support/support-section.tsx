@@ -113,7 +113,7 @@ export function SupportForm({ onSent }: SupportFormProps) {
         </button>
       </div>
 
-      {sent && <SentDialog onClose={() => setSent(false)} />}
+      {sent && <SentDialog onClose={() => { setSent(false); onSent?.() }} />}
     </>
   )
 }

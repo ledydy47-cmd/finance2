@@ -17,6 +17,8 @@ import {
 } from "@/lib/onboarding"
 import { formatRub } from "@/lib/format"
 import { parseAmount } from "@/lib/budget-planner"
+import { trackClientAnalytics } from "@/lib/analytics-client"
+import { getClientUserKey } from "@/lib/client-id"
 import { OnboardingContractStep } from "@/components/onboarding/onboarding-contract-step"
 import { OnboardingGoodNewsStep } from "@/components/onboarding/onboarding-good-news-step"
 import { OnboardingLongTermHabitsStep } from "@/components/onboarding/onboarding-long-term-habits-step"
@@ -236,6 +238,16 @@ export function OnboardingFlow() {
 
   function handleNext() {
     if (!canContinue) return
+    if (step === 0) {
+      void trackClientAnalytics({
+        event: "onboarding_started",
+        userKey: getClientUserKey(user?.id),
+        telegramUserId: user?.id,
+        telegramUsername: user?.username,
+        userName: draft.name.trim() || user?.first_name,
+        age: draft.age,
+      })
+    }
     if (step >= ONBOARDING_TOTAL_STEPS - 1) return
     setStep((s) => s + 1)
   }

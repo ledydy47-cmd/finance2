@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import {
   Bar,
   BarChart,
@@ -16,6 +17,25 @@ import { getCategorySpent, getDailySpendingMap } from "@/lib/calculations"
 import { formatRub } from "@/lib/format"
 import { getPeriodBounds } from "@/lib/period"
 
+const FALLBACK_COLORS = {
+  spent: "oklch(0.78 0.115 355)",
+  income: "oklch(0.7 0.12 160)",
+}
+
+function useComparisonChartColors() {
+  const [colors, setColors] = useState(FALLBACK_COLORS)
+
+  useEffect(() => {
+    const root = getComputedStyle(document.documentElement)
+    setColors({
+      spent: root.getPropertyValue("--chart-1").trim() || FALLBACK_COLORS.spent,
+      income: root.getPropertyValue("--chart-5").trim() || FALLBACK_COLORS.income,
+    })
+  }, [])
+
+  return colors
+}
+
 const CHART_COLORS = [
   "var(--chart-1)",
   "var(--chart-2)",
@@ -26,6 +46,7 @@ const CHART_COLORS = [
 
 export function AnalyticsScreen() {
   const { data, periodKey, periodLabel, summary } = useFinance()
+  const comparisonColors = useComparisonChartColors()
 
   const pieData = data.categories
     .map((category) => ({
@@ -117,14 +138,51 @@ export function AnalyticsScreen() {
 
         <section className="mt-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
           <h2 className="mb-3 font-serif text-base font-bold">Сравнение по месяцам</h2>
-          <div className="h-52">
+          <div className="mb-3 flex items-center justify-center gap-6 text-xs">
+            <span className="flex items-center gap-1.5 font-semibold text-foreground">
+              <span
+                className="size-3 rounded-sm"
+                style={{ backgroundColor: comparisonColors.spent }}
+              />
+              Расходы
+            </span>
+            <span className="flex items-center gap-1.5 font-semibold text-foreground">
+              <span
+                className="size-3 rounded-sm"
+                style={{ backgroundColor: comparisonColors.income }}
+              />
+              Доход
+            </span>
+          </div>
+          <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyComparison}>
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} width={42} />
-                <Tooltip formatter={(value) => formatRub(Number(value))} />
-                <Bar dataKey="spent" fill="var(--primary)" radius={[6, 6, 0, 0]} name="Расходы" />
-                <Bar dataKey="income" fill="var(--success)" radius={[6, 6, 0, 0]} name="Доход" />
+              <BarChart data={monthlyComparison} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "currentColor" }} />
+                <YAxis tick={{ fontSize: 11, fill: "currentColor" }} width={42} />
+                <Tooltip
+                  formatter={(value, name) => [
+                    formatRub(Number(value)),
+                    name === "spent" ? "Расходы" : "Доход",
+                  ]}
+                  labelFormatter={(label) => `Период: ${label}`}
+                  contentStyle={{
+                    borderRadius: "12px",
+                    border: "1px solid var(--border)",
+                    background: "var(--card)",
+                  }}
+                />
+                <Bar
+                  dataKey="spent"
+                  name="spent"
+                  fill={comparisonColors.spent}
+                  radius={[6, 6, 0, 0]}
+                />
+                <Bar
+                  dataKey="income"
+                  name="income"
+                  fill={comparisonColors.income}
+                  radius={[6, 6, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>

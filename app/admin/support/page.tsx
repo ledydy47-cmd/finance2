@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { SupportTicket } from "@/lib/server/support-types"
 
@@ -153,6 +154,12 @@ export default function AdminSupportPage() {
               <p className="text-sm text-muted-foreground">
                 {openTickets.length} открытых · {answeredTickets.length} с ответом
               </p>
+              <Link
+                href={`/admin?key=${encodeURIComponent(adminKey)}&tab=stats`}
+                className="mt-1 inline-block text-xs font-semibold text-primary underline-offset-2 hover:underline"
+              >
+                ← Админ-панель
+              </Link>
             </div>
             <button
               type="button"

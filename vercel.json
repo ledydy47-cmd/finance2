@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/subscription-renewals",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/scheduled-messages",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

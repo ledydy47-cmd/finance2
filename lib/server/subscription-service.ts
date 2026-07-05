@@ -13,6 +13,7 @@ import {
 import { findTelegramUserByUsername } from "@/lib/server/telegram-users"
 import type { SubscriptionRecord, SubscriptionStatus } from "@/lib/server/subscription-types"
 import { formatPeriodEnd, sendTelegramNotification } from "@/lib/server/telegram-notify"
+import { recordAnalyticsEvent } from "@/lib/server/user-analytics-service"
 import type { YooKassaPayment } from "@/lib/yookassa/server"
 import { createRecurringYooKassaPayment, fetchYooKassaPayment } from "@/lib/yookassa/server"
 
@@ -69,6 +70,12 @@ export async function activateSubscriptionFromPayment(payment: YooKassaPayment) 
 
   await upsertSubscription(record)
 
+  await recordAnalyticsEvent({
+    event: plan === "yearly" ? "subscription_paid_yearly" : "subscription_paid_monthly",
+    userKey,
+    telegramUserId: parseTelegramUserId(userKey),
+  })
+
   return {
     paymentId: payment.id,
     userKey,
@@ -94,6 +101,12 @@ export async function cancelAutoRenewal(userKey: string) {
   }
 
   await upsertSubscription(updated)
+
+  await recordAnalyticsEvent({
+    event: "auto_renew_canceled",
+    userKey,
+    telegramUserId: updated.telegramUserId,
+  })
 
   await sendTelegramNotification({
     telegramUserId: updated.telegramUserId,

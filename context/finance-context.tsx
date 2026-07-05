@@ -22,6 +22,7 @@ import {
   resetCurrentMonthSpending,
 } from "@/lib/period-reset"
 import { loadAppData, saveAppData } from "@/lib/storage"
+import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
@@ -236,7 +237,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const requiresPremiumAfterWalkthrough =
     data.settings.homeWalkthroughCompleted && !isUserSubscribed(data.settings)
 
-  const openPaywall = useCallback(() => setShowPaywall(true), [])
+  const openPaywall = useCallback(() => {
+    setShowPaywall(true)
+    const webAppUser = getWebApp()?.initDataUnsafe?.user
+    void trackClientAnalytics({
+      event: "paywall_shown",
+      userKey: getClientUserKey(webAppUser?.id),
+      telegramUserId: webAppUser?.id,
+      telegramUsername: webAppUser?.username,
+      userName: data.settings.userName || webAppUser?.first_name,
+      age: data.settings.age,
+    })
+  }, [data.settings.userName, data.settings.age])
   const closePaywall = useCallback(() => setShowPaywall(false), [])
 
   const homeSetupStep = useMemo((): 1 | 2 | 3 => {
@@ -488,6 +500,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
       if (shouldShowPaywall) {
         setShowPaywall(true)
+        const webAppUser = getWebApp()?.initDataUnsafe?.user
+        void trackClientAnalytics({
+          event: "paywall_shown",
+          userKey: getClientUserKey(webAppUser?.id),
+          telegramUserId: webAppUser?.id,
+          telegramUsername: webAppUser?.username,
+          userName: data.settings.userName || webAppUser?.first_name,
+          age: data.settings.age,
+        })
       }
     },
     [data.settings, isContentLocked, update],
@@ -726,6 +747,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         },
       }))
       setActiveTab("home")
+      const webAppUser = getWebApp()?.initDataUnsafe?.user
+      void trackClientAnalytics({
+        event: "onboarding_completed",
+        userKey: getClientUserKey(webAppUser?.id),
+        telegramUserId: webAppUser?.id,
+        telegramUsername: webAppUser?.username,
+        userName: input.name,
+        age: input.age,
+      })
     },
     [update, setActiveTab],
   )
@@ -739,7 +769,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       },
     }))
     setShowHomeGoalSetup(false)
-  }, [update])
+    const webAppUser = getWebApp()?.initDataUnsafe?.user
+    void trackClientAnalytics({
+      event: "walkthrough_completed",
+      userKey: getClientUserKey(webAppUser?.id),
+      telegramUserId: webAppUser?.id,
+      telegramUsername: webAppUser?.username,
+      userName: data.settings.userName || webAppUser?.first_name,
+      age: data.settings.age,
+    })
+  }, [data.settings.userName, data.settings.age, update])
 
   const completeHomeWalkthrough = useCallback(() => {
     update((prev) => ({
@@ -749,7 +788,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         homeWalkthroughCompleted: true,
       },
     }))
-  }, [update])
+    const webAppUser = getWebApp()?.initDataUnsafe?.user
+    void trackClientAnalytics({
+      event: "walkthrough_completed",
+      userKey: getClientUserKey(webAppUser?.id),
+      telegramUserId: webAppUser?.id,
+      telegramUsername: webAppUser?.username,
+      userName: data.settings.userName || webAppUser?.first_name,
+      age: data.settings.age,
+    })
+  }, [data.settings.userName, data.settings.age, update])
 
   const confirmNewMonthReset = useCallback(() => {
     update((prev) => applyNewMonthReset(prev))

@@ -20,6 +20,7 @@ import { TransactionsScreen } from "@/components/screens/transactions-screen"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
 import { getClientUserKey } from "@/lib/client-id"
+import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getWebApp } from "@/lib/telegram"
 
 export function AppShell() {
@@ -70,6 +71,14 @@ export function AppShell() {
     if (!user?.id) return
 
     void (async () => {
+      void trackClientAnalytics({
+        event: "app_opened",
+        userKey: getClientUserKey(user.id),
+        telegramUserId: user.id,
+        telegramUsername: user.username,
+        userName: user.first_name,
+      })
+
       await confirmPendingPayment()
 
       void fetch("/api/user/register-telegram", {
@@ -83,6 +92,12 @@ export function AppShell() {
       })
 
       await syncSubscriptionFromServer(getClientUserKey(user.id))
+
+      void fetch("/api/analytics/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userKey: getClientUserKey(user.id) }),
+      })
     })()
   }, [user?.id, user?.username, user?.first_name, confirmPendingPayment, syncSubscriptionFromServer])
 
