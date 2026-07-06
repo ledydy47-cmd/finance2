@@ -108,7 +108,6 @@ export async function createYooKassaPayment(input: {
     body: JSON.stringify({
       amount: { value: input.amount, currency: "RUB" },
       capture: true,
-      save_payment_method: true,
       confirmation: {
         type: "redirect",
         return_url: input.returnUrl,
