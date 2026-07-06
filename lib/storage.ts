@@ -65,13 +65,9 @@ function migrateData(data: AppData, defaults: AppData): AppData {
     categories = [...mandatoryCats, ...categories.filter((c) => c.kind !== "mandatory")]
   }
 
-  const missingDefaults = defaults.categories.filter(
-    (c) => c.kind === "flexible" && !categories.some((x) => x.id === c.id),
-  )
-
   return {
     ...data,
-    categories: [...categories, ...missingDefaults],
+    categories,
     budgetPlan,
     goals: data.goals.map((goal) => ({
       ...goal,
