@@ -52,6 +52,16 @@ function userLabel(user: UserAnalyticsRecord) {
     .join(" · ")
 }
 
+function ticketUserLabel(ticket: SupportTicket) {
+  return [
+    ticket.userName,
+    ticket.telegramUsername ? `@${ticket.telegramUsername}` : null,
+    ticket.telegramUserId ? `id ${ticket.telegramUserId}` : ticket.userKey,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+}
+
 export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId }) {
   const [adminKey, setAdminKey] = useState("")
   const [inputKey, setInputKey] = useState("")
@@ -61,6 +71,9 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const [userFilter, setUserFilter] = useState<UserFilter>("all")
   const [campaigns, setCampaigns] = useState<MessageCampaign[]>([])
   const [tickets, setTickets] = useState<SupportTicket[]>([])
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
+  const [supportReply, setSupportReply] = useState("")
+  const [replying, setReplying] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,6 +90,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const [scheduleType, setScheduleType] = useState<MessageCampaign["type"]>("delayed_filter")
 
   const selectedUser = users.find((user) => user.userKey === selectedUserKey) ?? null
+  const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) ?? null
 
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("key")
@@ -244,6 +258,35 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
       setError("Не удалось запланировать сообщение")
     } finally {
       setSendingToUser(false)
+    }
+  }
+
+  async function handleSupportReply() {
+    if (!selectedTicket || !adminKey) return
+    const trimmed = supportReply.trim()
+    if (!trimmed) return
+
+    setReplying(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/admin/support/tickets/${selectedTicket.id}/reply`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ reply: trimmed }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setError("Не удалось отправить ответ")
+        return
+      }
+
+      setSupportReply("")
+      setSelectedTicketId(data.ticket.id)
+      await loadTickets()
+    } catch {
+      setError("Не удалось отправить ответ")
+    } finally {
+      setReplying(false)
     }
   }
 
@@ -606,19 +649,119 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
         )}
 
         {tab === "support" && (
-          <div>
-            <p className="mb-3 text-sm text-muted-foreground">
-              Последние обращения. Ответы отправляются в Telegram.
-            </p>
-            <div className="space-y-2">
-              {tickets.slice(0, 20).map((ticket) => (
-                <div key={ticket.id} className="rounded-block-sm border border-border bg-card px-3 py-2 text-sm">
-                  <p className="font-semibold">{ticket.userName ?? ticket.userKey}</p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">{ticket.message}</p>
-                </div>
-              ))}
-              {tickets.length === 0 && (
-                <p className="text-sm text-muted-foreground">Обращений пока нет</p>
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="lg:w-[22rem] lg:shrink-0">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {tickets.filter((t) => t.status === "open").length} открытых ·{" "}
+                  {tickets.filter((t) => t.status === "answered").length} с ответом
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void loadTickets()}
+                  disabled={loading}
+                  className="rounded-block-sm border border-border px-3 py-2 text-xs font-semibold"
+                >
+                  Обновить
+                </button>
+              </div>
+              <div className="space-y-2">
+                {tickets.map((ticket) => (
+                  <button
+                    key={ticket.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTicketId(ticket.id)
+                      setSupportReply(ticket.reply ?? "")
+                    }}
+                    className={`w-full rounded-block-sm border px-3 py-3 text-left transition-colors ${
+                      selectedTicketId === ticket.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-card hover:bg-secondary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-foreground">
+                        {ticketUserLabel(ticket)}
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          ticket.status === "open"
+                            ? "bg-primary/15 text-primary"
+                            : "bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        {ticket.status === "open" ? "новое" : "ответ"}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{ticket.message}</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground/80">
+                      {formatDateTime(ticket.createdAt)}
+                    </p>
+                  </button>
+                ))}
+                {tickets.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Обращений пока нет</p>
+                )}
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1 rounded-block border border-border bg-card p-5 shadow-sm">
+              {!selectedTicket ? (
+                <p className="text-sm text-muted-foreground">Выберите обращение слева</p>
+              ) : (
+                <>
+                  <div className="mb-4 border-b border-border/70 pb-4">
+                    <p className="text-sm font-semibold text-foreground">
+                      {ticketUserLabel(selectedTicket)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatDateTime(selectedTicket.createdAt)}
+                    </p>
+                  </div>
+
+                  <div className="mb-4 rounded-block-sm bg-secondary/50 p-4">
+                    <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      Вопрос
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                      {selectedTicket.message}
+                    </p>
+                  </div>
+
+                  {selectedTicket.reply && (
+                    <div className="mb-4 rounded-block-sm border border-primary/20 bg-primary/5 p-4">
+                      <p className="mb-1 text-xs font-bold uppercase tracking-wide text-primary">
+                        Ваш ответ
+                        {selectedTicket.repliedAt
+                          ? ` · ${formatDateTime(selectedTicket.repliedAt)}`
+                          : ""}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                        {selectedTicket.reply}
+                      </p>
+                    </div>
+                  )}
+
+                  <label className="mb-1 block text-xs font-semibold text-muted-foreground">
+                    {selectedTicket.status === "answered" ? "Изменить ответ" : "Ответ пользователю"}
+                  </label>
+                  <textarea
+                    value={supportReply}
+                    onChange={(e) => setSupportReply(e.target.value)}
+                    rows={5}
+                    placeholder="Напишите ответ — пользователь получит его в Telegram"
+                    className="mb-3 w-full resize-y rounded-block-sm border border-border bg-background px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSupportReply}
+                    disabled={replying || !supportReply.trim()}
+                    className="rounded-block-sm bg-primary px-5 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+                  >
+                    {replying ? "Отправляем…" : "Отправить ответ в Telegram"}
+                  </button>
+                </>
               )}
             </div>
           </div>
