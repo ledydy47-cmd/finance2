@@ -18,22 +18,32 @@ export function getPeriodIncome(
   periodKey: string,
   monthStartDay: number,
 ) {
+  const plannedIncome = getPlannedIncomeTotal(budgetPlan)
+  const plannedSourceNames = new Set(
+    (budgetPlan?.incomeSources ?? [])
+      .filter((source) => source.amount > 0 && source.name.trim())
+      .map((source) => source.name.trim().toLowerCase()),
+  )
+
   const periodTx = getPeriodTransactions(transactions, periodKey, monthStartDay)
   const manualIncome = periodTx
-    .filter((tx) => tx.type === "income" && !isBudgetIncomeTransaction(tx))
+    .filter((tx) => {
+      if (tx.type !== "income" || isBudgetIncomeTransaction(tx)) return false
+      const note = tx.note?.trim().toLowerCase()
+      if (plannedIncome > 0 && note && plannedSourceNames.has(note)) return false
+      return true
+    })
     .reduce((sum, tx) => sum + tx.amount, 0)
-  const budgetIncomeFromTx = periodTx
-    .filter(isBudgetIncomeTransaction)
-    .reduce((sum, tx) => sum + tx.amount, 0)
-  const plannedIncome = getPlannedIncomeTotal(budgetPlan)
 
-  if (budgetIncomeFromTx > 0) {
-    return budgetIncomeFromTx + manualIncome
-  }
   if (plannedIncome > 0) {
     return plannedIncome + manualIncome
   }
-  return manualIncome
+
+  const budgetIncomeFromTx = periodTx
+    .filter(isBudgetIncomeTransaction)
+    .reduce((sum, tx) => sum + tx.amount, 0)
+
+  return budgetIncomeFromTx + manualIncome
 }
 
 export function syncBudgetIncomeTransactions(
@@ -42,22 +52,33 @@ export function syncBudgetIncomeTransactions(
   periodKey: string,
   monthStartDay: number,
 ): Transaction[] {
-  const withoutBudgetIncome = transactions.filter((tx) => !isBudgetIncomeTransaction(tx))
+  const activeSources = incomeSources.filter(
+    (source) => source.amount > 0 && source.name.trim(),
+  )
+  const sourceNames = new Set(activeSources.map((source) => source.name.trim().toLowerCase()))
+
+  const withoutPlannedIncome = transactions.filter((tx) => {
+    if (isBudgetIncomeTransaction(tx)) return false
+    if (tx.type !== "income" || !isDateInPeriod(tx.date, periodKey, monthStartDay)) {
+      return true
+    }
+    const note = tx.note?.trim().toLowerCase()
+    return !(note && sourceNames.has(note))
+  })
+
   const periodStart = getPeriodStartDate(periodKey, monthStartDay)
   const dateIso = periodStart.toISOString()
 
-  const budgetIncomeTransactions: Transaction[] = incomeSources
-    .filter((source) => source.amount > 0 && source.name.trim())
-    .map((source) => ({
-      id: `${BUDGET_INCOME_TX_PREFIX}${source.id}`,
-      amount: source.amount,
-      type: "income" as const,
-      date: dateIso,
-      categoryId: null,
-      note: source.name.trim(),
-    }))
+  const budgetIncomeTransactions: Transaction[] = activeSources.map((source) => ({
+    id: `${BUDGET_INCOME_TX_PREFIX}${source.id}`,
+    amount: source.amount,
+    type: "income" as const,
+    date: dateIso,
+    categoryId: null,
+    note: source.name.trim(),
+  }))
 
-  return [...withoutBudgetIncome, ...budgetIncomeTransactions]
+  return [...withoutPlannedIncome, ...budgetIncomeTransactions]
 }
 
 export function getPeriodTransactions(
