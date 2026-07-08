@@ -63,12 +63,12 @@ export function resetCurrentMonthSpending(data: AppData): AppData {
   if (!next.archives.some((a) => a.periodKey === periodKey)) {
     const label = getPeriodLabelFromKey(periodKey, monthStartDay)
     const archive = buildArchive(
-      data.transactions,
-      data.categories,
+      next.transactions,
+      next.categories,
       periodKey,
       monthStartDay,
       label,
-      { includeExcluded: true },
+      { includeExcluded: true, budgetPlan: next.budgetPlan },
     )
     if (archive.income > 0 || archive.spent > 0) {
       next = { ...next, archives: [...next.archives, archive] }

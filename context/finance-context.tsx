@@ -11,7 +11,7 @@ import {
 } from "react"
 import { buildBudgetPlanState, buildCategoriesFromPlan } from "@/lib/budget-planner"
 import type { ApplyBudgetInput } from "@/lib/budget-planner"
-import { getCurrentPeriodKey, getMonthlySummary } from "@/lib/calculations"
+import { getCurrentPeriodKey, getMonthlySummary, syncBudgetIncomeTransactions } from "@/lib/calculations"
 import { createDefaultData } from "@/lib/default-data"
 import { getActiveGoals, shouldCelebrateGoal } from "@/lib/goals"
 import { getPeriodLabel } from "@/lib/period"
@@ -224,8 +224,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const periodKey = getCurrentPeriodKey(data.settings.monthStartDay)
   const periodLabel = getPeriodLabel(new Date(), data.settings.monthStartDay)
   const summary = useMemo(
-    () => getMonthlySummary(data.transactions, data.categories, periodKey, data.settings.monthStartDay),
-    [data.transactions, data.categories, periodKey, data.settings.monthStartDay],
+    () =>
+      getMonthlySummary(
+        data.transactions,
+        data.categories,
+        periodKey,
+        data.settings.monthStartDay,
+        data.budgetPlan,
+      ),
+    [data.transactions, data.categories, data.budgetPlan, periodKey, data.settings.monthStartDay],
   )
 
   const isHomeSetupActive =
@@ -693,21 +700,32 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       )
       const nextCategoryIds = new Set(nextCategories.map((c) => c.id))
 
-      update((prev) => ({
-        ...prev,
-        budgetPlan: plan,
-        categories: nextCategories,
-        transactions: prev.transactions.map((tx) =>
+      update((prev) => {
+        const periodKey = getCurrentPeriodKey(prev.settings.monthStartDay)
+        const clearedTransactions = prev.transactions.map((tx) =>
           tx.categoryId && !nextCategoryIds.has(tx.categoryId)
             ? { ...tx, categoryId: null }
             : tx,
-        ),
-        goals: prev.goals.map((goal) =>
-          goal.id === primaryGoalId
-            ? { ...goal, monthlyContribution: input.goalContribution }
-            : goal,
-        ),
-      }))
+        )
+        const transactions = syncBudgetIncomeTransactions(
+          clearedTransactions,
+          plan.incomeSources,
+          periodKey,
+          prev.settings.monthStartDay,
+        )
+
+        return {
+          ...prev,
+          budgetPlan: plan,
+          categories: nextCategories,
+          transactions,
+          goals: prev.goals.map((goal) =>
+            goal.id === primaryGoalId
+              ? { ...goal, monthlyContribution: input.goalContribution }
+              : goal,
+          ),
+        }
+      })
       setShowBudgetPlannerState(false)
       setActiveTab("home")
     },

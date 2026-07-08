@@ -96,14 +96,6 @@ export function createDefaultData(): AppData {
 
   const transactions = [
     {
-      id: "tx-income-1",
-      amount: 72000,
-      type: "income" as const,
-      date: iso(new Date(today.getFullYear(), today.getMonth(), 1, 10, 0, 0)),
-      categoryId: null,
-      note: "Зарплата",
-    },
-    {
       id: "tx-1",
       amount: 420,
       type: "expense" as const,

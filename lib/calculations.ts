@@ -1,5 +1,64 @@
-import type { Category, PeriodArchive, Transaction } from "./types"
-import { getPeriodKey, isDateInPeriod } from "./period"
+import type { BudgetPlanState, Category, PeriodArchive, Transaction } from "./types"
+import { getPeriodKey, getPeriodStartDate, isDateInPeriod } from "./period"
+
+export const BUDGET_INCOME_TX_PREFIX = "budget-income-"
+
+export function isBudgetIncomeTransaction(tx: Transaction) {
+  return tx.type === "income" && tx.id.startsWith(BUDGET_INCOME_TX_PREFIX)
+}
+
+export function getPlannedIncomeTotal(budgetPlan?: BudgetPlanState) {
+  if (!budgetPlan?.incomeSources?.length) return 0
+  return budgetPlan.incomeSources.reduce((sum, entry) => sum + entry.amount, 0)
+}
+
+export function getPeriodIncome(
+  transactions: Transaction[],
+  budgetPlan: BudgetPlanState | undefined,
+  periodKey: string,
+  monthStartDay: number,
+) {
+  const periodTx = getPeriodTransactions(transactions, periodKey, monthStartDay)
+  const manualIncome = periodTx
+    .filter((tx) => tx.type === "income" && !isBudgetIncomeTransaction(tx))
+    .reduce((sum, tx) => sum + tx.amount, 0)
+  const budgetIncomeFromTx = periodTx
+    .filter(isBudgetIncomeTransaction)
+    .reduce((sum, tx) => sum + tx.amount, 0)
+  const plannedIncome = getPlannedIncomeTotal(budgetPlan)
+
+  if (budgetIncomeFromTx > 0) {
+    return budgetIncomeFromTx + manualIncome
+  }
+  if (plannedIncome > 0) {
+    return plannedIncome + manualIncome
+  }
+  return manualIncome
+}
+
+export function syncBudgetIncomeTransactions(
+  transactions: Transaction[],
+  incomeSources: BudgetPlanState["incomeSources"],
+  periodKey: string,
+  monthStartDay: number,
+): Transaction[] {
+  const withoutBudgetIncome = transactions.filter((tx) => !isBudgetIncomeTransaction(tx))
+  const periodStart = getPeriodStartDate(periodKey, monthStartDay)
+  const dateIso = periodStart.toISOString()
+
+  const budgetIncomeTransactions: Transaction[] = incomeSources
+    .filter((source) => source.amount > 0 && source.name.trim())
+    .map((source) => ({
+      id: `${BUDGET_INCOME_TX_PREFIX}${source.id}`,
+      amount: source.amount,
+      type: "income" as const,
+      date: dateIso,
+      categoryId: null,
+      note: source.name.trim(),
+    }))
+
+  return [...withoutBudgetIncome, ...budgetIncomeTransactions]
+}
 
 export function getPeriodTransactions(
   transactions: Transaction[],
@@ -46,9 +105,10 @@ export function getMonthlySummary(
   categories: Category[],
   periodKey: string,
   monthStartDay: number,
+  budgetPlan?: BudgetPlanState,
 ) {
   const periodTx = getPeriodTransactions(transactions, periodKey, monthStartDay)
-  const income = sumByType(periodTx, "income")
+  const income = getPeriodIncome(transactions, budgetPlan, periodKey, monthStartDay)
   const spent = sumByType(periodTx, "expense")
   const budgetTotal = categories.reduce((sum, c) => sum + c.monthlyLimit, 0)
   const left = income - spent
@@ -62,7 +122,7 @@ export function buildArchive(
   periodKey: string,
   monthStartDay: number,
   label: string,
-  options?: { includeExcluded?: boolean },
+  options?: { includeExcluded?: boolean; budgetPlan?: BudgetPlanState },
 ): PeriodArchive {
   const periodTx = getPeriodTransactions(transactions, periodKey, monthStartDay, options)
   const categorySpent: Record<string, number> = {}
@@ -83,7 +143,7 @@ export function buildArchive(
   return {
     periodKey,
     label,
-    income: sumByType(periodTx, "income"),
+    income: getPeriodIncome(transactions, options?.budgetPlan, periodKey, monthStartDay),
     spent: sumByType(periodTx, "expense"),
     categorySpent,
     categoryBudget,
