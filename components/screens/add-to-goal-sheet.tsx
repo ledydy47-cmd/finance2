@@ -32,7 +32,21 @@ export function AddToGoalSheet() {
   const percent = formatPercent(goal.savedAmount, goal.targetAmount)
 
   return (
-    <BottomSheet open={open} title="Пополнить цель" onClose={handleClose}>
+    <BottomSheet
+      open={open}
+      title="Пополнить цель"
+      onClose={handleClose}
+      footer={
+        <button
+          type="button"
+          disabled={!canSave}
+          onClick={handleSave}
+          className="w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
+        >
+          Отложить
+        </button>
+      }
+    >
       <div className="mb-5 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
         <p className="font-serif text-base font-bold text-foreground">{goal.name}</p>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -56,18 +70,9 @@ export function AddToGoalSheet() {
         placeholder="0"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        className="mb-6 rounded-block border border-border bg-card px-5 py-4 font-serif text-4xl font-bold text-foreground outline-none ring-primary focus:ring-2"
+        className="rounded-block border border-border bg-card px-5 py-4 font-serif text-4xl font-bold text-foreground outline-none ring-primary focus:ring-2"
         autoFocus
       />
-
-      <button
-        type="button"
-        disabled={!canSave}
-        onClick={handleSave}
-        className="w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
-      >
-        Отложить
-      </button>
     </BottomSheet>
   )
 }

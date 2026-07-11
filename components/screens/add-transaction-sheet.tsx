@@ -53,7 +53,21 @@ export function AddTransactionSheet() {
   const title = addTransactionDraft ? "Расход в категорию" : "Новая операция"
 
   return (
-    <BottomSheet open={showAddTransaction} title={title} onClose={handleClose}>
+    <BottomSheet
+      open={showAddTransaction}
+      title={title}
+      onClose={handleClose}
+      footer={
+        <button
+          type="button"
+          disabled={!canSave}
+          onClick={handleSave}
+          className="w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
+        >
+          Сохранить
+        </button>
+      }
+    >
       {!addTransactionDraft && (
         <div className="mb-5 flex rounded-block-sm bg-secondary p-1">
           {(["expense", "income"] as const).map((value) => (
@@ -121,17 +135,8 @@ export function AddTransactionSheet() {
         placeholder="Кофейня, зарплата…"
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        className="mb-6 rounded-block-sm border border-border bg-card px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
+        className="rounded-block-sm border border-border bg-card px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
       />
-
-      <button
-        type="button"
-        disabled={!canSave}
-        onClick={handleSave}
-        className="w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
-      >
-        Сохранить
-      </button>
     </BottomSheet>
   )
 }
