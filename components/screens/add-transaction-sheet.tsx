@@ -68,8 +68,9 @@ export function AddTransactionSheet() {
         </button>
       }
     >
+      <div className="w-full min-w-0 max-w-full">
       {!addTransactionDraft && (
-        <div className="mb-5 flex rounded-block-sm bg-secondary p-1">
+        <div className="mb-5 flex w-full min-w-0 rounded-block-sm bg-secondary p-1">
           {(["expense", "income"] as const).map((value) => (
             <button
               key={value}
@@ -92,14 +93,14 @@ export function AddTransactionSheet() {
         placeholder="0"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        className="mb-5 rounded-block border border-border bg-card px-5 py-4 font-serif text-4xl font-bold text-foreground outline-none ring-primary focus:ring-2"
+        className="mb-5 w-full min-w-0 max-w-full box-border rounded-block border border-border bg-card px-5 py-4 font-serif text-3xl font-bold text-foreground outline-none ring-primary focus:ring-2"
         autoFocus
       />
 
       {type === "expense" && (
         <>
           <p className="mb-2 text-xs font-semibold text-muted-foreground">Категория</p>
-          <div className="mb-5 grid grid-cols-3 gap-2">
+          <div className="mb-5 grid w-full min-w-0 grid-cols-3 gap-2">
             {data.categories.map((category) => {
               const selected = categoryId === category.id
               return (
@@ -135,8 +136,9 @@ export function AddTransactionSheet() {
         placeholder="Кофейня, зарплата…"
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        className="rounded-block-sm border border-border bg-card px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
+        className="w-full min-w-0 max-w-full box-border rounded-block-sm border border-border bg-card px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
       />
+      </div>
     </BottomSheet>
   )
 }

@@ -70,7 +70,7 @@ export function AddToGoalSheet() {
         placeholder="0"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        className="rounded-block border border-border bg-card px-5 py-4 font-serif text-4xl font-bold text-foreground outline-none ring-primary focus:ring-2"
+        className="w-full min-w-0 max-w-full box-border rounded-block border border-border bg-card px-5 py-4 font-serif text-3xl font-bold text-foreground outline-none ring-primary focus:ring-2"
         autoFocus
       />
     </BottomSheet>
