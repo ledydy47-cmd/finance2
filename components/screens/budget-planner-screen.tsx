@@ -157,19 +157,45 @@ function draftFromOption(option: CategoryIconOption, id: string, name: string, a
 }
 
 function categoryToEntryDraft(category: Category, amount: string): CategoryEntryDraft {
-  const preset = CATEGORY_ICON_OPTIONS.find(
-    (option) => option.key === category.id || option.icon === category.icon,
-  )
+  const presetById = CATEGORY_ICON_OPTIONS.find((option) => option.key === category.id)
+  const iconKey =
+    presetById && presetById.icon === category.icon ? presetById.key : "custom"
 
   return {
     id: category.id,
     name: category.name,
     amount,
-    iconKey: preset?.key ?? category.id,
+    iconKey,
     icon: category.icon,
     tint: category.tint,
     bar: category.bar,
   }
+}
+
+function buildFlexiblePlannerList(
+  flexibleCats: Category[],
+  isHomeSetupActive: boolean,
+  categories: Category[],
+) {
+  if (flexibleCats.length > 0) return flexibleCats
+
+  if (isHomeSetupActive) {
+    return SETUP_TOUR_CATEGORIES.map((cat, i) => {
+      const option = iconOptionForCategoryId(cat.id)
+      const palette = paletteForIndex(i)
+      return {
+        id: cat.id,
+        name: cat.name,
+        icon: option.icon,
+        tint: option.tint,
+        bar: option.bar,
+        monthlyLimit: 0,
+        kind: "flexible" as const,
+      }
+    })
+  }
+
+  return categories.filter((c) => c.kind !== "mandatory")
 }
 
 export function BudgetPlannerScreen() {
@@ -191,18 +217,25 @@ export function BudgetPlannerScreen() {
   const [openMandatoryIconPickerId, setOpenMandatoryIconPickerId] = useState<string | null>(null)
   const budgetIntroRef = useRef<HTMLElement>(null)
   const firstCategoryAmountRef = useRef<HTMLInputElement>(null)
+  const plannerInitializedRef = useRef(false)
 
   const primaryGoal = getPrimaryGoal()
 
   useEffect(() => {
     if (!showBudgetPlanner) {
+      plannerInitializedRef.current = false
       setCoachMarkDismissed(false)
       setOpenIconPickerId(null)
       setOpenMandatoryIconPickerId(null)
       return
     }
 
+    if (plannerInitializedRef.current) return
+    plannerInitializedRef.current = true
+
     const plan = data.budgetPlan
+    const mandatoryCats = data.categories.filter((c) => c.kind === "mandatory")
+    const flexibleCats = data.categories.filter((c) => c.kind === "flexible")
 
     const incomes = isHomeSetupActive
       ? plan?.incomeSources?.length
@@ -221,14 +254,6 @@ export function BudgetPlannerScreen() {
         amount: e.amount > 0 ? String(e.amount) : "",
       })),
     )
-  }, [showBudgetPlanner, data.budgetPlan, summary.income, isHomeSetupActive])
-
-  useEffect(() => {
-    if (!showBudgetPlanner) return
-
-    const plan = data.budgetPlan
-    const mandatoryCats = data.categories.filter((c) => c.kind === "mandatory")
-    const flexibleCats = data.categories.filter((c) => c.kind === "flexible")
 
     const mandatory = plan?.mandatoryExpenses?.length
       ? plan.mandatoryExpenses
@@ -255,24 +280,11 @@ export function BudgetPlannerScreen() {
       }),
     )
 
-    const flexList =
-      flexibleCats.length > 0
-        ? flexibleCats
-        : isHomeSetupActive
-          ? SETUP_TOUR_CATEGORIES.map((cat, i) => {
-              const option = iconOptionForCategoryId(cat.id)
-              const palette = paletteForIndex(i)
-              return {
-                id: cat.id,
-                name: cat.name,
-                icon: option.icon,
-                tint: option.tint,
-                bar: option.bar,
-                monthlyLimit: 0,
-                kind: "flexible" as const,
-              }
-            })
-          : data.categories.filter((c) => c.kind !== "mandatory")
+    const flexList = buildFlexiblePlannerList(
+      flexibleCats,
+      isHomeSetupActive,
+      data.categories,
+    )
 
     setFlexibleCategories(
       flexList.map((category) => {
@@ -281,7 +293,13 @@ export function BudgetPlannerScreen() {
         return categoryToEntryDraft(category, amount > 0 ? String(amount) : "")
       }),
     )
-  }, [showBudgetPlanner, data.budgetPlan, data.categories, isHomeSetupActive])
+  }, [
+    showBudgetPlanner,
+    data.budgetPlan,
+    data.categories,
+    summary.income,
+    isHomeSetupActive,
+  ])
 
   const incomeNumeric = useMemo(() => toEntries(incomeSources), [incomeSources])
   const mandatoryNumeric = useMemo(() => toEntries(mandatoryExpenses), [mandatoryExpenses])
@@ -340,7 +358,9 @@ export function BudgetPlannerScreen() {
   }
 
   function addMandatoryExpense() {
-    const usedKeys = new Set(mandatoryExpenses.map((c) => c.iconKey))
+    const usedKeys = new Set(
+      mandatoryExpenses.map((c) => c.iconKey).filter((key) => key !== "custom"),
+    )
     const option =
       CATEGORY_ICON_OPTIONS.find((o) => !usedKeys.has(o.key)) ??
       CATEGORY_ICON_OPTIONS[mandatoryExpenses.length % CATEGORY_ICON_OPTIONS.length]
@@ -351,7 +371,9 @@ export function BudgetPlannerScreen() {
   }
 
   function addFlexibleCategory() {
-    const usedKeys = new Set(flexibleCategories.map((c) => c.iconKey))
+    const usedKeys = new Set(
+      flexibleCategories.map((c) => c.iconKey).filter((key) => key !== "custom"),
+    )
     const option =
       CATEGORY_ICON_OPTIONS.find((o) => !usedKeys.has(o.key)) ??
       CATEGORY_ICON_OPTIONS[flexibleCategories.length % CATEGORY_ICON_OPTIONS.length]
