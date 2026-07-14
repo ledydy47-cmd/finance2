@@ -49,7 +49,7 @@ function migrateData(data: AppData, defaults: AppData): AppData {
     return {
       ...rest,
       kind,
-      icon: emojiForCategoryId(category.id, category.icon),
+      icon: category.icon?.trim() || emojiForCategoryId(category.id),
       ...(category.id === "cat-beauty" ? { name: "Косметика" } : {}),
       ...(category.id === "cat-rent" && category.name === "Аренда" ? { name: "Жилье" } : {}),
     }

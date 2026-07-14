@@ -157,8 +157,19 @@ function draftFromOption(option: CategoryIconOption, id: string, name: string, a
 }
 
 function categoryToEntryDraft(category: Category, amount: string): CategoryEntryDraft {
-  const option = iconOptionForCategoryId(category.id)
-  return draftFromOption(option, category.id, category.name, amount)
+  const preset = CATEGORY_ICON_OPTIONS.find(
+    (option) => option.key === category.id || option.icon === category.icon,
+  )
+
+  return {
+    id: category.id,
+    name: category.name,
+    amount,
+    iconKey: preset?.key ?? category.id,
+    icon: category.icon,
+    tint: category.tint,
+    bar: category.bar,
+  }
 }
 
 export function BudgetPlannerScreen() {
@@ -192,14 +203,6 @@ export function BudgetPlannerScreen() {
     }
 
     const plan = data.budgetPlan
-    const mandatoryCats = data.categories.filter((c) => c.kind === "mandatory")
-    const flexibleCats = data.categories.filter((c) => c.kind === "flexible")
-
-    const mandatory = plan?.mandatoryExpenses?.length
-      ? plan.mandatoryExpenses
-      : mandatoryCats.length > 0
-        ? mandatoryCats.map((c) => ({ id: c.id, name: c.name, amount: c.monthlyLimit }))
-        : createDefaultMandatoryExpenses()
 
     const incomes = isHomeSetupActive
       ? plan?.incomeSources?.length
@@ -218,6 +221,20 @@ export function BudgetPlannerScreen() {
         amount: e.amount > 0 ? String(e.amount) : "",
       })),
     )
+  }, [showBudgetPlanner, data.budgetPlan, summary.income, isHomeSetupActive])
+
+  useEffect(() => {
+    if (!showBudgetPlanner) return
+
+    const plan = data.budgetPlan
+    const mandatoryCats = data.categories.filter((c) => c.kind === "mandatory")
+    const flexibleCats = data.categories.filter((c) => c.kind === "flexible")
+
+    const mandatory = plan?.mandatoryExpenses?.length
+      ? plan.mandatoryExpenses
+      : mandatoryCats.length > 0
+        ? mandatoryCats.map((c) => ({ id: c.id, name: c.name, amount: c.monthlyLimit }))
+        : createDefaultMandatoryExpenses()
 
     setMandatoryExpenses(
       mandatory.map((e) => {
@@ -264,7 +281,7 @@ export function BudgetPlannerScreen() {
         return categoryToEntryDraft(category, amount > 0 ? String(amount) : "")
       }),
     )
-  }, [showBudgetPlanner, data.budgetPlan, data.categories, summary.income, isHomeSetupActive])
+  }, [showBudgetPlanner, data.budgetPlan, data.categories, isHomeSetupActive])
 
   const incomeNumeric = useMemo(() => toEntries(incomeSources), [incomeSources])
   const mandatoryNumeric = useMemo(() => toEntries(mandatoryExpenses), [mandatoryExpenses])

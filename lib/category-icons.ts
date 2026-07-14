@@ -62,7 +62,7 @@ export function iconOptionForCategoryId(categoryId: string): CategoryIconOption 
 }
 
 export function emojiForCategoryId(categoryId: string, fallbackIcon?: string): string {
-  return CATEGORY_EMOJI_BY_ID[categoryId] ?? fallbackIcon ?? "✨"
+  return fallbackIcon?.trim() || CATEGORY_EMOJI_BY_ID[categoryId] || "✨"
 }
 
 const EMOJI_PATTERN = /\p{Extended_Pictographic}/u
