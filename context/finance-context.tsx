@@ -73,7 +73,7 @@ interface FinanceContextValue {
   }) => void
   restoreSubscription: () => Promise<{ ok: boolean; message: string }>
   confirmPendingPayment: () => Promise<boolean>
-  syncSubscriptionFromServer: (userKey: string) => Promise<void>
+  syncSubscriptionFromServer: (userKey: string) => Promise<boolean>
   openAddToGoal: (goalId: string) => void
   closeAddToGoal: () => void
   setPrimaryGoal: (goalId: string) => void
@@ -124,10 +124,11 @@ interface FinanceContextValue {
 const FinanceContext = createContext<FinanceContextValue | null>(null)
 
 function isUserSubscribed(settings: Settings) {
+  if (settings.isSubscribed) return true
   if (settings.subscriptionExpiresAt) {
     return isSubscriptionActive(settings.subscriptionExpiresAt)
   }
-  return settings.isSubscribed
+  return false
 }
 
 function markGoalCelebrated(data: AppData, goalId: string): AppData {
@@ -221,6 +222,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     saveAppData(data)
   }, [data, hydrated])
 
+  useEffect(() => {
+    if (!hydrated) return
+    if (isUserSubscribed(data.settings)) {
+      setShowPaywall(false)
+    }
+  }, [
+    hydrated,
+    data.settings.isSubscribed,
+    data.settings.subscriptionExpiresAt,
+  ])
+
   const periodKey = getCurrentPeriodKey(data.settings.monthStartDay)
   const periodLabel = getPeriodLabel(new Date(), data.settings.monthStartDay)
   const summary = useMemo(
@@ -304,7 +316,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         )
         const payload = await response.json()
         const subscription = payload.subscription
-        if (!subscription) return
+        if (!subscription) return false
 
         update((prev) => ({
           ...prev,
@@ -320,8 +332,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
               : {}),
           },
         }))
+
+        if (subscription.active) {
+          setShowPaywall(false)
+        }
+
+        return Boolean(subscription.active)
       } catch {
-        // ignore sync errors in UI
+        return false
       }
     },
     [update],

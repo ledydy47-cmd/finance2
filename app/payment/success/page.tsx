@@ -3,19 +3,31 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ThemeApplier } from "@/components/theme/theme-applier"
-import { TelegramProvider } from "@/components/telegram/telegram-provider"
+import { TelegramProvider, useTelegram } from "@/components/telegram/telegram-provider"
 import { FinanceProvider, useFinance } from "@/context/finance-context"
 import { PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
+import { getClientUserKey } from "@/lib/client-id"
 
 function PaymentSuccessContent() {
   const router = useRouter()
-  const { confirmPendingPayment } = useFinance()
+  const { confirmPendingPayment, syncSubscriptionFromServer } = useFinance()
+  const { user } = useTelegram()
   const [message, setMessage] = useState("Проверяем оплату…")
 
   useEffect(() => {
     let cancelled = false
 
     async function verify() {
+      const userKey = getClientUserKey(user?.id)
+      const synced = await syncSubscriptionFromServer(userKey)
+      if (cancelled) return
+
+      if (synced) {
+        setMessage("Подписка активирована! Перенаправляем…")
+        window.setTimeout(() => router.replace("/"), 1200)
+        return
+      }
+
       const paymentId = localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)
       if (!paymentId) {
         setMessage("Не найден платёж. Вернитесь в приложение и попробуйте снова.")
@@ -26,6 +38,8 @@ function PaymentSuccessContent() {
       if (cancelled) return
 
       if (!activated) {
+        await syncSubscriptionFromServer(userKey)
+        if (cancelled) return
         setMessage("Оплата ещё не подтверждена. Подождите минуту и откройте приложение снова.")
         return
       }
@@ -38,7 +52,7 @@ function PaymentSuccessContent() {
     return () => {
       cancelled = true
     }
-  }, [confirmPendingPayment, router])
+  }, [confirmPendingPayment, router, syncSubscriptionFromServer, user?.id])
 
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-6">

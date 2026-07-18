@@ -71,15 +71,18 @@ export function AppShell() {
     if (!user?.id) return
 
     void (async () => {
+      const userKey = getClientUserKey(user.id)
+
       void trackClientAnalytics({
         event: "app_opened",
-        userKey: getClientUserKey(user.id),
+        userKey,
         telegramUserId: user.id,
         telegramUsername: user.username,
         userName: user.first_name,
       })
 
-      await confirmPendingPayment()
+      await syncSubscriptionFromServer(userKey)
+      void confirmPendingPayment()
 
       void fetch("/api/user/register-telegram", {
         method: "POST",
@@ -91,12 +94,10 @@ export function AppShell() {
         }),
       })
 
-      await syncSubscriptionFromServer(getClientUserKey(user.id))
-
       void fetch("/api/analytics/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userKey: getClientUserKey(user.id) }),
+        body: JSON.stringify({ userKey }),
       })
     })()
   }, [user?.id, user?.username, user?.first_name, confirmPendingPayment, syncSubscriptionFromServer])
