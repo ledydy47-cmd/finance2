@@ -1,16 +1,5 @@
 import type { Settings } from "@/lib/types"
 
-const DEFAULT_ONE_FREE_EXPENSE_USER_IDS = "664811251"
-
-function parseTestUserIds(raw: string | undefined) {
-  return new Set(
-    (raw ?? DEFAULT_ONE_FREE_EXPENSE_USER_IDS)
-      .split(",")
-      .map((item) => Number(item.trim()))
-      .filter(Number.isFinite),
-  )
-}
-
 export function isUserSubscribed(settings: Settings) {
   if (settings.isSubscribed) return true
   if (settings.subscriptionExpiresAt) {
@@ -20,6 +9,7 @@ export function isUserSubscribed(settings: Settings) {
 }
 
 export const FLASH_SALE_DURATION_MS = 15 * 60 * 1000
+export const FLASH_SALE_REMINDER_BEFORE_MS = 5 * 60 * 1000
 
 export const FLASH_SALE_LIST_PRICES = {
   yearly: {
@@ -72,39 +62,18 @@ export function getFlashSaleState(settings: Settings, now = Date.now()) {
   }
 }
 
-export function isOneFreeExpenseTestUser(telegramUserId?: number | null) {
-  if (!telegramUserId) return false
-  const ids = parseTestUserIds(
-    process.env.ONE_FREE_EXPENSE_USER_IDS ??
-      process.env.NEXT_PUBLIC_ONE_FREE_EXPENSE_USER_IDS,
-  )
-  return ids.has(telegramUserId)
-}
-
-export function resolvePaywallAccess(
-  settings: Settings,
-  telegramUserId?: number | null,
-): {
+export function resolvePaywallAccess(settings: Settings): {
   isContentLocked: boolean
   requiresPremiumAfterWalkthrough: boolean
   showPaywallOnFirstExpense: boolean
 } {
   const subscribed = isUserSubscribed(settings)
-
-  if (isOneFreeExpenseTestUser(telegramUserId)) {
-    const usedFreeExpense = settings.firstExpenseAdded
-    return {
-      isContentLocked: usedFreeExpense && !subscribed,
-      requiresPremiumAfterWalkthrough:
-        settings.homeWalkthroughCompleted && usedFreeExpense && !subscribed,
-      showPaywallOnFirstExpense: false,
-    }
-  }
+  const usedFreeExpense = settings.firstExpenseAdded
 
   return {
-    isContentLocked: settings.paywallShown && !subscribed,
+    isContentLocked: usedFreeExpense && !subscribed,
     requiresPremiumAfterWalkthrough:
-      settings.homeWalkthroughCompleted && !subscribed,
-    showPaywallOnFirstExpense: true,
+      settings.homeWalkthroughCompleted && usedFreeExpense && !subscribed,
+    showPaywallOnFirstExpense: false,
   }
 }

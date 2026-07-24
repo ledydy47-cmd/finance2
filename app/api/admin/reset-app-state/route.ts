@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { clearFlashSaleStartedAt } from "@/lib/server/flash-sale-store"
+import { clearFlashSaleReminder, clearFlashSaleStartedAt } from "@/lib/server/flash-sale-store"
 import {
   queueAppReset,
   WALKTHROUGH_RESET_PATCH,
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
 
     if (body.resetToWalkthrough) {
       await clearFlashSaleStartedAt(userKey)
+      await clearFlashSaleReminder(userKey)
     }
 
     try {

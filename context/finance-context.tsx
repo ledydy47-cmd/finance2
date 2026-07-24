@@ -29,7 +29,7 @@ import {
 } from "@/lib/app-reset-client"
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
-import { isOneFreeExpenseTestUser, resolvePaywallAccess } from "@/lib/paywall-experiment"
+import { resolvePaywallAccess } from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
 import { isSubscriptionActive, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
@@ -275,8 +275,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const telegramUserId = getWebApp()?.initDataUnsafe?.user?.id
   const paywallAccess = useMemo(
-    () => resolvePaywallAccess(data.settings, telegramUserId),
-    [data.settings, telegramUserId],
+    () => resolvePaywallAccess(data.settings),
+    [data.settings],
   )
   const isContentLocked = paywallAccess.isContentLocked
   const requiresPremiumAfterWalkthrough = paywallAccess.requiresPremiumAfterWalkthrough

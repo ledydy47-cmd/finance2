@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import {
   getFlashSaleStartedAt,
+  scheduleFlashSaleReminder,
   setFlashSaleStartedAt,
 } from "@/lib/server/flash-sale-store"
 
@@ -16,9 +17,11 @@ export async function POST(request: Request) {
     }
 
     const userKey = body.userKey.trim()
+    const startedAt = body.startedAt.trim()
     const existing = await getFlashSaleStartedAt(userKey)
     if (!existing) {
-      await setFlashSaleStartedAt(userKey, body.startedAt.trim())
+      await setFlashSaleStartedAt(userKey, startedAt)
+      await scheduleFlashSaleReminder(userKey, startedAt)
     }
 
     return NextResponse.json({ ok: true })
