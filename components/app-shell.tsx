@@ -21,10 +21,8 @@ import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
-import {
-  resumeFlashSaleReminderWatch,
-  scheduleFlashSaleReminderChecks,
-} from "@/lib/client/flash-sale-reminder-client"
+import { resumeFlashSaleReminderWatch, scheduleFlashSaleReminderChecks } from "@/lib/client/flash-sale-reminder-client"
+import { isUserSubscribed } from "@/lib/paywall-experiment"
 import { getWebApp } from "@/lib/telegram"
 
 export function AppShell() {
@@ -244,7 +242,7 @@ export function AppShell() {
 
             {showHomeWalkthrough && <HomeWalkthrough />}
 
-            {showPaywall && (
+            {showPaywall && !isUserSubscribed(data.settings) && (
               <SubscriptionPaywallModal onClose={closePaywall} />
             )}
 

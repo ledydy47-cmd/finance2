@@ -38,6 +38,7 @@ import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/teleg
 import type { SubscriptionPlan } from "@/lib/subscription"
 import { isSubscriptionActive, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
 import { verifyPaymentWithRetry } from "@/lib/pending-payment-verify"
+import { fetchServerSubscriptionSettings } from "@/lib/subscription-sync-client"
 import type { ThemeId } from "@/lib/themes"
 import { applyTheme, DEFAULT_THEME_ID } from "@/lib/themes"
 import type {
@@ -209,6 +210,45 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         // ignore remote reset errors
       }
 
+      if (userKey.startsWith("tg-")) {
+        try {
+          const subscriptionPatch = await fetchServerSubscriptionSettings(userKey)
+          if (subscriptionPatch) {
+            loaded = {
+              ...loaded,
+              settings: { ...loaded.settings, ...subscriptionPatch },
+            }
+          }
+        } catch {
+          // ignore subscription sync errors
+        }
+
+        const pendingPaymentId = localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)
+        if (pendingPaymentId && !isUserSubscribed(loaded.settings)) {
+          try {
+            const verified = await verifyPaymentWithRetry(pendingPaymentId)
+            if (verified) {
+              loaded = {
+                ...loaded,
+                settings: {
+                  ...loaded.settings,
+                  isSubscribed: true,
+                  subscriptionPlan: verified.plan,
+                  subscriptionExpiresAt: verified.expiresAt,
+                  lastPaymentId: verified.paymentId,
+                  autoRenew: verified.autoRenew,
+                  subscriptionStatus:
+                    (verified.status as Settings["subscriptionStatus"]) ?? "active",
+                },
+              }
+              localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
+            }
+          } catch {
+            // ignore pending payment verification errors
+          }
+        }
+      }
+
       const subscribed = isUserSubscribed(loaded.settings)
       if (loaded.settings.isSubscribed !== subscribed) {
         loaded.settings.isSubscribed = subscribed
@@ -287,6 +327,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const requiresPremiumAfterWalkthrough = paywallAccess.requiresPremiumAfterWalkthrough
 
   const markPaywallShown = useCallback(() => {
+    if (isUserSubscribed(data.settings)) {
+      setShowPaywall(false)
+      return
+    }
+
     setShowPaywall(true)
 
     const alreadyShown = data.settings.paywallShown
@@ -352,8 +397,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   ])
 
   const openPaywall = useCallback(() => {
+    if (isUserSubscribed(data.settings)) return
     markPaywallShown()
-  }, [markPaywallShown])
+  }, [data.settings, markPaywallShown])
   const closePaywall = useCallback(() => setShowPaywall(false), [])
 
   const homeSetupStep = useMemo((): 1 | 2 | 3 => {

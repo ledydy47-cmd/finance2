@@ -16,9 +16,9 @@ export function SettingsScreen() {
   const isSubscribed = data.settings.isSubscribed
 
   useEffect(() => {
-    if (!isSubscribed && !user?.id) return
-    void syncSubscriptionFromServer(getClientUserKey(user?.id))
-  }, [isSubscribed, syncSubscriptionFromServer, user?.id])
+    if (!user?.id) return
+    void syncSubscriptionFromServer(getClientUserKey(user.id))
+  }, [syncSubscriptionFromServer, user?.id])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

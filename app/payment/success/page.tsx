@@ -14,9 +14,16 @@ async function verifyPaymentWithRetryByOrder(orderId: string) {
       const response = await fetch(
         `/api/payments/verify-by-order?orderId=${encodeURIComponent(orderId)}`,
       )
-      const data = (await response.json()) as { active?: boolean }
-      if (response.ok && data.active) {
-        return true
+      const data = (await response.json()) as {
+        active?: boolean
+        paymentId?: string
+        plan?: "yearly" | "monthly"
+        expiresAt?: string
+        autoRenew?: boolean
+        status?: string
+      }
+      if (response.ok && data.active && data.paymentId && data.plan && data.expiresAt) {
+        return data
       }
     } catch {
       // retry
@@ -27,13 +34,13 @@ async function verifyPaymentWithRetryByOrder(orderId: string) {
     }
   }
 
-  return false
+  return null
 }
 
 function PaymentSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { confirmPendingPayment, syncSubscriptionFromServer } = useFinance()
+  const { confirmPendingPayment, syncSubscriptionFromServer, activateSubscription } = useFinance()
   const { user } = useTelegram()
   const [message, setMessage] = useState("Проверяем оплату…")
 
@@ -49,6 +56,15 @@ function PaymentSuccessContent() {
         if (cancelled) return
 
         if (verified) {
+          activateSubscription({
+            plan: verified.plan,
+            paymentId: verified.paymentId,
+            expiresAt: verified.expiresAt,
+            autoRenew: verified.autoRenew ?? true,
+            subscriptionStatus:
+              (verified.status as "active" | "canceled" | "past_due" | "expired") ?? "active",
+          })
+          localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
           setMessage("Подписка активирована! Вернитесь в Telegram и откройте приложение.")
           return
         }
@@ -86,7 +102,7 @@ function PaymentSuccessContent() {
     return () => {
       cancelled = true
     }
-  }, [confirmPendingPayment, searchParams, syncSubscriptionFromServer, user?.id])
+  }, [activateSubscription, confirmPendingPayment, searchParams, syncSubscriptionFromServer, user?.id])
 
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-6">
