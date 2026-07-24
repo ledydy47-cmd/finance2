@@ -20,10 +20,16 @@ export async function getQStashUrl() {
     process.env.UPSTASH_QSTASH_URL?.trim() ||
     null
 
-  if (fromEnv) return fromEnv.replace(/\/$/, "")
+  const normalize = (value: string) =>
+    value
+      .trim()
+      .replace(/\/$/, "")
+      .replace(/\/v2\/publish$/i, "")
+
+  if (fromEnv) return normalize(fromEnv)
 
   const fromKv = await kvRestGet(URL_KEY)
-  if (fromKv) return fromKv.replace(/\/$/, "")
+  if (fromKv) return normalize(fromKv)
 
   return "https://qstash.upstash.io"
 }

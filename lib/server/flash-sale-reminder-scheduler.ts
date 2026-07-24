@@ -36,6 +36,7 @@ async function scheduleQStashDelivery(input: {
   }
 
   const callbackUrl = `${config.baseUrl}${input.callbackPath}`
+  const delaySeconds = Math.max(1, Math.ceil(input.delayMs / 1000))
 
   const response = await fetch(`${config.qstashUrl}/v2/publish/${callbackUrl}`, {
       method: "POST",
@@ -74,7 +75,14 @@ async function scheduleQStashDelivery(input: {
 }
 
 function dedupeSuffix(timing: FlashSaleTiming) {
-  return timing.isTest ? ":test" : ""
+  return timing.isTest ? "-test" : ""
+}
+
+function buildDeduplicationId(parts: string[]) {
+  return parts
+    .filter(Boolean)
+    .join("-")
+    .replace(/:/g, "-")
 }
 
 async function resolveTiming(userKey: string, startedAt: string, timing?: FlashSaleTiming) {
@@ -90,7 +98,12 @@ export async function scheduleFlashSaleReminderDelivery(
   return scheduleQStashDelivery({
     callbackPath: "/api/subscription/flash-sale-reminder-deliver",
     delayMs: resolved.reminderDelayMs,
-    deduplicationId: `flash-sale-reminder:${userKey}:${startedAt}${dedupeSuffix(resolved)}`,
+    deduplicationId: buildDeduplicationId([
+      "flash-sale-reminder",
+      userKey,
+      startedAt,
+      dedupeSuffix(resolved),
+    ]),
     body: { userKey, startedAt },
     logLabel: "flash-sale-reminder",
   })
@@ -106,7 +119,12 @@ export async function scheduleFlashSaleReofferDelivery(
   return scheduleQStashDelivery({
     callbackPath: "/api/subscription/flash-sale-offer-deliver",
     delayMs: getReofferScheduleDelayMs(resolved, offer),
-    deduplicationId: `flash-sale-offer-${offer}:${userKey}:${startedAt}${dedupeSuffix(resolved)}`,
+    deduplicationId: buildDeduplicationId([
+      `flash-sale-offer-${offer}`,
+      userKey,
+      startedAt,
+      dedupeSuffix(resolved),
+    ]),
     body: { userKey, startedAt, offer },
     logLabel: `flash-sale-offer-${offer}`,
   })
