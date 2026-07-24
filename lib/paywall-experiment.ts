@@ -1,4 +1,12 @@
-import type { Settings } from "@/lib/types"
+import type { Settings, Transaction } from "@/lib/types"
+
+export function countExpenseTransactions(transactions: Transaction[]) {
+  return transactions.filter((tx) => tx.type === "expense").length
+}
+
+export function hasUsedFreeExpense(settings: Settings, transactions: Transaction[]) {
+  return settings.firstExpenseAdded || countExpenseTransactions(transactions) > 0
+}
 
 export function isUserSubscribed(settings: Settings) {
   if (settings.isSubscribed) return true
@@ -64,13 +72,16 @@ export function getFlashSaleState(settings: Settings, now = Date.now()) {
   }
 }
 
-export function resolvePaywallAccess(settings: Settings): {
+export function resolvePaywallAccess(
+  settings: Settings,
+  transactions: Transaction[] = [],
+): {
   isContentLocked: boolean
   requiresPremiumAfterWalkthrough: boolean
   showPaywallOnFirstExpense: boolean
 } {
   const subscribed = isUserSubscribed(settings)
-  const usedFreeExpense = settings.firstExpenseAdded
+  const usedFreeExpense = hasUsedFreeExpense(settings, transactions)
 
   return {
     isContentLocked: usedFreeExpense && !subscribed,
@@ -78,4 +89,12 @@ export function resolvePaywallAccess(settings: Settings): {
       settings.homeWalkthroughCompleted && usedFreeExpense && !subscribed,
     showPaywallOnFirstExpense: false,
   }
+}
+
+export function isAddingFirstExpense(
+  settings: Settings,
+  transactions: Transaction[],
+  type: Transaction["type"],
+) {
+  return type === "expense" && !hasUsedFreeExpense(settings, transactions)
 }

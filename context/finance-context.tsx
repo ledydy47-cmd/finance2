@@ -29,7 +29,12 @@ import {
 } from "@/lib/app-reset-client"
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
-import { resolvePaywallAccess } from "@/lib/paywall-experiment"
+import {
+  FLASH_SALE_DURATION_MS,
+  FLASH_SALE_REMINDER_BEFORE_MS,
+  isAddingFirstExpense,
+  resolvePaywallAccess,
+} from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
 import { isSubscriptionActive, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
@@ -276,8 +281,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const telegramUserId = getWebApp()?.initDataUnsafe?.user?.id
   const paywallAccess = useMemo(
-    () => resolvePaywallAccess(data.settings),
-    [data.settings],
+    () => resolvePaywallAccess(data.settings, data.transactions),
+    [data.settings, data.transactions],
   )
   const isContentLocked = paywallAccess.isContentLocked
   const requiresPremiumAfterWalkthrough = paywallAccess.requiresPremiumAfterWalkthrough
@@ -303,14 +308,24 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
 
     if (flashSaleStartedAt) {
+      const userKey = getClientUserKey(telegramUserId)
       void fetch("/api/subscription/flash-sale-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userKey: getClientUserKey(telegramUserId),
+          userKey,
           startedAt: flashSaleStartedAt,
         }),
       })
+
+      const remindInMs = FLASH_SALE_DURATION_MS - FLASH_SALE_REMINDER_BEFORE_MS
+      window.setTimeout(() => {
+        void fetch("/api/subscription/flash-sale-reminder-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userKey }),
+        })
+      }, remindInMs)
     }
 
     if (!alreadyShown) {
@@ -438,6 +453,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           },
         }))
         setShowPaywall(true)
+
+        const remindInMs = FLASH_SALE_DURATION_MS - FLASH_SALE_REMINDER_BEFORE_MS
+        window.setTimeout(() => {
+          void fetch("/api/subscription/flash-sale-reminder-check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userKey }),
+          })
+        }, remindInMs)
 
         void trackClientAnalytics({
           event: "paywall_shown",
@@ -604,13 +628,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       note: string
       date?: string
     }) => {
-      if (isContentLocked) {
+      const isFirstExpense = isAddingFirstExpense(
+        data.settings,
+        data.transactions,
+        input.type,
+      )
+
+      if (isContentLocked && !isFirstExpense) {
         markPaywallShown()
         return
       }
-
-      const isFirstExpense =
-        input.type === "expense" && !data.settings.firstExpenseAdded
 
       const tx: Transaction = {
         id: crypto.randomUUID(),
@@ -634,7 +661,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setShowAddTransactionState(false)
       setActiveTab("home")
     },
-    [data.settings.firstExpenseAdded, isContentLocked, markPaywallShown, update],
+    [data.settings, data.transactions, isContentLocked, markPaywallShown, update],
   )
 
   const deleteTransaction = useCallback(

@@ -464,17 +464,22 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                 ))}
               </div>
 
+              <p className="mb-2 text-xs text-muted-foreground">
+                Колонка «Расход» — пользователь добавил хотя бы одну трату. Пролистайте таблицу вправо на
+                узком экране.
+              </p>
+
               <div className="overflow-x-auto rounded-block border border-border bg-card">
-                <table className="min-w-full text-left text-xs">
+                <table className="min-w-[52rem] w-full text-left text-xs">
                   <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-2">Пользователь</th>
+                      <th className="sticky left-0 z-10 bg-secondary/95 px-3 py-2">Пользователь</th>
                       <th className="px-3 py-2">Возраст</th>
                       <th className="px-3 py-2">Открыл</th>
                       <th className="px-3 py-2">Начал</th>
                       <th className="px-3 py-2">Онбординг</th>
+                      <th className="px-3 py-2 font-semibold text-foreground">Расход</th>
                       <th className="px-3 py-2">Обучение</th>
-                      <th className="px-3 py-2">Расход</th>
                       <th className="px-3 py-2">Paywall</th>
                       <th className="px-3 py-2">Подписка</th>
                       <th className="px-3 py-2">Автооткл.</th>
@@ -490,13 +495,13 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                           selectedUserKey === user.userKey ? "bg-primary/10" : ""
                         }`}
                       >
-                        <td className="px-3 py-2 font-medium">{userLabel(user)}</td>
+                        <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium">{userLabel(user)}</td>
                         <td className="px-3 py-2">{user.age ?? "—"}</td>
                         <td className="px-3 py-2"><Check value={Boolean(user.appOpenedAt)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.onboardingStartedAt)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.onboardingCompletedAt)} /></td>
-                        <td className="px-3 py-2"><Check value={hasCompletedWalkthrough(user)} /></td>
                         <td className="px-3 py-2"><Check value={hasAddedFirstExpense(user)} /></td>
+                        <td className="px-3 py-2"><Check value={hasCompletedWalkthrough(user)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.paywallShownAt)} /></td>
                         <td className="px-3 py-2">
                           {user.subscriptionPlan === "monthly"
@@ -523,6 +528,18 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                   <p className="mt-1 text-xs text-muted-foreground">
                     Последний заход: {formatDateTime(selectedUser.lastVisitAt)}
                   </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                    <span className="rounded-full bg-secondary px-2.5 py-1">
+                      Расход: {hasAddedFirstExpense(selectedUser) ? "✓ да" : "— нет"}
+                    </span>
+                    <span className="rounded-full bg-secondary px-2.5 py-1">
+                      Обучение: {hasCompletedWalkthrough(selectedUser) ? "✓" : "—"}
+                    </span>
+                    <span className="rounded-full bg-secondary px-2.5 py-1">
+                      Paywall: {selectedUser.paywallShownAt ? "✓" : "—"}
+                    </span>
+                  </div>
 
                   <div className="mt-4 space-y-2">
                     <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">

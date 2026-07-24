@@ -96,31 +96,44 @@ export function AppShell() {
         }),
       })
 
-      void fetch("/api/analytics/sync", {
+      void fetch("/api/subscription/flash-sale-reminder-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userKey,
-          homeWalkthroughCompleted: data.settings.homeWalkthroughCompleted,
-          onboardingCompleted: data.settings.onboardingCompleted,
-          firstExpenseAdded: data.settings.firstExpenseAdded,
-          userName: data.settings.userName || user.first_name,
-          age: data.settings.age,
-        }),
+        body: JSON.stringify({ userKey }),
       })
     })()
   }, [
     user?.id,
     user?.username,
     user?.first_name,
+    confirmPendingPayment,
+    syncSubscriptionFromServer,
+    activatePendingFlashSaleOffer,
+  ])
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    void fetch("/api/analytics/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userKey: getClientUserKey(user.id),
+        homeWalkthroughCompleted: data.settings.homeWalkthroughCompleted,
+        onboardingCompleted: data.settings.onboardingCompleted,
+        firstExpenseAdded: data.settings.firstExpenseAdded,
+        userName: data.settings.userName || user.first_name,
+        age: data.settings.age,
+      }),
+    })
+  }, [
+    user?.id,
+    user?.first_name,
     data.settings.age,
     data.settings.homeWalkthroughCompleted,
     data.settings.onboardingCompleted,
     data.settings.firstExpenseAdded,
     data.settings.userName,
-    confirmPendingPayment,
-    syncSubscriptionFromServer,
-    activatePendingFlashSaleOffer,
   ])
 
   useEffect(() => {

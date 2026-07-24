@@ -47,7 +47,6 @@ export function AddTransactionSheet() {
       categoryId: type === "expense" ? categoryId : null,
       note,
     })
-    handleClose()
   }
 
   const title = addTransactionDraft ? "Расход в категорию" : "Новая операция"

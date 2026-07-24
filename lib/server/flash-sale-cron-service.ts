@@ -75,6 +75,56 @@ async function processFiveMinuteReminders(now: Date) {
   return { sent, pending: cleaned.filter((item) => !item.sent).length }
 }
 
+export async function processUserFlashSaleReminder(userKey: string, now = new Date()) {
+  const reminders = await readFlashSaleReminders()
+  const nowMs = now.getTime()
+  const reminder = reminders.find(
+    (item) => item.userKey === userKey && !item.sent,
+  )
+
+  if (!reminder) {
+    return { sent: false as const, reason: "NO_PENDING" as const }
+  }
+
+  if (new Date(reminder.remindAt).getTime() > nowMs) {
+    return { sent: false as const, reason: "NOT_DUE" as const }
+  }
+
+  const subscription = await getServerSubscriptionStatus(userKey)
+  if (subscription?.active) {
+    reminder.sent = true
+    await writeFlashSaleReminders(reminders)
+    return { sent: false as const, reason: "SUBSCRIBED" as const }
+  }
+
+  const startedAt = await getFlashSaleStartedAt(userKey)
+  if (!startedAt || startedAt !== reminder.startedAt) {
+    reminder.sent = true
+    await writeFlashSaleReminders(reminders)
+    return { sent: false as const, reason: "STALE" as const }
+  }
+
+  const expiresMs = new Date(startedAt).getTime() + FLASH_SALE_DURATION_MS
+  if (nowMs >= expiresMs) {
+    reminder.sent = true
+    await writeFlashSaleReminders(reminders)
+    return { sent: false as const, reason: "EXPIRED" as const }
+  }
+
+  const result = await sendMessageToUser({
+    userKey,
+    message: FLASH_SALE_REMINDER_MESSAGE,
+  })
+
+  if (result.ok) {
+    reminder.sent = true
+    await writeFlashSaleReminders(reminders)
+    return { sent: true as const }
+  }
+
+  return { sent: false as const, reason: "SEND_FAILED" as const }
+}
+
 async function processReengagementOffers(now: Date) {
   const nowMs = now.getTime()
   let sent4h = 0
