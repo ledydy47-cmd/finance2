@@ -62,6 +62,7 @@ export const WALKTHROUGH_RESET_PATCH: Partial<Settings> = {
   homeWalkthroughCompleted: false,
   paywallShown: false,
   firstExpenseAdded: false,
+  paywallFlashSaleStartedAt: null,
   isSubscribed: false,
   subscriptionPlan: null,
   subscriptionExpiresAt: null,

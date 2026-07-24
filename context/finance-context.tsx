@@ -29,7 +29,7 @@ import {
 } from "@/lib/app-reset-client"
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
-import { resolvePaywallAccess } from "@/lib/paywall-experiment"
+import { isOneFreeExpenseTestUser, resolvePaywallAccess } from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
 import { isSubscriptionActive, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
@@ -283,23 +283,38 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const markPaywallShown = useCallback(() => {
     setShowPaywall(true)
-    if (data.settings.paywallShown) return
 
-    update((prev) => ({
-      ...prev,
-      settings: { ...prev.settings, paywallShown: true },
-    }))
+    const alreadyShown = data.settings.paywallShown
+    const shouldStartFlashSale =
+      isOneFreeExpenseTestUser(telegramUserId) &&
+      !data.settings.paywallFlashSaleStartedAt
 
-    void trackClientAnalytics({
-      event: "paywall_shown",
-      userKey: getClientUserKey(telegramUserId),
-      telegramUserId,
-      telegramUsername: getWebApp()?.initDataUnsafe?.user?.username,
-      userName: data.settings.userName || getWebApp()?.initDataUnsafe?.user?.first_name,
-      age: data.settings.age,
-    })
+    if (!alreadyShown || shouldStartFlashSale) {
+      update((prev) => ({
+        ...prev,
+        settings: {
+          ...prev.settings,
+          paywallShown: true,
+          ...(shouldStartFlashSale
+            ? { paywallFlashSaleStartedAt: new Date().toISOString() }
+            : {}),
+        },
+      }))
+    }
+
+    if (!alreadyShown) {
+      void trackClientAnalytics({
+        event: "paywall_shown",
+        userKey: getClientUserKey(telegramUserId),
+        telegramUserId,
+        telegramUsername: getWebApp()?.initDataUnsafe?.user?.username,
+        userName: data.settings.userName || getWebApp()?.initDataUnsafe?.user?.first_name,
+        age: data.settings.age,
+      })
+    }
   }, [
     data.settings.age,
+    data.settings.paywallFlashSaleStartedAt,
     data.settings.paywallShown,
     data.settings.userName,
     telegramUserId,

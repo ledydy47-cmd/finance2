@@ -2,11 +2,12 @@
 
 import { Check, Shield, Star, X } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { SupportSection } from "@/components/support/support-section"
 import { useFinance } from "@/context/finance-context"
 import { getClientUserKey } from "@/lib/client-id"
+import { getFlashSaleState } from "@/lib/paywall-experiment"
 import {
   PAYWALL_TESTIMONIALS,
   PENDING_PAYMENT_STORAGE_KEY,
@@ -19,6 +20,10 @@ const TESTIMONIAL_LAYOUT = [
   { className: "-rotate-[0.5deg] mx-2 -mt-1" },
 ] as const
 
+function formatRub(value: number) {
+  return `${value.toLocaleString("ru-RU")} ₽`
+}
+
 function PlanRadio({ selected }: { selected: boolean }) {
   if (selected) {
     return (
@@ -28,6 +33,29 @@ function PlanRadio({ selected }: { selected: boolean }) {
     )
   }
   return <span className="size-6 shrink-0 rounded-full border-2 border-muted-foreground/30 bg-card" />
+}
+
+function PlanPrice({
+  listPrice,
+  salePrice,
+  flashSaleActive,
+}: {
+  listPrice: string
+  salePrice: string
+  flashSaleActive: boolean
+}) {
+  if (!flashSaleActive) {
+    return (
+      <p className="text-right text-lg font-extrabold tracking-tight text-foreground">{salePrice}</p>
+    )
+  }
+
+  return (
+    <div className="text-right">
+      <p className="text-xs font-semibold text-muted-foreground line-through">{listPrice}</p>
+      <p className="text-lg font-extrabold tracking-tight text-primary">{salePrice}</p>
+    </div>
+  )
 }
 
 interface SubscriptionPaywallModalProps {
@@ -42,7 +70,20 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
   const [restoring, setRestoring] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const isSubscribed = data.settings.isSubscribed
+  const [now, setNow] = useState(() => Date.now())
+
+  const flashSale = getFlashSaleState(data.settings, user?.id, now)
+  const flashSaleActive = flashSale.active
+
+  useEffect(() => {
+    if (!data.settings.paywallFlashSaleStartedAt) return
+
+    const timerId = window.setInterval(() => {
+      setNow(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(timerId)
+  }, [data.settings.paywallFlashSaleStartedAt])
 
   async function handlePay() {
     if (!agreedToTerms) return
@@ -59,19 +100,19 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
         body: JSON.stringify({ plan, userKey, orderId }),
       })
 
-      const data = await response.json()
+      const payload = await response.json()
       if (!response.ok) {
         setError(
-          data.error === "YOOKASSA_NOT_CONFIGURED"
+          payload.error === "YOOKASSA_NOT_CONFIGURED"
             ? "ЮKassa не настроена на сервере. Добавьте YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY в Vercel → Settings → Environment Variables и пересоберите проект."
-            : data.message ||
+            : payload.message ||
               "Оплата временно недоступна. Проверьте настройки ЮKassa на сервере.",
         )
         return
       }
 
-      localStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, data.paymentId)
-      openLink(data.confirmationUrl)
+      localStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, payload.paymentId)
+      openLink(payload.confirmationUrl)
     } catch {
       setError("Не удалось создать платёж. Попробуйте ещё раз.")
     } finally {
@@ -90,6 +131,13 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
     }
     onClose()
   }
+
+  const yearlyListTotal = formatRub(flashSale.listPrices?.yearly.total ?? 2980)
+  const yearlySaleTotal = formatRub(flashSale.salePrices?.yearly.total ?? 1490)
+  const yearlyListPerMonth = `${flashSale.listPrices?.yearly.perMonth ?? 248} ₽/мес`
+  const yearlySalePerMonth = `${flashSale.salePrices?.yearly.perMonth ?? 124} ₽/мес`
+  const monthlyListPerMonth = `${flashSale.listPrices?.monthly.perMonth ?? 598} ₽/мес`
+  const monthlySalePerMonth = `${flashSale.salePrices?.monthly.perMonth ?? 299} ₽/мес`
 
   return (
     <div className="absolute inset-0 z-[80] flex flex-col bg-background">
@@ -113,8 +161,20 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           </button>
         </div>
 
+        {flashSaleActive ? (
+          <div className="mb-3 shrink-0 rounded-block-sm border border-primary/25 bg-primary/10 px-4 py-3 text-center">
+            <p className="font-serif text-base font-bold text-foreground">Скидка 50%</p>
+            <p className="mt-1 text-sm font-semibold text-primary">
+              Осталось {flashSale.countdownLabel}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Специальное предложение только 15 минут
+            </p>
+          </div>
+        ) : null}
+
         <h2 className="shrink-0 text-center font-serif text-[1.35rem] font-bold leading-tight text-foreground">
-          Выбери свой план
+          {flashSaleActive ? "Забери скидку на подписку" : "Выбери свой план"}
         </h2>
 
         <div className="mt-2 flex shrink-0 justify-center gap-0.5" aria-label="5 из 5 звёзд">
@@ -140,7 +200,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
         <div className="mt-6 flex flex-col gap-2.5">
           <div className="relative shrink-0 pt-2">
             <span className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-md bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm">
-              Самый выгодный
+              {flashSaleActive ? "−50%" : "Самый выгодный"}
             </span>
             <button
               type="button"
@@ -153,12 +213,23 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
             >
               <div className="min-w-0">
                 <p className="font-serif text-[15px] font-bold text-foreground">Годовая</p>
-                <p className="mt-0.5 text-xs font-medium text-muted-foreground">12 мес · 1 490 ₽</p>
+                {flashSaleActive ? (
+                  <div className="mt-0.5 text-xs font-medium">
+                    <span className="text-muted-foreground line-through">12 мес · {yearlyListTotal}</span>
+                    <span className="ml-2 text-primary">12 мес · {yearlySaleTotal}</span>
+                  </div>
+                ) : (
+                  <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                    12 мес · {yearlySaleTotal}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-2.5">
-                <p className="text-right text-lg font-extrabold tracking-tight text-foreground">
-                  124 ₽/мес
-                </p>
+                <PlanPrice
+                  listPrice={yearlyListPerMonth}
+                  salePrice={yearlySalePerMonth}
+                  flashSaleActive={flashSaleActive}
+                />
                 <PlanRadio selected={plan === "yearly"} />
               </div>
             </button>
@@ -177,9 +248,11 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
               <p className="font-serif text-[15px] font-bold text-foreground">Месячная</p>
             </div>
             <div className="flex shrink-0 items-center gap-2.5">
-              <p className="text-right text-lg font-extrabold tracking-tight text-foreground">
-                299 ₽/мес
-              </p>
+              <PlanPrice
+                listPrice={monthlyListPerMonth}
+                salePrice={monthlySalePerMonth}
+                flashSaleActive={flashSaleActive}
+              />
               <PlanRadio selected={plan === "monthly"} />
             </div>
           </button>
@@ -210,7 +283,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
             disabled={paying || !agreedToTerms}
             className="w-full rounded-full bg-primary py-[1.125rem] text-base font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
           >
-            {paying ? "Создаём платёж…" : "Оплатить"}
+            {paying ? "Создаём платёж…" : flashSaleActive ? "Оплатить со скидкой 50%" : "Оплатить"}
           </button>
 
           {error && (
