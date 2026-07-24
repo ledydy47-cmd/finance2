@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server"
 import {
-  getFlashSaleStartedAt,
+  resolveFlashSaleStartedAt,
   scheduleFlashSaleReminder,
-  setFlashSaleStartedAt,
 } from "@/lib/server/flash-sale-store"
 import { registerFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
 import { scheduleFlashSaleReminderDelivery } from "@/lib/server/flash-sale-reminder-scheduler"
@@ -20,18 +19,17 @@ export async function POST(request: Request) {
 
     const userKey = body.userKey.trim()
     const startedAt = body.startedAt.trim()
-    const existing = await getFlashSaleStartedAt(userKey)
-
-    if (!existing) {
-      await setFlashSaleStartedAt(userKey, startedAt)
-    }
-
-    const activeStartedAt = existing ?? startedAt
-    await scheduleFlashSaleReminder(userKey, activeStartedAt)
-    await scheduleFlashSaleReminderDelivery(userKey, activeStartedAt)
+    const activeStartedAt = await resolveFlashSaleStartedAt(userKey, startedAt)
+    const reminderScheduled = await scheduleFlashSaleReminder(userKey, activeStartedAt)
+    const delivery = await scheduleFlashSaleReminderDelivery(userKey, activeStartedAt)
     await registerFlashSaleLifecycle(userKey, activeStartedAt)
 
-    return NextResponse.json({ ok: true, startedAt: activeStartedAt })
+    return NextResponse.json({
+      ok: true,
+      startedAt: activeStartedAt,
+      reminderScheduled,
+      delivery,
+    })
   } catch (error) {
     console.error("[subscription/flash-sale-sync]", error)
     return NextResponse.json({ error: "SYNC_FAILED" }, { status: 500 })

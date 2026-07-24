@@ -33,6 +33,20 @@ export async function kvRestSet(key: string, value: string): Promise<boolean> {
   return response.ok
 }
 
+export async function kvRestDel(key: string): Promise<boolean> {
+  const url = process.env.KV_REST_API_URL
+  const token = process.env.KV_REST_API_TOKEN
+  if (!url || !token) return false
+
+  const response = await fetch(`${url}/del/${encodeURIComponent(key)}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  })
+
+  return response.ok
+}
+
 export async function kvRestGetJson<T>(key: string, fallback: T): Promise<T> {
   const raw = await kvRestGet(key)
   if (!raw) return fallback

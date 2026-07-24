@@ -3,6 +3,7 @@ import {
   syncUserAppState,
   syncUserSubscriptionPlan,
 } from "@/lib/server/user-analytics-service"
+import { processUserFlashSaleReminder } from "@/lib/server/flash-sale-cron-service"
 
 export async function POST(request: Request) {
   try {
@@ -30,7 +31,9 @@ export async function POST(request: Request) {
       age: body.age,
     })
 
-    return NextResponse.json({ ok: true })
+    const reminder = await processUserFlashSaleReminder(userKey)
+
+    return NextResponse.json({ ok: true, reminder })
   } catch (error) {
     console.error("[analytics/sync]", error)
     return NextResponse.json({ error: "SYNC_FAILED" }, { status: 500 })

@@ -283,13 +283,14 @@ export async function sendMessageToUser(input: {
 }) {
   const store = await readAnalyticsStore()
   const user = store.users[input.userKey]
-  if (!user?.telegramUserId) {
+  const telegramUserId = user?.telegramUserId ?? parseTelegramUserId(input.userKey)
+  if (!telegramUserId) {
     return { ok: false as const, error: "NO_TELEGRAM" as const }
   }
 
-  const text = formatMessageWithName(user.userName, input.message)
+  const text = formatMessageWithName(user?.userName ?? null, input.message)
   const result = await sendTelegramNotification({
-    telegramUserId: user.telegramUserId,
+    telegramUserId,
     text,
   })
 

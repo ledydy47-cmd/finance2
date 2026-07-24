@@ -67,7 +67,8 @@ export async function tryDeliverFlashSaleReminder(input: {
   }
 
   const expiresMs = new Date(activeStartedAt).getTime() + FLASH_SALE_DURATION_MS
-  if (nowMs >= expiresMs) {
+  const deliveryGraceMs = 5 * 60 * 1000
+  if (nowMs >= expiresMs + deliveryGraceMs) {
     reminder.sent = true
     await writeFlashSaleReminders(reminders)
     return { sent: false as const, reason: "EXPIRED" as const }

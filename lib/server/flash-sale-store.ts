@@ -1,5 +1,6 @@
-import { kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { kvRestDel, kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
 import {
+  FLASH_SALE_DURATION_MS,
   FLASH_SALE_REMINDER_DELAY_MS,
 } from "@/lib/paywall-experiment"
 
@@ -22,7 +23,24 @@ export async function getFlashSaleStartedAt(userKey: string) {
 }
 
 export async function clearFlashSaleStartedAt(userKey: string) {
+  const deleted = await kvRestDel(flashSaleKey(userKey))
+  if (deleted) return true
   return kvRestSet(flashSaleKey(userKey), "")
+}
+
+export function isFlashSaleExpired(startedAt: string, nowMs = Date.now()) {
+  const startedMs = new Date(startedAt).getTime()
+  if (Number.isNaN(startedMs)) return true
+  return nowMs >= startedMs + FLASH_SALE_DURATION_MS
+}
+
+export async function resolveFlashSaleStartedAt(userKey: string, clientStartedAt: string) {
+  const existing = await getFlashSaleStartedAt(userKey)
+  if (!existing || isFlashSaleExpired(existing)) {
+    await setFlashSaleStartedAt(userKey, clientStartedAt)
+    return clientStartedAt
+  }
+  return existing
 }
 
 export async function readFlashSaleReminders() {

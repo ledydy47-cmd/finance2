@@ -306,13 +306,23 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
     if (flashSaleStartedAt) {
       const userKey = getClientUserKey(telegramUserId)
-      void fetch("/api/subscription/flash-sale-sync", {
+      void fetch("/api/user/register-telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userKey,
-          startedAt: flashSaleStartedAt,
+          telegramUserId,
+          username: getWebApp()?.initDataUnsafe?.user?.username,
+          firstName: getWebApp()?.initDataUnsafe?.user?.first_name,
         }),
+      }).finally(() => {
+        void fetch("/api/subscription/flash-sale-sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userKey,
+            startedAt: flashSaleStartedAt,
+          }),
+        })
       })
     }
 

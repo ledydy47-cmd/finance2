@@ -40,8 +40,10 @@ export async function scheduleFlashSaleReminderDelivery(userKey: string, started
   if (!response.ok) {
     const text = await response.text()
     console.error("[flash-sale-reminder] QStash schedule failed", response.status, text)
-    return { scheduled: false as const, reason: "QSTASH_FAILED" as const }
+    return { scheduled: false as const, reason: "QSTASH_FAILED" as const, status: response.status }
   }
 
-  return { scheduled: true as const, delaySeconds, deduplicationId }
+  const payload = (await response.json()) as { messageId?: string }
+  console.info("[flash-sale-reminder] QStash scheduled", deduplicationId, payload.messageId)
+  return { scheduled: true as const, delaySeconds, deduplicationId, messageId: payload.messageId }
 }
