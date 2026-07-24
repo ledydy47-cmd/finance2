@@ -35,6 +35,16 @@ function PlanRadio({ selected }: { selected: boolean }) {
   return <span className="size-6 shrink-0 rounded-full border-2 border-muted-foreground/30 bg-card" />
 }
 
+function PlanDiscountBadge({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-md bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm ${className}`}
+    >
+      −50%
+    </span>
+  )
+}
+
 function FlashSaleBadge({ className = "" }: { className?: string }) {
   return (
     <span
@@ -69,7 +79,7 @@ function FlashSaleBanner({ countdownLabel }: { countdownLabel: string }) {
 
       <div className="relative mt-3 inline-flex min-w-[9.5rem] items-center justify-center rounded-full border border-destructive/30 bg-background/90 px-4 py-2">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Успей за
+          Осталось
         </span>
         <span className="ml-2 font-mono text-lg font-extrabold tabular-nums text-destructive">
           {countdownLabel}
@@ -97,7 +107,7 @@ function PlanPrice({
   return (
     <div className="text-right">
       <p className="text-xs font-semibold text-muted-foreground line-through">{listPrice}</p>
-      <p className="text-lg font-extrabold tracking-tight text-destructive">{salePrice}</p>
+      <p className="text-lg font-extrabold tracking-tight text-primary">{salePrice}</p>
     </div>
   )
 }
@@ -237,7 +247,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           <div className="relative shrink-0 pt-3">
             <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
               {flashSaleActive ? (
-                <FlashSaleBadge className="px-3.5 py-1.5 text-xs shadow-xl ring-2 ring-background" />
+                <PlanDiscountBadge className="rounded-full px-3.5 py-1 text-xs shadow-xl ring-2 ring-background" />
               ) : (
                 <span className="rounded-md bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm">
                   Самый выгодный
@@ -249,19 +259,15 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
               onClick={() => setPlan("yearly")}
               className={`flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3.5 pt-5 text-left transition-all ${
                 plan === "yearly"
-                  ? flashSaleActive
-                    ? "border-2 border-destructive/50 bg-destructive/8 shadow-md shadow-destructive/15"
-                    : "border-2 border-primary bg-primary/10 shadow-sm shadow-primary/10"
-                  : flashSaleActive
-                    ? "border border-destructive/20 bg-card shadow-sm shadow-destructive/5"
-                    : "border border-border bg-card shadow-sm shadow-primary/5"
+                  ? "border-2 border-primary bg-primary/10 shadow-sm shadow-primary/10"
+                  : "border border-border bg-card shadow-sm shadow-primary/5"
               }`}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-serif text-[15px] font-bold text-foreground">Годовая</p>
                   {flashSaleActive ? (
-                    <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
                       цена навсегда
                     </span>
                   ) : null}
@@ -269,7 +275,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
                 {flashSaleActive ? (
                   <div className="mt-0.5 text-xs font-medium">
                     <span className="text-muted-foreground line-through">12 мес · {yearlyListTotal}</span>
-                    <span className="ml-2 font-bold text-destructive">12 мес · {yearlySaleTotal}</span>
+                    <span className="ml-2 font-bold text-primary">12 мес · {yearlySaleTotal}</span>
                   </div>
                 ) : (
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
@@ -291,7 +297,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           <div className="relative shrink-0">
             {flashSaleActive ? (
               <div className="absolute right-4 top-0 z-10 -translate-y-1/2">
-                <FlashSaleBadge className="px-2.5 py-1 text-[10px] shadow-lg ring-2 ring-background" />
+                <PlanDiscountBadge className="rounded-full px-2.5 py-1 text-[10px] shadow-lg ring-2 ring-background" />
               </div>
             ) : null}
             <button
@@ -299,19 +305,15 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
               onClick={() => setPlan("monthly")}
               className={`flex w-full shrink-0 items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${
                 plan === "monthly"
-                  ? flashSaleActive
-                    ? "border-2 border-destructive/50 bg-destructive/8 shadow-md shadow-destructive/15"
-                    : "border-2 border-primary bg-primary/10 shadow-sm shadow-primary/10"
-                  : flashSaleActive
-                    ? "border border-destructive/20 bg-card shadow-sm shadow-destructive/5"
-                    : "border border-border bg-card shadow-sm shadow-primary/5"
+                  ? "border-2 border-primary bg-primary/10 shadow-sm shadow-primary/10"
+                  : "border border-border bg-card shadow-sm shadow-primary/5"
               }`}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-serif text-[15px] font-bold text-foreground">Месячная</p>
                   {flashSaleActive ? (
-                    <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
                       цена навсегда
                     </span>
                   ) : null}
