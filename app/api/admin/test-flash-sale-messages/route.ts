@@ -7,7 +7,6 @@ import {
 import { scheduleFlashSaleTestDeliveries } from "@/lib/server/flash-sale-reminder-scheduler"
 import {
   tryDeliverFlashSaleReoffer,
-  tryDeliverFlashSaleReminder,
 } from "@/lib/server/flash-sale-cron-service"
 import {
   clearFlashSaleTestSession,
@@ -21,7 +20,8 @@ import {
   scheduleFlashSaleReminder,
   setFlashSaleStartedAt,
 } from "@/lib/server/flash-sale-store"
-import { ensureAnalyticsUser } from "@/lib/server/user-analytics-service"
+import { ensureAnalyticsUser, sendMessageToUser } from "@/lib/server/user-analytics-service"
+import { FLASH_SALE_REMINDER_MESSAGE } from "@/lib/server/flash-sale-cron-service"
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -84,11 +84,16 @@ export async function POST(request: Request) {
     await saveFlashSaleLifecycle(lifecycle)
 
     if (mode === "instant") {
-      const [reminder, offer4h, offer24h] = await Promise.all([
-        tryDeliverFlashSaleReminder({ userKey, startedAt }),
+      const reminderMessage = `🧪 [тест] ${FLASH_SALE_REMINDER_MESSAGE}`
+      const [reminderSend, offer4h, offer24h] = await Promise.all([
+        sendMessageToUser({ userKey, message: reminderMessage }),
         tryDeliverFlashSaleReoffer({ userKey, startedAt, offer: "4h" }),
         tryDeliverFlashSaleReoffer({ userKey, startedAt, offer: "24h" }),
       ])
+
+      const reminder = reminderSend.ok
+        ? ({ sent: true as const } as const)
+        : ({ sent: false as const, reason: reminderSend.error ?? ("SEND_FAILED" as const) } as const)
 
       return NextResponse.json({
         ok: true,
