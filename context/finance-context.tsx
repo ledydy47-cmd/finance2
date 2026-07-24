@@ -22,8 +22,14 @@ import {
   resetCurrentMonthSpending,
 } from "@/lib/period-reset"
 import { loadAppData, saveAppData } from "@/lib/storage"
+import {
+  applyRemoteAppReset,
+  fetchPendingAppReset,
+  markResetApplied,
+} from "@/lib/app-reset-client"
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
+import { resolvePaywallAccess } from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
 import { isSubscriptionActive, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
@@ -109,7 +115,6 @@ interface FinanceContextValue {
   homeSetupStep: 1 | 2 | 3
   showHomeGoalSetup: boolean
   setShowHomeGoalSetup: (open: boolean) => void
-  skipHomeSetup: () => void
   completeHomeWalkthrough: () => void
   confirmNewMonthReset: () => void
   dismissNewMonthUntilLater: () => void
@@ -182,9 +187,23 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    const finishHydration = () => {
+    const finishHydration = async () => {
       if (cancelled) return
-      const loaded = loadAppData()
+      let loaded = loadAppData()
+      const webAppUser = getWebApp()?.initDataUnsafe?.user
+      const userKey = getClientUserKey(webAppUser?.id)
+
+      try {
+        const pendingReset = await fetchPendingAppReset(userKey)
+        if (pendingReset) {
+          loaded = applyRemoteAppReset(loaded, pendingReset)
+          markResetApplied(pendingReset.resetId)
+          saveAppData(loaded)
+        }
+      } catch {
+        // ignore remote reset errors
+      }
+
       const subscribed = isUserSubscribed(loaded.settings)
       if (loaded.settings.isSubscribed !== subscribed) {
         loaded.settings.isSubscribed = subscribed
@@ -208,7 +227,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined)
       .finally(() => {
         window.clearTimeout(timeoutId)
-        finishHydration()
+        void finishHydration()
       })
 
     return () => {
@@ -250,24 +269,46 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const isHomeSetupActive =
     data.settings.onboardingCompleted && !data.settings.homeWalkthroughCompleted
 
-  const isContentLocked =
-    data.settings.paywallShown && !isUserSubscribed(data.settings)
+  const update = useCallback((updater: (prev: AppData) => AppData) => {
+    setData((prev) => updater(prev))
+  }, [])
 
-  const requiresPremiumAfterWalkthrough =
-    data.settings.homeWalkthroughCompleted && !isUserSubscribed(data.settings)
+  const telegramUserId = getWebApp()?.initDataUnsafe?.user?.id
+  const paywallAccess = useMemo(
+    () => resolvePaywallAccess(data.settings, telegramUserId),
+    [data.settings, telegramUserId],
+  )
+  const isContentLocked = paywallAccess.isContentLocked
+  const requiresPremiumAfterWalkthrough = paywallAccess.requiresPremiumAfterWalkthrough
 
-  const openPaywall = useCallback(() => {
+  const markPaywallShown = useCallback(() => {
     setShowPaywall(true)
-    const webAppUser = getWebApp()?.initDataUnsafe?.user
+    if (data.settings.paywallShown) return
+
+    update((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, paywallShown: true },
+    }))
+
     void trackClientAnalytics({
       event: "paywall_shown",
-      userKey: getClientUserKey(webAppUser?.id),
-      telegramUserId: webAppUser?.id,
-      telegramUsername: webAppUser?.username,
-      userName: data.settings.userName || webAppUser?.first_name,
+      userKey: getClientUserKey(telegramUserId),
+      telegramUserId,
+      telegramUsername: getWebApp()?.initDataUnsafe?.user?.username,
+      userName: data.settings.userName || getWebApp()?.initDataUnsafe?.user?.first_name,
       age: data.settings.age,
     })
-  }, [data.settings.userName, data.settings.age])
+  }, [
+    data.settings.age,
+    data.settings.paywallShown,
+    data.settings.userName,
+    telegramUserId,
+    update,
+  ])
+
+  const openPaywall = useCallback(() => {
+    markPaywallShown()
+  }, [markPaywallShown])
   const closePaywall = useCallback(() => setShowPaywall(false), [])
 
   const homeSetupStep = useMemo((): 1 | 2 | 3 => {
@@ -278,10 +319,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     if (flexCount === 0) return 2
     return 3
   }, [isHomeSetupActive, data.goals.length, data.categories])
-
-  const update = useCallback((updater: (prev: AppData) => AppData) => {
-    setData((prev) => updater(prev))
-  }, [])
 
   const activateSubscription = useCallback(
     (input: {
@@ -417,7 +454,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const setShowAddTransaction = useCallback(
     (open: boolean) => {
       if (open && isContentLocked) {
-        setShowPaywall(true)
+        markPaywallShown()
         return
       }
       if (!open) {
@@ -425,58 +462,58 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       }
       setShowAddTransactionState(open)
     },
-    [isContentLocked],
+    [isContentLocked, markPaywallShown],
   )
 
   const openAddTransactionForCategory = useCallback(
     (categoryId: string) => {
       if (isContentLocked) {
-        setShowPaywall(true)
+        markPaywallShown()
         return
       }
       setAddTransactionDraft({ categoryId, type: "expense" })
       setShowAddTransactionState(true)
     },
-    [isContentLocked],
+    [isContentLocked, markPaywallShown],
   )
 
   const setShowBudgetPlanner = useCallback(
     (open: boolean) => {
       if (open && isContentLocked) {
-        setShowPaywall(true)
+        markPaywallShown()
         return
       }
       setShowBudgetPlannerState(open)
     },
-    [isContentLocked],
+    [isContentLocked, markPaywallShown],
   )
 
   const guardLocked = useCallback(() => {
     if (isContentLocked) {
-      setShowPaywall(true)
+      markPaywallShown()
       return true
     }
     return false
-  }, [isContentLocked])
+  }, [isContentLocked, markPaywallShown])
 
   const guardPremiumGoalCreation = useCallback(() => {
     if (
       requiresPremiumAfterWalkthrough &&
       getActiveGoals(data.goals).length >= 1
     ) {
-      setShowPaywall(true)
+      markPaywallShown()
       return true
     }
     return false
-  }, [data.goals, requiresPremiumAfterWalkthrough])
+  }, [data.goals, markPaywallShown, requiresPremiumAfterWalkthrough])
 
   const guardPremiumGoalEdit = useCallback(() => {
     if (requiresPremiumAfterWalkthrough) {
-      setShowPaywall(true)
+      markPaywallShown()
       return true
     }
     return false
-  }, [requiresPremiumAfterWalkthrough])
+  }, [markPaywallShown, requiresPremiumAfterWalkthrough])
 
   const addTransaction = useCallback(
     (input: {
@@ -487,13 +524,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       date?: string
     }) => {
       if (isContentLocked) {
-        setShowPaywall(true)
+        markPaywallShown()
         return
       }
 
       const isFirstExpense =
         input.type === "expense" && !data.settings.firstExpenseAdded
       const shouldShowPaywall =
+        paywallAccess.showPaywallOnFirstExpense &&
         isFirstExpense &&
         data.settings.homeWalkthroughCompleted &&
         !data.settings.paywallShown
@@ -524,19 +562,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setActiveTab("home")
 
       if (shouldShowPaywall) {
-        setShowPaywall(true)
-        const webAppUser = getWebApp()?.initDataUnsafe?.user
-        void trackClientAnalytics({
-          event: "paywall_shown",
-          userKey: getClientUserKey(webAppUser?.id),
-          telegramUserId: webAppUser?.id,
-          telegramUsername: webAppUser?.username,
-          userName: data.settings.userName || webAppUser?.first_name,
-          age: data.settings.age,
-        })
+        markPaywallShown()
       }
     },
-    [data.settings, isContentLocked, update],
+    [data.settings, isContentLocked, markPaywallShown, paywallAccess.showPaywallOnFirstExpense, update],
   )
 
   const deleteTransaction = useCallback(
@@ -796,26 +825,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     [update, setActiveTab],
   )
 
-  const skipHomeSetup = useCallback(() => {
-    update((prev) => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        homeWalkthroughCompleted: true,
-      },
-    }))
-    setShowHomeGoalSetup(false)
-    const webAppUser = getWebApp()?.initDataUnsafe?.user
-    void trackClientAnalytics({
-      event: "walkthrough_completed",
-      userKey: getClientUserKey(webAppUser?.id),
-      telegramUserId: webAppUser?.id,
-      telegramUsername: webAppUser?.username,
-      userName: data.settings.userName || webAppUser?.first_name,
-      age: data.settings.age,
-    })
-  }, [data.settings.userName, data.settings.age, update])
-
   const completeHomeWalkthrough = useCallback(() => {
     update((prev) => ({
       ...prev,
@@ -925,7 +934,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     homeSetupStep,
     showHomeGoalSetup,
     setShowHomeGoalSetup,
-    skipHomeSetup,
     completeHomeWalkthrough,
     confirmNewMonthReset,
     dismissNewMonthUntilLater,

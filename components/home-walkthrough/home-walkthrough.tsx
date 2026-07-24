@@ -38,7 +38,7 @@ interface Rect {
 }
 
 export function HomeWalkthrough() {
-  const { homeSetupStep, skipHomeSetup, completeHomeWalkthrough } = useFinance()
+  const { homeSetupStep, completeHomeWalkthrough } = useFinance()
   const stepIndex = homeSetupStep - 1
   const current = STEPS[stepIndex]
   const [hole, setHole] = useState<Rect | null>(null)
@@ -126,15 +126,8 @@ export function HomeWalkthrough() {
           />
           <div className="rounded-block-sm bg-card p-4 shadow-xl shadow-primary/15">
             <p className="text-sm font-semibold leading-relaxed text-foreground">{current.renderText()}</p>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={skipHomeSetup}
-                className="text-xs font-semibold text-muted-foreground underline-offset-2 transition-transform active:scale-95 hover:text-primary hover:underline"
-              >
-                Пропустить
-              </button>
-              {homeSetupStep === 3 && (
+            {homeSetupStep === 3 ? (
+              <div className="mt-4 flex justify-end">
                 <button
                   type="button"
                   onClick={completeHomeWalkthrough}
@@ -142,8 +135,8 @@ export function HomeWalkthrough() {
                 >
                   Понятно
                 </button>
-              )}
-            </div>
+              </div>
+            ) : null}
             <p className="mt-3 text-center text-[10px] text-muted-foreground">
               {homeSetupStep} / {STEPS.length}
             </p>
