@@ -4,12 +4,7 @@ import {
   getReofferScheduleDelayMs,
 } from "@/lib/server/flash-sale-timing"
 import { getQStashToken, getQStashUrl } from "@/lib/server/qstash-config"
-
-export type FlashSaleReofferType = "4h" | "24h"
-
-function getAppBaseUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""
-}
+import { getAppBaseUrl } from "@/lib/yookassa/server"
 
 async function getQStashConfig() {
   const token = await getQStashToken()

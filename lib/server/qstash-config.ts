@@ -38,11 +38,13 @@ export async function saveQStashConfig(input: { token: string; url?: string }) {
 
 export async function getQStashConfigStatus() {
   const [token, url] = await Promise.all([getQStashToken(), getQStashUrl()])
+  const appUrl = getAppBaseUrl()
   return {
     hasToken: Boolean(token),
     hasUrl: Boolean(url),
-    hasAppUrl: Boolean(process.env.NEXT_PUBLIC_APP_URL),
+    hasAppUrl: Boolean(appUrl),
     hasCronSecret: Boolean(process.env.CRON_SECRET),
+    appUrl,
     tokenSource: process.env.QSTASH_TOKEN
       ? "env"
       : process.env.UPSTASH_QSTASH_TOKEN
