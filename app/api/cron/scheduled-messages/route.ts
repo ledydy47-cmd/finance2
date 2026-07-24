@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { processFlashSaleCronJobs } from "@/lib/server/flash-sale-cron-service"
 import { processScheduledCampaigns } from "@/lib/server/user-analytics-service"
 
 export async function GET(request: Request) {
@@ -9,8 +10,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await processScheduledCampaigns()
-    return NextResponse.json({ ok: true, ...result })
+    const campaigns = await processScheduledCampaigns()
+    const flashSale = await processFlashSaleCronJobs(new Date())
+    return NextResponse.json({ ok: true, campaigns, flashSale })
   } catch (error) {
     console.error("[cron/scheduled-messages]", error)
     return NextResponse.json({ error: "CRON_FAILED" }, { status: 500 })

@@ -8,6 +8,6 @@ export default async function PanelAliasPage({
   const params = await searchParams
   const query = new URLSearchParams()
   if (params.key) query.set("key", params.key)
-  query.set("tab", params.tab ?? "stats")
+  query.set("tab", params.tab ?? "users")
   redirect(`/admin/support?${query.toString()}`)
 }

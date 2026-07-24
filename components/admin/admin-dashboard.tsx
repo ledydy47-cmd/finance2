@@ -474,11 +474,13 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                   <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                     <tr>
                       <th className="sticky left-0 z-10 bg-secondary/95 px-3 py-2">Пользователь</th>
+                      <th className="sticky left-[9rem] z-10 bg-primary/15 px-3 py-2 font-bold text-foreground">
+                        Расход
+                      </th>
                       <th className="px-3 py-2">Возраст</th>
                       <th className="px-3 py-2">Открыл</th>
                       <th className="px-3 py-2">Начал</th>
                       <th className="px-3 py-2">Онбординг</th>
-                      <th className="px-3 py-2 font-semibold text-foreground">Расход</th>
                       <th className="px-3 py-2">Обучение</th>
                       <th className="px-3 py-2">Paywall</th>
                       <th className="px-3 py-2">Подписка</th>
@@ -496,11 +498,13 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                         }`}
                       >
                         <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium">{userLabel(user)}</td>
+                        <td className="sticky left-[9rem] z-10 bg-primary/5 px-3 py-2">
+                          <Check value={hasAddedFirstExpense(user)} />
+                        </td>
                         <td className="px-3 py-2">{user.age ?? "—"}</td>
                         <td className="px-3 py-2"><Check value={Boolean(user.appOpenedAt)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.onboardingStartedAt)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.onboardingCompletedAt)} /></td>
-                        <td className="px-3 py-2"><Check value={hasAddedFirstExpense(user)} /></td>
                         <td className="px-3 py-2"><Check value={hasCompletedWalkthrough(user)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.paywallShownAt)} /></td>
                         <td className="px-3 py-2">
