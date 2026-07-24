@@ -58,7 +58,12 @@ async function scheduleQStashDelivery(input: {
   if (!response.ok) {
     const text = await response.text()
     console.error(`[${input.logLabel}] QStash schedule failed`, response.status, text)
-    return { scheduled: false as const, reason: "QSTASH_FAILED" as const, status: response.status }
+    return {
+      scheduled: false as const,
+      reason: "QSTASH_FAILED" as const,
+      status: response.status,
+      detail: text.slice(0, 200),
+    }
   }
 
   const payload = (await response.json()) as { messageId?: string }

@@ -192,9 +192,19 @@ export async function fetchYooKassaPayment(paymentId: string): Promise<YooKassaP
   return response.json() as Promise<YooKassaPayment>
 }
 
+const PRODUCTION_APP_URL = "https://finance2-36rh.vercel.app"
+
 export function getAppBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-  )
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")
+  if (fromEnv) return fromEnv
+
+  if (process.env.VERCEL_ENV === "production") {
+    return PRODUCTION_APP_URL
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  return "http://localhost:3000"
 }
