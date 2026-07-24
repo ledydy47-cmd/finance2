@@ -1,0 +1,182 @@
+import {
+  FLASH_SALE_DURATION_MS,
+  FLASH_SALE_REOFFER_4H_MS,
+  FLASH_SALE_REOFFER_24H_MS,
+} from "@/lib/paywall-experiment"
+import {
+  getFlashSaleStartedAt,
+  readFlashSaleReminders,
+  scheduleFlashSaleReminder,
+  writeFlashSaleReminders,
+} from "@/lib/server/flash-sale-store"
+import {
+  clearFlashSaleLifecycle,
+  getFlashSaleLifecycle,
+  listTrackedFlashSaleLifecycles,
+  saveFlashSaleLifecycle,
+} from "@/lib/server/flash-sale-lifecycle-store"
+import { getServerSubscriptionStatus } from "@/lib/server/subscription-service"
+import { sendMessageToUser } from "@/lib/server/user-analytics-service"
+
+export const FLASH_SALE_REMINDER_MESSAGE =
+  "скидка −50% заканчивается через 5 минут — успей оформить подписку, пока цена зафиксирована! 💗"
+
+export const FLASH_SALE_OFFER_4H_MESSAGE =
+  "пусть все твои мечты сбываются! А для этого мы дарим тебе скидку −50% — загляни в приложение и зафиксируй цену 💗"
+
+export const FLASH_SALE_OFFER_24H_MESSAGE =
+  "ты уже начала путь к своей цели — не останавливайся! Мы снова открыли для тебя скидку −50%. Загляни в приложение, пока она доступна ✨"
+
+async function processFiveMinuteReminders(now: Date) {
+  const reminders = await readFlashSaleReminders()
+  const nowMs = now.getTime()
+  let sent = 0
+
+  for (const reminder of reminders) {
+    if (reminder.sent) continue
+    if (new Date(reminder.remindAt).getTime() > nowMs) continue
+
+    const subscription = await getServerSubscriptionStatus(reminder.userKey)
+    if (subscription?.active) {
+      reminder.sent = true
+      continue
+    }
+
+    const startedAt = await getFlashSaleStartedAt(reminder.userKey)
+    if (!startedAt || startedAt !== reminder.startedAt) {
+      reminder.sent = true
+      continue
+    }
+
+    const expiresMs = new Date(startedAt).getTime() + FLASH_SALE_DURATION_MS
+    if (nowMs >= expiresMs) {
+      reminder.sent = true
+      continue
+    }
+
+    const result = await sendMessageToUser({
+      userKey: reminder.userKey,
+      message: FLASH_SALE_REMINDER_MESSAGE,
+    })
+    if (result.ok) {
+      reminder.sent = true
+      sent += 1
+    }
+  }
+
+  const cutoffMs = nowMs - 24 * 60 * 60 * 1000
+  const cleaned = reminders.filter((item) => {
+    if (!item.sent) return true
+    return new Date(item.remindAt).getTime() > cutoffMs
+  })
+
+  await writeFlashSaleReminders(cleaned)
+
+  return { sent, pending: cleaned.filter((item) => !item.sent).length }
+}
+
+async function processReengagementOffers(now: Date) {
+  const nowMs = now.getTime()
+  let sent4h = 0
+  let sent24h = 0
+  let expiredMarked = 0
+
+  const lifecycles = await listTrackedFlashSaleLifecycles()
+
+  for (const lifecycle of lifecycles) {
+    const subscription = await getServerSubscriptionStatus(lifecycle.userKey)
+    if (subscription?.active) {
+      await clearFlashSaleLifecycle(lifecycle.userKey)
+      continue
+    }
+
+    const startedAt = await getFlashSaleStartedAt(lifecycle.userKey)
+    if (!startedAt) {
+      await clearFlashSaleLifecycle(lifecycle.userKey)
+      continue
+    }
+
+    lifecycle.startedAt = startedAt
+    const saleExpiresMs = new Date(startedAt).getTime() + FLASH_SALE_DURATION_MS
+
+    if (!lifecycle.expiredAt && nowMs >= saleExpiresMs) {
+      lifecycle.expiredAt = new Date(saleExpiresMs).toISOString()
+      expiredMarked += 1
+    }
+
+    if (!lifecycle.expiredAt) {
+      await saveFlashSaleLifecycle(lifecycle)
+      continue
+    }
+
+    const expiredMs = new Date(lifecycle.expiredAt).getTime()
+
+    if (!lifecycle.offer4hSentAt && nowMs >= expiredMs + FLASH_SALE_REOFFER_4H_MS) {
+      const result = await sendMessageToUser({
+        userKey: lifecycle.userKey,
+        message: FLASH_SALE_OFFER_4H_MESSAGE,
+      })
+      if (result.ok) {
+        lifecycle.offer4hSentAt = now.toISOString()
+        lifecycle.pendingOffer = "4h"
+        sent4h += 1
+      }
+    }
+
+    if (!lifecycle.offer24hSentAt && nowMs >= expiredMs + FLASH_SALE_REOFFER_24H_MS) {
+      const result = await sendMessageToUser({
+        userKey: lifecycle.userKey,
+        message: FLASH_SALE_OFFER_24H_MESSAGE,
+      })
+      if (result.ok) {
+        lifecycle.offer24hSentAt = now.toISOString()
+        lifecycle.pendingOffer = "24h"
+        sent24h += 1
+      }
+    }
+
+    await saveFlashSaleLifecycle(lifecycle)
+  }
+
+  return { sent4h, sent24h, expiredMarked }
+}
+
+export async function processFlashSaleCronJobs(now = new Date()) {
+  const reminders = await processFiveMinuteReminders(now)
+  const reengagement = await processReengagementOffers(now)
+
+  return {
+    reminders,
+    reengagement,
+  }
+}
+
+export async function activatePendingFlashSaleOffer(userKey: string, now = new Date()) {
+  const subscription = await getServerSubscriptionStatus(userKey)
+  if (subscription?.active) {
+    return { activated: false as const, reason: "SUBSCRIBED" as const }
+  }
+
+  const lifecycle = await getFlashSaleLifecycle(userKey)
+  if (!lifecycle?.pendingOffer) {
+    return { activated: false as const, reason: "NO_PENDING_OFFER" as const }
+  }
+
+  const startedAt = now.toISOString()
+  const offerType = lifecycle.pendingOffer
+
+  const { setFlashSaleStartedAt } = await import("@/lib/server/flash-sale-store")
+  await setFlashSaleStartedAt(userKey, startedAt)
+  await scheduleFlashSaleReminder(userKey, startedAt)
+
+  lifecycle.startedAt = startedAt
+  lifecycle.expiredAt = null
+  lifecycle.pendingOffer = null
+  await saveFlashSaleLifecycle(lifecycle)
+
+  return {
+    activated: true as const,
+    startedAt,
+    offerType,
+  }
+}

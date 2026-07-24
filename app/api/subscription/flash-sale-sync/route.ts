@@ -4,6 +4,7 @@ import {
   scheduleFlashSaleReminder,
   setFlashSaleStartedAt,
 } from "@/lib/server/flash-sale-store"
+import { registerFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
 
 export async function POST(request: Request) {
   try {
@@ -19,12 +20,16 @@ export async function POST(request: Request) {
     const userKey = body.userKey.trim()
     const startedAt = body.startedAt.trim()
     const existing = await getFlashSaleStartedAt(userKey)
+
     if (!existing) {
       await setFlashSaleStartedAt(userKey, startedAt)
-      await scheduleFlashSaleReminder(userKey, startedAt)
     }
 
-    return NextResponse.json({ ok: true })
+    const activeStartedAt = existing ?? startedAt
+    await scheduleFlashSaleReminder(userKey, activeStartedAt)
+    await registerFlashSaleLifecycle(userKey, activeStartedAt)
+
+    return NextResponse.json({ ok: true, startedAt: activeStartedAt })
   } catch (error) {
     console.error("[subscription/flash-sale-sync]", error)
     return NextResponse.json({ error: "SYNC_FAILED" }, { status: 500 })

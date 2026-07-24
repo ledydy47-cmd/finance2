@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { processFlashSaleReminders } from "@/lib/server/flash-sale-reminder-service"
+import { processFlashSaleCronJobs } from "@/lib/server/flash-sale-cron-service"
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization")
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await processFlashSaleReminders(new Date())
+    const result = await processFlashSaleCronJobs(new Date())
     return NextResponse.json({ ok: true, ...result })
   } catch (error) {
     console.error("[cron/flash-sale-reminders]", error)

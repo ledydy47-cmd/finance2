@@ -80,6 +80,7 @@ interface FinanceContextValue {
   restoreSubscription: () => Promise<{ ok: boolean; message: string }>
   confirmPendingPayment: () => Promise<boolean>
   syncSubscriptionFromServer: (userKey: string) => Promise<boolean>
+  activatePendingFlashSaleOffer: (userKey: string) => Promise<boolean>
   openAddToGoal: (goalId: string) => void
   closeAddToGoal: () => void
   setPrimaryGoal: (goalId: string) => void
@@ -409,6 +410,59 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     [update],
   )
 
+  const activatePendingFlashSaleOffer = useCallback(
+    async (userKey: string) => {
+      if (isUserSubscribed(data.settings)) return false
+
+      try {
+        const response = await fetch("/api/subscription/activate-flash-offer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userKey }),
+        })
+        const payload = (await response.json()) as {
+          activated?: boolean
+          startedAt?: string
+        }
+
+        if (!response.ok || !payload.activated || !payload.startedAt) {
+          return false
+        }
+
+        update((prev) => ({
+          ...prev,
+          settings: {
+            ...prev.settings,
+            paywallFlashSaleStartedAt: payload.startedAt,
+            paywallShown: true,
+          },
+        }))
+        setShowPaywall(true)
+
+        void trackClientAnalytics({
+          event: "paywall_shown",
+          userKey,
+          telegramUserId,
+          telegramUsername: getWebApp()?.initDataUnsafe?.user?.username,
+          userName: data.settings.userName || getWebApp()?.initDataUnsafe?.user?.first_name,
+          age: data.settings.age,
+        })
+
+        return true
+      } catch {
+        return false
+      }
+    },
+    [
+      data.settings.age,
+      data.settings.subscriptionExpiresAt,
+      data.settings.isSubscribed,
+      data.settings.userName,
+      telegramUserId,
+      update,
+    ],
+  )
+
   const confirmPendingPayment = useCallback(async (): Promise<boolean> => {
     const paymentId = localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)
     if (!paymentId) return false
@@ -557,11 +611,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
       const isFirstExpense =
         input.type === "expense" && !data.settings.firstExpenseAdded
-      const shouldShowPaywall =
-        paywallAccess.showPaywallOnFirstExpense &&
-        isFirstExpense &&
-        data.settings.homeWalkthroughCompleted &&
-        !data.settings.paywallShown
 
       const tx: Transaction = {
         id: crypto.randomUUID(),
@@ -576,9 +625,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (isFirstExpense) {
           nextSettings.firstExpenseAdded = true
         }
-        if (shouldShowPaywall) {
-          nextSettings.paywallShown = true
-        }
         return {
           ...prev,
           transactions: [tx, ...prev.transactions],
@@ -587,12 +633,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       })
       setShowAddTransactionState(false)
       setActiveTab("home")
-
-      if (shouldShowPaywall) {
-        markPaywallShown()
-      }
     },
-    [data.settings, isContentLocked, markPaywallShown, paywallAccess.showPaywallOnFirstExpense, update],
+    [data.settings.firstExpenseAdded, isContentLocked, markPaywallShown, update],
   )
 
   const deleteTransaction = useCallback(
@@ -940,6 +982,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     restoreSubscription,
     confirmPendingPayment,
     syncSubscriptionFromServer,
+    activatePendingFlashSaleOffer,
     openAddToGoal,
     closeAddToGoal,
     setPrimaryGoal,

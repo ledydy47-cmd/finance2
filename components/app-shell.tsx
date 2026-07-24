@@ -50,6 +50,7 @@ export function AppShell() {
     closeAddToGoal,
     confirmPendingPayment,
     syncSubscriptionFromServer,
+    activatePendingFlashSaleOffer,
   } = useFinance()
 
   const showOnboarding = !data.settings.onboardingCompleted
@@ -82,6 +83,7 @@ export function AppShell() {
       })
 
       await syncSubscriptionFromServer(userKey)
+      await activatePendingFlashSaleOffer(userKey)
       void confirmPendingPayment()
 
       void fetch("/api/user/register-telegram", {
@@ -116,6 +118,7 @@ export function AppShell() {
     data.settings.userName,
     confirmPendingPayment,
     syncSubscriptionFromServer,
+    activatePendingFlashSaleOffer,
   ])
 
   useEffect(() => {
