@@ -36,16 +36,13 @@ async function scheduleQStashDelivery(input: {
   }
 
   const callbackUrl = `${config.baseUrl}${input.callbackPath}`
-  const delaySeconds = Math.max(1, Math.ceil(input.delayMs / 1000))
 
-  const response = await fetch(
-    `${config.qstashUrl}/v2/publish/${encodeURIComponent(callbackUrl)}`,
-    {
+  const response = await fetch(`${config.qstashUrl}/v2/publish/${callbackUrl}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.token}`,
         "Content-Type": "application/json",
-        "Upstash-Delay": `${delaySeconds}s`,
+        "Upstash-Delay": `${Math.max(1, Math.ceil(input.delayMs / 1000))}s`,
         "Upstash-Forward-Authorization": `Bearer ${config.cronSecret}`,
         "Upstash-Deduplication-Id": input.deduplicationId,
         "Upstash-Retries": "3",
