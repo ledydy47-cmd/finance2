@@ -7,7 +7,12 @@ import {
   setFlashSaleStartedAt,
 } from "@/lib/server/flash-sale-store"
 import { registerFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
+import { saveFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
 import { scheduleFlashSaleTestDeliveries } from "@/lib/server/flash-sale-reminder-scheduler"
+import {
+  tryDeliverFlashSaleReoffer,
+  tryDeliverFlashSaleReminder,
+} from "@/lib/server/flash-sale-cron-service"
 import {
   clearFlashSaleTestSession,
   FLASH_SALE_TEST_DELAYS,
@@ -15,6 +20,7 @@ import {
 } from "@/lib/server/flash-sale-test-mode"
 import { getReofferScheduleDelayMs } from "@/lib/server/flash-sale-timing"
 import { ensureAnalyticsUser } from "@/lib/server/user-analytics-service"
+import { saveFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -44,6 +50,7 @@ export async function POST(request: Request) {
       telegramUserId?: number
       telegramUsername?: string | null
       firstName?: string | null
+      mode?: "schedule" | "instant"
     }
 
     if (!body.telegramUserId || !Number.isFinite(body.telegramUserId)) {
@@ -51,7 +58,11 @@ export async function POST(request: Request) {
     }
 
     const userKey = `tg-${body.telegramUserId}`
-    const startedAt = new Date().toISOString()
+    const mode = body.mode ?? "schedule"
+    const startedAt =
+      mode === "instant"
+        ? new Date(Date.now() - FLASH_SALE_TEST_DELAYS.reoffer24hMs - FLASH_SALE_TEST_DELAYS.saleDurationMs - 5_000).toISOString()
+        : new Date().toISOString()
 
     await clearFlashSaleState(userKey)
     await ensureAnalyticsUser({
@@ -64,7 +75,30 @@ export async function POST(request: Request) {
     const testSession = await setFlashSaleTestSession(userKey, startedAt, FLASH_SALE_TEST_DELAYS)
     await setFlashSaleStartedAt(userKey, startedAt)
     await scheduleFlashSaleReminder(userKey, startedAt, testSession.reminderDelayMs)
-    await registerFlashSaleLifecycle(userKey, startedAt)
+
+    const lifecycle = await registerFlashSaleLifecycle(userKey, startedAt)
+    lifecycle.expiredAt = new Date(
+      new Date(startedAt).getTime() + testSession.saleDurationMs,
+    ).toISOString()
+    await saveFlashSaleLifecycle(lifecycle)
+
+    if (mode === "instant") {
+      const [reminder, offer4h, offer24h] = await Promise.all([
+        tryDeliverFlashSaleReminder({ userKey, startedAt }),
+        tryDeliverFlashSaleReoffer({ userKey, startedAt, offer: "4h" }),
+        tryDeliverFlashSaleReoffer({ userKey, startedAt, offer: "24h" }),
+      ])
+
+      return NextResponse.json({
+        ok: true,
+        userKey,
+        startedAt,
+        testMode: true,
+        mode,
+        delivered: { reminder, offer4h, offer24h },
+        hint: "Все 3 тестовых сообщения отправлены сразу. Открой приложение, чтобы активировать скидку после 4h/24h.",
+      })
+    }
 
     const schedules = await scheduleFlashSaleTestDeliveries(userKey, startedAt)
     const timing = schedules.timing

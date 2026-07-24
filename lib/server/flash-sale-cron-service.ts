@@ -1,9 +1,4 @@
 import {
-  FLASH_SALE_DURATION_MS,
-  FLASH_SALE_REOFFER_4H_MS,
-  FLASH_SALE_REOFFER_24H_MS,
-} from "@/lib/paywall-experiment"
-import {
   getFlashSaleTiming,
   getReofferDelayMs as getTimingReofferDelayMs,
 } from "@/lib/server/flash-sale-timing"
