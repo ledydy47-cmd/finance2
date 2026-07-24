@@ -4,6 +4,10 @@ function getAppBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""
 }
 
+function getQStashBaseUrl() {
+  return (process.env.QSTASH_URL ?? "https://qstash.upstash.io").replace(/\/$/, "")
+}
+
 export async function scheduleFlashSaleReminderDelivery(userKey: string, startedAt: string) {
   const token = process.env.QSTASH_TOKEN
   const baseUrl = getAppBaseUrl()
@@ -21,7 +25,7 @@ export async function scheduleFlashSaleReminderDelivery(userKey: string, started
   const deduplicationId = `flash-sale-reminder:${userKey}:${startedAt}`
 
   const response = await fetch(
-    `https://qstash.upstash.io/v2/publish/${encodeURIComponent(callbackUrl)}`,
+    `${getQStashBaseUrl()}/v2/publish/${encodeURIComponent(callbackUrl)}`,
     {
       method: "POST",
       headers: {
