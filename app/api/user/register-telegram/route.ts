@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { grantManualSubscription } from "@/lib/server/subscription-service"
 import { getSubscriptionByUserKey } from "@/lib/server/subscription-store"
 import { registerTelegramUser } from "@/lib/server/telegram-users"
+import { ensureAnalyticsUser } from "@/lib/server/user-analytics-service"
 import { isSubscriptionActive } from "@/lib/subscription"
 
 function shouldAutoGrantTestSubscription(username?: string | null) {
@@ -29,6 +30,13 @@ export async function POST(request: Request) {
       telegramUserId: body.telegramUserId,
       username: body.username,
       firstName: body.firstName,
+    })
+
+    await ensureAnalyticsUser({
+      userKey: record.userKey,
+      telegramUserId: body.telegramUserId,
+      telegramUsername: body.username,
+      userName: body.firstName,
     })
 
     if (shouldAutoGrantTestSubscription(body.username)) {

@@ -110,6 +110,36 @@ export async function recordAnalyticsEvent(input: {
   return existing
 }
 
+export async function ensureAnalyticsUser(input: {
+  userKey: string
+  telegramUserId?: number | null
+  telegramUsername?: string | null
+  userName?: string | null
+  age?: number | null
+}) {
+  const store = await readAnalyticsStore()
+  const at = nowIso()
+  const existing = store.users[input.userKey]
+
+  if (existing) {
+    if (input.telegramUserId) existing.telegramUserId = input.telegramUserId
+    if (input.telegramUsername) existing.telegramUsername = input.telegramUsername
+    if (input.userName) existing.userName = input.userName
+    if (input.age != null) existing.age = input.age
+    existing.lastVisitAt = at
+    store.users[input.userKey] = existing
+    await writeAnalyticsStore(store)
+    return existing
+  }
+
+  const created = createEmptyUser(input)
+  created.appOpenedAt = at
+  created.events.push({ type: "app_opened", at })
+  store.users[input.userKey] = created
+  await writeAnalyticsStore(store)
+  return created
+}
+
 export async function syncUserSubscriptionPlan(userKey: string) {
   const subscription = await getSubscriptionByUserKey(userKey)
   if (!subscription || !isSubscriptionActive(subscription.currentPeriodEnd)) return

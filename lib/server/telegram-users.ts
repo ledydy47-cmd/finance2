@@ -1,4 +1,4 @@
-import { readSubscriptionStore, writeSubscriptionStore } from "@/lib/server/subscription-store"
+import { kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
 
 const USERS_KEY = "kopilka:telegram-users"
 
@@ -15,41 +15,18 @@ interface TelegramUsersSnapshot {
   byUsername: Record<string, string>
 }
 
-async function readFromKv(): Promise<TelegramUsersSnapshot | null> {
-  const url = process.env.KV_REST_API_URL
-  const token = process.env.KV_REST_API_TOKEN
-  if (!url || !token) return null
-
-  const response = await fetch(`${url}/get/${encodeURIComponent(USERS_KEY)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  })
-  if (!response.ok) return null
-
-  const payload = (await response.json()) as { result?: string | null }
-  if (!payload.result) return { byUserKey: {}, byUsername: {} }
-  return JSON.parse(payload.result) as TelegramUsersSnapshot
-}
-
-async function writeToKv(snapshot: TelegramUsersSnapshot) {
-  const url = process.env.KV_REST_API_URL
-  const token = process.env.KV_REST_API_TOKEN
-  if (!url || !token) return false
-
-  const response = await fetch(
-    `${url}/set/${encodeURIComponent(USERS_KEY)}/${encodeURIComponent(JSON.stringify(snapshot))}`,
-    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
-  )
-  return response.ok
-}
+const EMPTY_USERS: TelegramUsersSnapshot = { byUserKey: {}, byUsername: {} }
 
 async function readUsers(): Promise<TelegramUsersSnapshot> {
-  const fromKv = await readFromKv()
-  return fromKv ?? { byUserKey: {}, byUsername: {} }
+  const fromKv = await kvRestGetJson(USERS_KEY, null)
+  return fromKv ?? EMPTY_USERS
 }
 
 async function writeUsers(snapshot: TelegramUsersSnapshot) {
-  await writeToKv(snapshot)
+  const wrote = await kvRestSet(USERS_KEY, JSON.stringify(snapshot))
+  if (!wrote) {
+    throw new Error("Failed to write telegram users store")
+  }
 }
 
 export async function registerTelegramUser(input: {

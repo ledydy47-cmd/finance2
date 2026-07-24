@@ -1,5 +1,6 @@
 import fs from "fs/promises"
 import path from "path"
+import { kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
 import type {
   MessageCampaignStoreSnapshot,
   UserAnalyticsStoreSnapshot,
@@ -10,72 +11,57 @@ const CAMPAIGNS_KEY = "kopilka:message-campaigns"
 const ANALYTICS_FILE = path.join(process.cwd(), "data", "user-analytics.json")
 const CAMPAIGNS_FILE = path.join(process.cwd(), "data", "message-campaigns.json")
 
-async function kvGet(key: string): Promise<string | null> {
-  const url = process.env.KV_REST_API_URL
-  const token = process.env.KV_REST_API_TOKEN
-  if (!url || !token) return null
+const EMPTY_ANALYTICS: UserAnalyticsStoreSnapshot = { users: {} }
+const EMPTY_CAMPAIGNS: MessageCampaignStoreSnapshot = { campaigns: {} }
 
-  const response = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  })
-  if (!response.ok) return null
-  const payload = (await response.json()) as { result?: string | null }
-  return payload.result ?? null
+async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
+  try {
+    const raw = await fs.readFile(filePath, "utf8")
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
 }
 
-async function kvSet(key: string, value: string) {
-  const url = process.env.KV_REST_API_URL
-  const token = process.env.KV_REST_API_TOKEN
-  if (!url || !token) return false
-
-  const response = await fetch(
-    `${url}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}`,
-    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
-  )
-  return response.ok
+async function writeJsonFile(filePath: string, value: unknown) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true })
+  await fs.writeFile(filePath, JSON.stringify(value), "utf8")
 }
 
 export async function readAnalyticsStore(): Promise<UserAnalyticsStoreSnapshot> {
-  const fromKv = await kvGet(ANALYTICS_KEY)
-  if (fromKv !== null) {
-    return JSON.parse(fromKv) as UserAnalyticsStoreSnapshot
-  }
-  try {
-    const raw = await fs.readFile(ANALYTICS_FILE, "utf8")
-    return JSON.parse(raw) as UserAnalyticsStoreSnapshot
-  } catch {
-    return { users: {} }
-  }
+  const fromKv = await kvRestGetJson(ANALYTICS_KEY, null)
+  if (fromKv) return fromKv
+  return readJsonFile(ANALYTICS_FILE, EMPTY_ANALYTICS)
 }
 
 export async function writeAnalyticsStore(snapshot: UserAnalyticsStoreSnapshot) {
   const payload = JSON.stringify(snapshot)
-  const wrote = await kvSet(ANALYTICS_KEY, payload)
-  if (!wrote) {
-    await fs.mkdir(path.dirname(ANALYTICS_FILE), { recursive: true })
-    await fs.writeFile(ANALYTICS_FILE, payload, "utf8")
+  const wrote = await kvRestSet(ANALYTICS_KEY, payload)
+  if (wrote) return
+
+  try {
+    await writeJsonFile(ANALYTICS_FILE, snapshot)
+  } catch (error) {
+    console.error("[user-analytics-store] write failed", error)
+    throw error
   }
 }
 
 export async function readCampaignStore(): Promise<MessageCampaignStoreSnapshot> {
-  const fromKv = await kvGet(CAMPAIGNS_KEY)
-  if (fromKv !== null) {
-    return JSON.parse(fromKv) as MessageCampaignStoreSnapshot
-  }
-  try {
-    const raw = await fs.readFile(CAMPAIGNS_FILE, "utf8")
-    return JSON.parse(raw) as MessageCampaignStoreSnapshot
-  } catch {
-    return { campaigns: {} }
-  }
+  const fromKv = await kvRestGetJson(CAMPAIGNS_KEY, null)
+  if (fromKv) return fromKv
+  return readJsonFile(CAMPAIGNS_FILE, EMPTY_CAMPAIGNS)
 }
 
 export async function writeCampaignStore(snapshot: MessageCampaignStoreSnapshot) {
   const payload = JSON.stringify(snapshot)
-  const wrote = await kvSet(CAMPAIGNS_KEY, payload)
-  if (!wrote) {
-    await fs.mkdir(path.dirname(CAMPAIGNS_FILE), { recursive: true })
-    await fs.writeFile(CAMPAIGNS_FILE, payload, "utf8")
+  const wrote = await kvRestSet(CAMPAIGNS_KEY, payload)
+  if (wrote) return
+
+  try {
+    await writeJsonFile(CAMPAIGNS_FILE, snapshot)
+  } catch (error) {
+    console.error("[campaign-store] write failed", error)
+    throw error
   }
 }
