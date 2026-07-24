@@ -12,6 +12,7 @@ export async function POST(request: Request) {
       homeWalkthroughCompleted?: boolean
       onboardingCompleted?: boolean
       firstExpenseAdded?: boolean
+      paywallShown?: boolean
       userName?: string | null
       age?: number | null
     }
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
       homeWalkthroughCompleted: body.homeWalkthroughCompleted,
       onboardingCompleted: body.onboardingCompleted,
       firstExpenseAdded: body.firstExpenseAdded,
+      paywallShown: body.paywallShown,
       userName: body.userName,
       age: body.age,
     })

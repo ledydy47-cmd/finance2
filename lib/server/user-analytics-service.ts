@@ -192,6 +192,7 @@ export async function syncUserAppState(input: {
   homeWalkthroughCompleted?: boolean
   onboardingCompleted?: boolean
   firstExpenseAdded?: boolean
+  paywallShown?: boolean
   userName?: string | null
   age?: number | null
 }) {
@@ -221,6 +222,10 @@ export async function syncUserAppState(input: {
 
   if (input.firstExpenseAdded != null) {
     existing.firstExpenseAdded = input.firstExpenseAdded
+  }
+
+  if (input.paywallShown === true && !existing.paywallShownAt) {
+    applyEvent(existing, "paywall_shown", at)
   }
 
   store.users[input.userKey] = existing

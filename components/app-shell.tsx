@@ -138,6 +138,7 @@ export function AppShell() {
         homeWalkthroughCompleted: data.settings.homeWalkthroughCompleted,
         onboardingCompleted: data.settings.onboardingCompleted,
         firstExpenseAdded: data.settings.firstExpenseAdded,
+        paywallShown: data.settings.paywallShown,
         userName: data.settings.userName || user.first_name,
         age: data.settings.age,
       }),
@@ -149,6 +150,7 @@ export function AppShell() {
     data.settings.homeWalkthroughCompleted,
     data.settings.onboardingCompleted,
     data.settings.firstExpenseAdded,
+    data.settings.paywallShown,
     data.settings.userName,
   ])
 
