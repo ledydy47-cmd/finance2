@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { clearFlashSaleStartedAt } from "@/lib/server/flash-sale-store"
 import {
   queueAppReset,
   WALKTHROUGH_RESET_PATCH,
@@ -44,6 +45,10 @@ export async function POST(request: Request) {
       settingsPatch,
       clearExpenseTransactions: body.clearExpenseTransactions ?? body.resetToWalkthrough ?? false,
     })
+
+    if (body.resetToWalkthrough) {
+      await clearFlashSaleStartedAt(userKey)
+    }
 
     try {
       const subscriptionResult = await adminUpdateSubscription({

@@ -2,12 +2,16 @@
 
 import { Check, Shield, Star, X } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { SupportSection } from "@/components/support/support-section"
 import { useFinance } from "@/context/finance-context"
 import { getClientUserKey } from "@/lib/client-id"
 import { getFlashSaleState } from "@/lib/paywall-experiment"
+import {
+  getPaywallDisplayPrices,
+  type PaywallPlanDisplayPrices,
+} from "@/lib/paywall-pricing"
 import {
   PAYWALL_TESTIMONIALS,
   PENDING_PAYMENT_STORAGE_KEY,
@@ -89,25 +93,21 @@ function FlashSaleBanner({ countdownLabel }: { countdownLabel: string }) {
   )
 }
 
-function PlanPrice({
-  listPrice,
-  salePrice,
-  flashSaleActive,
-}: {
-  listPrice: string
-  salePrice: string
-  flashSaleActive: boolean
-}) {
-  if (!flashSaleActive) {
+function PlanPrice({ prices }: { prices: PaywallPlanDisplayPrices }) {
+  const perMonthLabel = `${prices.perMonth} ₽/мес`
+
+  if (!prices.showDiscount || !prices.listPerMonth) {
     return (
-      <p className="text-right text-lg font-extrabold tracking-tight text-foreground">{salePrice}</p>
+      <p className="text-right text-lg font-extrabold tracking-tight text-foreground">{perMonthLabel}</p>
     )
   }
 
   return (
     <div className="text-right">
-      <p className="text-xs font-semibold text-muted-foreground line-through">{listPrice}</p>
-      <p className="text-lg font-extrabold tracking-tight text-primary">{salePrice}</p>
+      <p className="text-xs font-semibold text-muted-foreground line-through">
+        {prices.listPerMonth} ₽/мес
+      </p>
+      <p className="text-lg font-extrabold tracking-tight text-primary">{perMonthLabel}</p>
     </div>
   )
 }
@@ -126,8 +126,17 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
-  const flashSale = getFlashSaleState(data.settings, user?.id, now)
-  const flashSaleActive = flashSale.active
+  const pricing = useMemo(
+    () =>
+      getPaywallDisplayPrices({
+        settings: data.settings,
+        now,
+      }),
+    [data.settings, now],
+  )
+
+  const flashSaleActive = pricing.phase === "flash_sale"
+  const flashSale = getFlashSaleState(data.settings, now)
 
   useEffect(() => {
     if (!data.settings.paywallFlashSaleStartedAt) return
@@ -186,12 +195,9 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
     onClose()
   }
 
-  const yearlyListTotal = formatRub(flashSale.listPrices?.yearly.total ?? 2980)
-  const yearlySaleTotal = formatRub(flashSale.salePrices?.yearly.total ?? 1490)
-  const yearlyListPerMonth = `${flashSale.listPrices?.yearly.perMonth ?? 248} ₽/мес`
-  const yearlySalePerMonth = `${flashSale.salePrices?.yearly.perMonth ?? 124} ₽/мес`
-  const monthlyListPerMonth = `${flashSale.listPrices?.monthly.perMonth ?? 598} ₽/мес`
-  const monthlySalePerMonth = `${flashSale.salePrices?.monthly.perMonth ?? 299} ₽/мес`
+  const { yearly, monthly } = pricing
+  const yearlyTotalLabel = yearly.total ? formatRub(yearly.total) : null
+  const yearlyListTotalLabel = yearly.listTotal ? formatRub(yearly.listTotal) : null
 
   return (
     <div className="absolute inset-0 z-[80] flex flex-col bg-background">
@@ -215,7 +221,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           </button>
         </div>
 
-        {flashSaleActive ? (
+        {flashSaleActive && flashSale.active ? (
           <FlashSaleBanner countdownLabel={flashSale.countdownLabel} />
         ) : null}
 
@@ -272,23 +278,21 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
                     </span>
                   ) : null}
                 </div>
-                {flashSaleActive ? (
+                {flashSaleActive && yearlyListTotalLabel && yearlyTotalLabel ? (
                   <div className="mt-0.5 text-xs font-medium">
-                    <span className="text-muted-foreground line-through">12 мес · {yearlyListTotal}</span>
-                    <span className="ml-2 font-bold text-primary">12 мес · {yearlySaleTotal}</span>
+                    <span className="text-muted-foreground line-through">
+                      12 мес · {yearlyListTotalLabel}
+                    </span>
+                    <span className="ml-2 font-bold text-primary">12 мес · {yearlyTotalLabel}</span>
                   </div>
-                ) : (
+                ) : yearlyTotalLabel ? (
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                    12 мес · {yearlySaleTotal}
+                    12 мес · {yearlyTotalLabel}
                   </p>
-                )}
+                ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-2.5">
-                <PlanPrice
-                  listPrice={yearlyListPerMonth}
-                  salePrice={yearlySalePerMonth}
-                  flashSaleActive={flashSaleActive}
-                />
+                <PlanPrice prices={yearly} />
                 <PlanRadio selected={plan === "yearly"} />
               </div>
             </button>
@@ -320,11 +324,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2.5">
-                <PlanPrice
-                  listPrice={monthlyListPerMonth}
-                  salePrice={monthlySalePerMonth}
-                  flashSaleActive={flashSaleActive}
-                />
+                <PlanPrice prices={monthly} />
                 <PlanRadio selected={plan === "monthly"} />
               </div>
             </button>

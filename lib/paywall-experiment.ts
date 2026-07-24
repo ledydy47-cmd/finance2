@@ -11,7 +11,7 @@ function parseTestUserIds(raw: string | undefined) {
   )
 }
 
-function isUserSubscribed(settings: Settings) {
+export function isUserSubscribed(settings: Settings) {
   if (settings.isSubscribed) return true
   if (settings.subscriptionExpiresAt) {
     return new Date(settings.subscriptionExpiresAt).getTime() > Date.now()
@@ -48,12 +48,8 @@ function formatCountdown(remainingMs: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
 }
 
-export function getFlashSaleState(
-  settings: Settings,
-  telegramUserId?: number | null,
-  now = Date.now(),
-) {
-  if (!isOneFreeExpenseTestUser(telegramUserId) || !settings.paywallFlashSaleStartedAt) {
+export function getFlashSaleState(settings: Settings, now = Date.now()) {
+  if (isUserSubscribed(settings) || !settings.paywallFlashSaleStartedAt) {
     return { active: false as const }
   }
 
@@ -78,7 +74,10 @@ export function getFlashSaleState(
 
 export function isOneFreeExpenseTestUser(telegramUserId?: number | null) {
   if (!telegramUserId) return false
-  const ids = parseTestUserIds(process.env.NEXT_PUBLIC_ONE_FREE_EXPENSE_USER_IDS)
+  const ids = parseTestUserIds(
+    process.env.ONE_FREE_EXPENSE_USER_IDS ??
+      process.env.NEXT_PUBLIC_ONE_FREE_EXPENSE_USER_IDS,
+  )
   return ids.has(telegramUserId)
 }
 

@@ -285,9 +285,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setShowPaywall(true)
 
     const alreadyShown = data.settings.paywallShown
-    const shouldStartFlashSale =
-      isOneFreeExpenseTestUser(telegramUserId) &&
-      !data.settings.paywallFlashSaleStartedAt
+    const subscribed =
+      data.settings.isSubscribed || isSubscriptionActive(data.settings.subscriptionExpiresAt)
+    const shouldStartFlashSale = !subscribed && !data.settings.paywallFlashSaleStartedAt
+    const flashSaleStartedAt = shouldStartFlashSale ? new Date().toISOString() : null
 
     if (!alreadyShown || shouldStartFlashSale) {
       update((prev) => ({
@@ -295,11 +296,20 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         settings: {
           ...prev.settings,
           paywallShown: true,
-          ...(shouldStartFlashSale
-            ? { paywallFlashSaleStartedAt: new Date().toISOString() }
-            : {}),
+          ...(flashSaleStartedAt ? { paywallFlashSaleStartedAt: flashSaleStartedAt } : {}),
         },
       }))
+    }
+
+    if (flashSaleStartedAt) {
+      void fetch("/api/subscription/flash-sale-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userKey: getClientUserKey(telegramUserId),
+          startedAt: flashSaleStartedAt,
+        }),
+      })
     }
 
     if (!alreadyShown) {
@@ -314,8 +324,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
   }, [
     data.settings.age,
+    data.settings.isSubscribed,
     data.settings.paywallFlashSaleStartedAt,
     data.settings.paywallShown,
+    data.settings.subscriptionExpiresAt,
     data.settings.userName,
     telegramUserId,
     update,

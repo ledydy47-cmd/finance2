@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { PLAN_CONFIG, type SubscriptionPlan } from "@/lib/subscription"
+import { resolveServerPaywallPricing } from "@/lib/server/paywall-pricing-service"
 import {
   createYooKassaPayment,
   getAppBaseUrl,
@@ -30,16 +31,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 })
     }
 
-    const plan = PLAN_CONFIG[body.plan]
+    const planConfig = PLAN_CONFIG[body.plan]
+    const userKey = body.userKey.trim()
+    const pricing = await resolveServerPaywallPricing({
+      userKey,
+      plan: body.plan,
+    })
     const returnUrl = `${getAppBaseUrl()}/payment/success`
 
     const payment = await createYooKassaPayment({
       plan: body.plan,
-      userKey: body.userKey.trim(),
+      userKey,
       orderId: body.orderId.trim(),
       returnUrl,
-      amount: plan.amount,
-      description: plan.description,
+      amount: pricing.amount,
+      description: planConfig.description,
     })
 
     const confirmationUrl = payment.confirmation?.confirmation_url
