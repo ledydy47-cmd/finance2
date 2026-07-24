@@ -1,4 +1,5 @@
 import { kvRestGet, kvRestSet } from "@/lib/server/kv-rest"
+import { getAppBaseUrl } from "@/lib/yookassa/server"
 
 const TOKEN_KEY = "kopilka:config:qstash_token"
 const URL_KEY = "kopilka:config:qstash_url"

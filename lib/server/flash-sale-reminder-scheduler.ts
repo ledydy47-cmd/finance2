@@ -6,6 +6,8 @@ import {
 import { getQStashToken, getQStashUrl } from "@/lib/server/qstash-config"
 import { getAppBaseUrl } from "@/lib/yookassa/server"
 
+export type FlashSaleReofferType = "4h" | "24h"
+
 async function getQStashConfig() {
   const token = await getQStashToken()
   const baseUrl = getAppBaseUrl()
