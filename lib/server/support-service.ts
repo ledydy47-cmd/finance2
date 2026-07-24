@@ -4,6 +4,7 @@ import { getSupportTicket, upsertSupportTicket, listSupportTickets } from "@/lib
 import type { SupportTicket } from "@/lib/server/support-types"
 import { sendTelegramNotification } from "@/lib/server/telegram-notify"
 import { notifyNewSupportTicket } from "@/lib/server/support-email-notify"
+import { notifyAdminNewSupportTicket } from "@/lib/server/admin-telegram-notify"
 
 function nowIso() {
   return new Date().toISOString()
@@ -43,6 +44,9 @@ export async function createSupportTicket(input: {
   await upsertSupportTicket(ticket)
   void notifyNewSupportTicket(ticket).catch((error) => {
     console.error("[support/email-notify]", error)
+  })
+  void notifyAdminNewSupportTicket(ticket).catch((error) => {
+    console.error("[support/admin-telegram-notify]", error)
   })
   return { ok: true as const, ticketId: ticket.id }
 }

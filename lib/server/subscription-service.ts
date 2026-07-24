@@ -13,6 +13,7 @@ import {
 import { findTelegramUserByUsername } from "@/lib/server/telegram-users"
 import type { SubscriptionRecord, SubscriptionStatus } from "@/lib/server/subscription-types"
 import { formatPeriodEnd, sendTelegramNotification } from "@/lib/server/telegram-notify"
+import { notifyAdminSubscriptionPayment } from "@/lib/server/admin-telegram-notify"
 import { recordAnalyticsEvent } from "@/lib/server/user-analytics-service"
 import type { YooKassaPayment } from "@/lib/yookassa/server"
 import { createRecurringYooKassaPayment, fetchYooKassaPayment } from "@/lib/yookassa/server"
@@ -71,6 +72,10 @@ export async function activateSubscriptionFromPayment(payment: YooKassaPayment) 
     return subscriptionActivationResult(existing, payment.id, existing.subscriptionType)
   }
 
+  const isRenewal = Boolean(
+    existing && isSubscriptionActive(existing.currentPeriodEnd) && existing.lastPaymentId,
+  )
+
   const baseDate =
     existing && isSubscriptionActive(existing.currentPeriodEnd)
       ? existing.currentPeriodEnd
@@ -112,6 +117,17 @@ export async function activateSubscriptionFromPayment(payment: YooKassaPayment) 
     event: plan === "yearly" ? "subscription_paid_yearly" : "subscription_paid_monthly",
     userKey,
     telegramUserId: parseTelegramUserId(userKey),
+  })
+
+  void notifyAdminSubscriptionPayment({
+    userKey,
+    plan,
+    paymentId: payment.id,
+    amount: payment.amount.value,
+    currentPeriodEnd,
+    isRenewal,
+  }).catch((error) => {
+    console.error("[subscription/admin-telegram-notify]", userKey, payment.id, error)
   })
 
   return {
