@@ -1,7 +1,6 @@
 import { kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
 import {
-  FLASH_SALE_DURATION_MS,
-  FLASH_SALE_REMINDER_BEFORE_MS,
+  FLASH_SALE_REMINDER_DELAY_MS,
 } from "@/lib/paywall-experiment"
 
 const flashSaleKey = (userKey: string) => `kopilka:flash-sale:${userKey}`
@@ -38,9 +37,7 @@ export async function scheduleFlashSaleReminder(userKey: string, startedAt: stri
   const startedMs = new Date(startedAt).getTime()
   if (Number.isNaN(startedMs)) return false
 
-  const remindAt = new Date(
-    startedMs + FLASH_SALE_DURATION_MS - FLASH_SALE_REMINDER_BEFORE_MS,
-  ).toISOString()
+  const remindAt = new Date(startedMs + FLASH_SALE_REMINDER_DELAY_MS).toISOString()
 
   const reminders = await readFlashSaleReminders()
   const alreadyScheduled = reminders.some(

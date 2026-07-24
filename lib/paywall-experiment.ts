@@ -17,6 +17,8 @@ export function isUserSubscribed(settings: Settings) {
 }
 
 export const FLASH_SALE_DURATION_MS = 15 * 60 * 1000
+/** Bot reminder: 10 minutes after the first paywall / flash sale start. */
+export const FLASH_SALE_REMINDER_DELAY_MS = 10 * 60 * 1000
 export const FLASH_SALE_REMINDER_BEFORE_MS = 5 * 60 * 1000
 export const FLASH_SALE_REOFFER_4H_MS = 4 * 60 * 60 * 1000
 export const FLASH_SALE_REOFFER_24H_MS = 24 * 60 * 60 * 1000

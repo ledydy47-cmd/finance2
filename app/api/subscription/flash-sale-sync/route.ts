@@ -5,6 +5,7 @@ import {
   setFlashSaleStartedAt,
 } from "@/lib/server/flash-sale-store"
 import { registerFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
+import { scheduleFlashSaleReminderDelivery } from "@/lib/server/flash-sale-reminder-scheduler"
 
 export async function POST(request: Request) {
   try {
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
 
     const activeStartedAt = existing ?? startedAt
     await scheduleFlashSaleReminder(userKey, activeStartedAt)
+    await scheduleFlashSaleReminderDelivery(userKey, activeStartedAt)
     await registerFlashSaleLifecycle(userKey, activeStartedAt)
 
     return NextResponse.json({ ok: true, startedAt: activeStartedAt })

@@ -30,8 +30,6 @@ import {
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
 import {
-  FLASH_SALE_DURATION_MS,
-  FLASH_SALE_REMINDER_BEFORE_MS,
   resolvePaywallAccess,
 } from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
@@ -316,15 +314,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           startedAt: flashSaleStartedAt,
         }),
       })
-
-      const remindInMs = FLASH_SALE_DURATION_MS - FLASH_SALE_REMINDER_BEFORE_MS
-      window.setTimeout(() => {
-        void fetch("/api/subscription/flash-sale-reminder-check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userKey }),
-        })
-      }, remindInMs)
     }
 
     if (!alreadyShown) {
@@ -452,15 +441,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           },
         }))
         setShowPaywall(true)
-
-        const remindInMs = FLASH_SALE_DURATION_MS - FLASH_SALE_REMINDER_BEFORE_MS
-        window.setTimeout(() => {
-          void fetch("/api/subscription/flash-sale-reminder-check", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userKey }),
-          })
-        }, remindInMs)
 
         void trackClientAnalytics({
           event: "paywall_shown",
