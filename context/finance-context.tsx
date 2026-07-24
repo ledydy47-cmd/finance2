@@ -32,7 +32,6 @@ import { getClientUserKey } from "@/lib/client-id"
 import {
   FLASH_SALE_DURATION_MS,
   FLASH_SALE_REMINDER_BEFORE_MS,
-  isAddingFirstExpense,
   resolvePaywallAccess,
 } from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
@@ -628,13 +627,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       note: string
       date?: string
     }) => {
-      const isFirstExpense = isAddingFirstExpense(
-        data.settings,
-        data.transactions,
-        input.type,
-      )
+      const expenseCount = data.transactions.filter((tx) => tx.type === "expense").length
+      const isFirstExpense = input.type === "expense" && expenseCount === 0
 
-      if (isContentLocked && !isFirstExpense) {
+      if (!isFirstExpense && isContentLocked) {
         markPaywallShown()
         return
       }
@@ -661,7 +657,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setShowAddTransactionState(false)
       setActiveTab("home")
     },
-    [data.settings, data.transactions, isContentLocked, markPaywallShown, update],
+    [data.transactions, isContentLocked, markPaywallShown, update],
   )
 
   const deleteTransaction = useCallback(

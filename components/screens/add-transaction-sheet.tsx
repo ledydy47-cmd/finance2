@@ -18,6 +18,7 @@ export function AddTransactionSheet() {
   const [type, setType] = useState<TransactionType>("expense")
   const [categoryId, setCategoryId] = useState<string | null>(data.categories[0]?.id ?? null)
   const [note, setNote] = useState("")
+  const [saving, setSaving] = useState(false)
 
   const parsedAmount = Number(amount.replace(/\s/g, "").replace(",", "."))
   const canSave = parsedAmount > 0 && (type === "income" || categoryId)
@@ -33,6 +34,7 @@ export function AddTransactionSheet() {
     }
     setAmount("")
     setNote("")
+    setSaving(false)
   }, [showAddTransaction, addTransactionDraft, data.categories])
 
   function handleClose() {
@@ -40,7 +42,8 @@ export function AddTransactionSheet() {
   }
 
   function handleSave() {
-    if (!canSave) return
+    if (!canSave || saving) return
+    setSaving(true)
     addTransaction({
       amount: parsedAmount,
       type,
@@ -59,11 +62,11 @@ export function AddTransactionSheet() {
       footer={
         <button
           type="button"
-          disabled={!canSave}
+          disabled={!canSave || saving}
           onClick={handleSave}
           className="w-full rounded-block-sm bg-primary py-4 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
         >
-          Сохранить
+          {saving ? "Сохраняем…" : "Сохранить"}
         </button>
       }
     >

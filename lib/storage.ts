@@ -86,9 +86,7 @@ function migrateData(data: AppData, defaults: AppData): AppData {
       themeId: isThemeId(data.settings.themeId ?? "")
         ? data.settings.themeId
         : DEFAULT_THEME_ID,
-      firstExpenseAdded:
-        data.settings.firstExpenseAdded ??
-        data.transactions.some((tx) => tx.type === "expense"),
+      firstExpenseAdded: data.transactions.some((tx) => tx.type === "expense"),
       paywallShown: data.settings.paywallShown ?? false,
       paywallFlashSaleStartedAt: data.settings.paywallFlashSaleStartedAt ?? null,
       isSubscribed: data.settings.isSubscribed ?? false,

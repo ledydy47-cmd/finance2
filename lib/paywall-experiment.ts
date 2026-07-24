@@ -4,8 +4,8 @@ export function countExpenseTransactions(transactions: Transaction[]) {
   return transactions.filter((tx) => tx.type === "expense").length
 }
 
-export function hasUsedFreeExpense(settings: Settings, transactions: Transaction[]) {
-  return settings.firstExpenseAdded || countExpenseTransactions(transactions) > 0
+export function hasSavedExpense(transactions: Transaction[]) {
+  return countExpenseTransactions(transactions) > 0
 }
 
 export function isUserSubscribed(settings: Settings) {
@@ -81,20 +81,16 @@ export function resolvePaywallAccess(
   showPaywallOnFirstExpense: boolean
 } {
   const subscribed = isUserSubscribed(settings)
-  const usedFreeExpense = hasUsedFreeExpense(settings, transactions)
+  const savedExpenses = countExpenseTransactions(transactions)
 
   return {
-    isContentLocked: usedFreeExpense && !subscribed,
+    isContentLocked: savedExpenses >= 1 && !subscribed,
     requiresPremiumAfterWalkthrough:
-      settings.homeWalkthroughCompleted && usedFreeExpense && !subscribed,
+      settings.homeWalkthroughCompleted && savedExpenses >= 1 && !subscribed,
     showPaywallOnFirstExpense: false,
   }
 }
 
-export function isAddingFirstExpense(
-  settings: Settings,
-  transactions: Transaction[],
-  type: Transaction["type"],
-) {
-  return type === "expense" && !hasUsedFreeExpense(settings, transactions)
+export function isAddingFirstExpense(transactions: Transaction[], type: Transaction["type"]) {
+  return type === "expense" && countExpenseTransactions(transactions) === 0
 }
