@@ -4,7 +4,10 @@ import {
   scheduleFlashSaleReminder,
 } from "@/lib/server/flash-sale-store"
 import { registerFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
-import { scheduleFlashSaleReminderDelivery } from "@/lib/server/flash-sale-reminder-scheduler"
+import {
+  scheduleFlashSaleReminderDelivery,
+  scheduleFlashSaleReofferDeliveries,
+} from "@/lib/server/flash-sale-reminder-scheduler"
 
 export async function POST(request: Request) {
   try {
@@ -22,13 +25,18 @@ export async function POST(request: Request) {
     const activeStartedAt = await resolveFlashSaleStartedAt(userKey, startedAt)
     const reminderScheduled = await scheduleFlashSaleReminder(userKey, activeStartedAt)
     const delivery = await scheduleFlashSaleReminderDelivery(userKey, activeStartedAt)
-    await registerFlashSaleLifecycle(userKey, activeStartedAt)
+    const lifecycle = await registerFlashSaleLifecycle(userKey, activeStartedAt)
+    const reoffers =
+      !lifecycle.offer4hSentAt || !lifecycle.offer24hSentAt
+        ? await scheduleFlashSaleReofferDeliveries(userKey, activeStartedAt)
+        : { skipped: true as const }
 
     return NextResponse.json({
       ok: true,
       startedAt: activeStartedAt,
       reminderScheduled,
       delivery,
+      reoffers,
     })
   } catch (error) {
     console.error("[subscription/flash-sale-sync]", error)
