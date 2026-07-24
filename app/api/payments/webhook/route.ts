@@ -23,7 +23,16 @@ export async function POST(request: Request) {
 
     if (body.event === "payment.succeeded") {
       const subscription = await activateSubscriptionFromPayment(payment)
-      console.info("[payments/webhook] subscription updated", subscription)
+      if (!subscription) {
+        console.error(
+          "[payments/webhook] activation skipped",
+          paymentId,
+          payment.status,
+          payment.metadata,
+        )
+      } else {
+        console.info("[payments/webhook] subscription updated", subscription)
+      }
     }
 
     if (body.event === "payment.canceled") {

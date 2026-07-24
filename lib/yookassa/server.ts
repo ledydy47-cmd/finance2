@@ -123,6 +123,7 @@ export async function createYooKassaPayment(input: {
         userKey: input.userKey,
         orderId: input.orderId,
       },
+      save_payment_method: true,
     }),
   })
 

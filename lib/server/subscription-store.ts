@@ -27,6 +27,7 @@ export async function writeSubscriptionStore(snapshot: SubscriptionStoreSnapshot
   const wroteKv = await kvRestSet(STORE_KEY, payload)
   if (wroteKv) return
 
+  console.error("[subscription-store] KV write failed — subscription may not persist on serverless")
   try {
     await fs.mkdir(path.dirname(FILE_PATH), { recursive: true })
     await fs.writeFile(FILE_PATH, payload, "utf8")

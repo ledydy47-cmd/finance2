@@ -46,11 +46,25 @@ function subscriptionActivationResult(
 }
 
 export async function activateSubscriptionFromPayment(payment: YooKassaPayment) {
-  if (payment.status !== "succeeded" || !payment.paid) return null
+  if (payment.status !== "succeeded" || !payment.paid) {
+    console.warn("[subscription] payment not succeeded", payment.id, payment.status, payment.paid)
+    return null
+  }
 
   const plan = payment.metadata?.plan
-  const userKey = payment.metadata?.userKey?.trim()
-  if ((plan !== "yearly" && plan !== "monthly") || !userKey) return null
+  let userKey = payment.metadata?.userKey?.trim()
+  if ((plan !== "yearly" && plan !== "monthly") || !userKey) {
+    console.error("[subscription] missing metadata", payment.id, payment.metadata)
+    return null
+  }
+
+  if (userKey.startsWith("web-")) {
+    const { getPendingPaymentOwner } = await import("@/lib/server/pending-payment-store")
+    const owner = await getPendingPaymentOwner(payment.id)
+    if (owner?.startsWith("tg-")) {
+      userKey = owner
+    }
+  }
 
   const existing = await getSubscriptionByUserKey(userKey)
   if (existing?.lastPaymentId === payment.id) {
@@ -90,6 +104,9 @@ export async function activateSubscriptionFromPayment(payment: YooKassaPayment) 
   }
 
   await upsertSubscription(record)
+
+  const { clearPendingPayment } = await import("@/lib/server/pending-payment-store")
+  await clearPendingPayment(userKey, payment.id)
 
   await recordAnalyticsEvent({
     event: plan === "yearly" ? "subscription_paid_yearly" : "subscription_paid_monthly",
@@ -389,4 +406,25 @@ export async function resolveTelegramUserId(username: string): Promise<number | 
 export async function verifyPaymentById(paymentId: string) {
   const payment = await fetchYooKassaPayment(paymentId)
   return activateSubscriptionFromPayment(payment)
+}
+
+export async function verifyPaymentByOrderId(orderId: string) {
+  const { getPendingPaymentByOrderId } = await import("@/lib/server/pending-payment-store")
+  const pending = await getPendingPaymentByOrderId(orderId)
+  if (!pending) return null
+  return verifyPaymentById(pending.paymentId)
+}
+
+export async function tryActivatePendingPaymentForUser(userKey: string) {
+  const existing = await getServerSubscriptionStatus(userKey)
+  if (existing?.active) return existing
+
+  const { getPendingPayment } = await import("@/lib/server/pending-payment-store")
+  const pending = await getPendingPayment(userKey)
+  if (!pending) return null
+
+  const activated = await verifyPaymentById(pending.paymentId)
+  if (!activated) return null
+
+  return getServerSubscriptionStatus(userKey)
 }

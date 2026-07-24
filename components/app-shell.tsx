@@ -19,9 +19,12 @@ import { StatsScreen } from "@/components/screens/stats-screen"
 import { TransactionsScreen } from "@/components/screens/transactions-screen"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
-import { getClientUserKey } from "@/lib/client-id"
 import { trackClientAnalytics } from "@/lib/analytics-client"
-import { scheduleFlashSaleReminderChecks } from "@/lib/client/flash-sale-reminder-client"
+import { getClientUserKey } from "@/lib/client-id"
+import {
+  resumeFlashSaleReminderWatch,
+  scheduleFlashSaleReminderChecks,
+} from "@/lib/client/flash-sale-reminder-client"
 import { getWebApp } from "@/lib/telegram"
 
 export function AppShell() {
@@ -114,10 +117,14 @@ export function AppShell() {
 
   useEffect(() => {
     if (!user?.id) return
-    const startedAt = data.settings.paywallFlashSaleStartedAt
-    if (!startedAt) return
 
-    return scheduleFlashSaleReminderChecks(getClientUserKey(user.id), startedAt)
+    const userKey = getClientUserKey(user.id)
+    const startedAt = data.settings.paywallFlashSaleStartedAt
+    if (startedAt) {
+      return scheduleFlashSaleReminderChecks(userKey, startedAt)
+    }
+
+    return resumeFlashSaleReminderWatch(userKey)
   }, [user?.id, data.settings.paywallFlashSaleStartedAt])
 
   useEffect(() => {

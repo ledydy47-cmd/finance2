@@ -3,6 +3,7 @@ import {
   getFlashSaleTiming,
   getReofferScheduleDelayMs,
 } from "@/lib/server/flash-sale-timing"
+import { getQStashToken, getQStashUrl } from "@/lib/server/qstash-config"
 
 export type FlashSaleReofferType = "4h" | "24h"
 
@@ -10,12 +11,8 @@ function getAppBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? ""
 }
 
-function getQStashBaseUrl() {
-  return (process.env.QSTASH_URL ?? "https://qstash.upstash.io").replace(/\/$/, "")
-}
-
-function getQStashConfig() {
-  const token = process.env.QSTASH_TOKEN
+async function getQStashConfig() {
+  const token = await getQStashToken()
   const baseUrl = getAppBaseUrl()
   const cronSecret = process.env.CRON_SECRET
 
@@ -23,7 +20,7 @@ function getQStashConfig() {
     return null
   }
 
-  return { token, baseUrl, cronSecret }
+  return { token, baseUrl, cronSecret, qstashUrl: await getQStashUrl() }
 }
 
 async function scheduleQStashDelivery(input: {
@@ -33,7 +30,7 @@ async function scheduleQStashDelivery(input: {
   body: Record<string, unknown>
   logLabel: string
 }) {
-  const config = getQStashConfig()
+  const config = await getQStashConfig()
   if (!config) {
     console.warn(
       `[${input.logLabel}] QStash not configured (QSTASH_TOKEN / NEXT_PUBLIC_APP_URL / CRON_SECRET)`,
@@ -45,7 +42,7 @@ async function scheduleQStashDelivery(input: {
   const delaySeconds = Math.max(1, Math.ceil(input.delayMs / 1000))
 
   const response = await fetch(
-    `${getQStashBaseUrl()}/v2/publish/${encodeURIComponent(callbackUrl)}`,
+    `${config.qstashUrl}/v2/publish/${encodeURIComponent(callbackUrl)}`,
     {
       method: "POST",
       headers: {

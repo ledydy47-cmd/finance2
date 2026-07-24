@@ -7,7 +7,8 @@ import { useTelegram } from "@/components/telegram/telegram-provider"
 import { SupportSection } from "@/components/support/support-section"
 import { useFinance } from "@/context/finance-context"
 import { getClientUserKey } from "@/lib/client-id"
-import { getFlashSaleState } from "@/lib/paywall-experiment"
+import { triggerFlashSaleReminderCheck } from "@/lib/client/flash-sale-reminder-client"
+import { getFlashSaleState, FLASH_SALE_REMINDER_DELAY_MS } from "@/lib/paywall-experiment"
 import {
   getPaywallDisplayPrices,
   type PaywallPlanDisplayPrices,
@@ -148,14 +149,38 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
     return () => window.clearInterval(timerId)
   }, [data.settings.paywallFlashSaleStartedAt])
 
+  useEffect(() => {
+    if (!flashSale.active || !data.settings.paywallFlashSaleStartedAt || !user?.id) return
+
+    const userKey = getClientUserKey(user.id)
+    const startedAt = data.settings.paywallFlashSaleStartedAt
+    const remindAtMs =
+      new Date(startedAt).getTime() + FLASH_SALE_REMINDER_DELAY_MS
+
+    const tick = () => {
+      if (Date.now() >= remindAtMs - 60_000) {
+        triggerFlashSaleReminderCheck(userKey, startedAt)
+      }
+    }
+
+    tick()
+    const intervalId = window.setInterval(tick, 15_000)
+    return () => window.clearInterval(intervalId)
+  }, [flashSale.active, data.settings.paywallFlashSaleStartedAt, user?.id])
+
   async function handlePay() {
     if (!agreedToTerms) return
+    if (!user?.id) {
+      setError("Не удалось определить Telegram-профиль. Перезапустите мини-приложение и попробуйте снова.")
+      return
+    }
+
     setError(null)
     setPaying(true)
 
     try {
       const orderId = crypto.randomUUID()
-      const userKey = getClientUserKey(user?.id)
+      const userKey = getClientUserKey(user.id)
 
       const response = await fetch("/api/payments/create", {
         method: "POST",
@@ -175,6 +200,9 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
       }
 
       localStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, payload.paymentId)
+      if (payload.orderId) {
+        localStorage.setItem("kopilka-pending-order-id", payload.orderId)
+      }
       openLink(payload.confirmationUrl)
     } catch {
       setError("Не удалось создать платёж. Попробуйте ещё раз.")

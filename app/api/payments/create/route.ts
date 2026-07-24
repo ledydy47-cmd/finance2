@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { PLAN_CONFIG, type SubscriptionPlan } from "@/lib/subscription"
+import { savePendingPayment } from "@/lib/server/pending-payment-store"
 import { resolveServerPaywallPricing } from "@/lib/server/paywall-pricing-service"
 import {
   createYooKassaPayment,
@@ -33,19 +34,39 @@ export async function POST(request: Request) {
 
     const planConfig = PLAN_CONFIG[body.plan]
     const userKey = body.userKey.trim()
+    const orderId = body.orderId.trim()
+
+    if (!userKey.startsWith("tg-")) {
+      return NextResponse.json(
+        {
+          error: "MISSING_TELEGRAM_USER",
+          message: "Не удалось определить Telegram-профиль. Перезапустите мини-приложение и попробуйте снова.",
+        },
+        { status: 400 },
+      )
+    }
+
     const pricing = await resolveServerPaywallPricing({
       userKey,
       plan: body.plan,
     })
-    const returnUrl = `${getAppBaseUrl()}/payment/success`
+    const returnUrl = `${getAppBaseUrl()}/payment/success?orderId=${encodeURIComponent(orderId)}`
 
     const payment = await createYooKassaPayment({
       plan: body.plan,
       userKey,
-      orderId: body.orderId.trim(),
+      orderId,
       returnUrl,
       amount: pricing.amount,
       description: planConfig.description,
+    })
+
+    await savePendingPayment({
+      paymentId: payment.id,
+      userKey,
+      plan: body.plan,
+      orderId,
+      createdAt: new Date().toISOString(),
     })
 
     const confirmationUrl = payment.confirmation?.confirmation_url
@@ -55,6 +76,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       paymentId: payment.id,
+      orderId,
       confirmationUrl,
     })
   } catch (error) {

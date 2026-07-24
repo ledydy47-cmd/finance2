@@ -29,6 +29,7 @@ import {
 } from "@/lib/app-reset-client"
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
+import { scheduleFlashSaleReminderChecks } from "@/lib/client/flash-sale-reminder-client"
 import {
   resolvePaywallAccess,
 } from "@/lib/paywall-experiment"
@@ -306,6 +307,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
     if (flashSaleStartedAt) {
       const userKey = getClientUserKey(telegramUserId)
+      scheduleFlashSaleReminderChecks(userKey, flashSaleStartedAt)
+
       void fetch("/api/user/register-telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
