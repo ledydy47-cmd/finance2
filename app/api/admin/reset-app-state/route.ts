@@ -68,6 +68,7 @@ export async function POST(request: Request) {
     const record = analytics.users[userKey]
     if (record) {
       record.walkthroughCompletedAt = null
+      record.homeWalkthroughCompleted = false
       record.paywallShownAt = null
       record.subscribedMonthlyAt = null
       record.subscribedYearlyAt = null

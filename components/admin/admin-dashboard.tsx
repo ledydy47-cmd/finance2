@@ -42,6 +42,31 @@ function Check({ value }: { value: boolean }) {
   )
 }
 
+function todayYmdMoscow() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date())
+}
+
+function hasCompletedWalkthrough(user: UserAnalyticsRecord) {
+  if (user.homeWalkthroughCompleted === true) return true
+  if (user.homeWalkthroughCompleted === false) return false
+  return Boolean(user.walkthroughCompletedAt)
+}
+
+function formatSelectedDate(dateYmd: string) {
+  const [year, month, day] = dateYmd.split("-").map(Number)
+  if (!year || !month || !day) return dateYmd
+  return new Date(year, month - 1, day).toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+}
+
 function userLabel(user: UserAnalyticsRecord) {
   return [
     user.userName,
@@ -66,7 +91,8 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const [adminKey, setAdminKey] = useState("")
   const [inputKey, setInputKey] = useState("")
   const [tab, setTab] = useState<TabId>(defaultTab)
-  const [summary, setSummary] = useState<Record<string, number> | null>(null)
+  const [summary, setSummary] = useState<Record<string, number | string> | null>(null)
+  const [statsDate, setStatsDate] = useState(todayYmdMoscow)
   const [users, setUsers] = useState<UserAnalyticsRecord[]>([])
   const [userFilter, setUserFilter] = useState<UserFilter>("all")
   const [campaigns, setCampaigns] = useState<MessageCampaign[]>([])
@@ -110,10 +136,11 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   )
 
   const loadSummary = useCallback(async () => {
-    const response = await fetch("/api/admin/analytics/summary", { headers: authHeaders() })
+    const query = statsDate ? `?date=${encodeURIComponent(statsDate)}` : ""
+    const response = await fetch(`/api/admin/analytics/summary${query}`, { headers: authHeaders() })
     const data = await response.json()
     if (response.ok) setSummary(data.summary)
-  }, [authHeaders])
+  }, [authHeaders, statsDate])
 
   const loadUsers = useCallback(async () => {
     const query = userFilter === "all" ? "" : `?filter=${userFilter}`
@@ -150,7 +177,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   useEffect(() => {
     if (!adminKey) return
     void refresh()
-  }, [adminKey, userFilter, refresh])
+  }, [adminKey, userFilter, statsDate, refresh])
 
   function handleLogin(event: React.FormEvent) {
     event.preventDefault()
@@ -312,6 +339,11 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
 
   const statCards = summary
     ? [
+        {
+          label: `Новых за ${formatSelectedDate(String(summary.selectedDate ?? statsDate))}`,
+          value: summary.newUsersOnDate ?? 0,
+          highlight: true,
+        },
         { label: "Открыли приложение", value: summary.totalAppOpened },
         { label: "Нажали «Начать»", value: summary.totalOnboardingStarted },
         { label: "Закончили онбординг", value: summary.totalOnboardingCompleted },
@@ -366,13 +398,39 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
         {tab === "stats" && (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {statCards.map((card) => (
-              <div key={card.label} className="rounded-block border border-border bg-card p-4 shadow-sm">
-                <p className="text-xs text-muted-foreground">{card.label}</p>
-                <p className="mt-1 font-serif text-3xl font-bold">{card.value ?? 0}</p>
-              </div>
-            ))}
+          <div>
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-block border border-border bg-card p-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold text-muted-foreground">
+                  Новые пользователи за день (МСК)
+                </span>
+                <input
+                  type="date"
+                  value={statsDate}
+                  onChange={(e) => setStatsDate(e.target.value || todayYmdMoscow())}
+                  className="rounded-block-sm border border-border bg-background px-3 py-2 text-sm"
+                />
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Считаются те, кто впервые открыл приложение в выбранный день
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {statCards.map((card) => (
+                <div
+                  key={card.label}
+                  className={`rounded-block border bg-card p-4 shadow-sm ${
+                    "highlight" in card && card.highlight
+                      ? "border-primary/40 bg-primary/5"
+                      : "border-border"
+                  }`}
+                >
+                  <p className="text-xs text-muted-foreground">{card.label}</p>
+                  <p className="mt-1 font-serif text-3xl font-bold">{card.value ?? 0}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -431,7 +489,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                         <td className="px-3 py-2"><Check value={Boolean(user.appOpenedAt)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.onboardingStartedAt)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.onboardingCompletedAt)} /></td>
-                        <td className="px-3 py-2"><Check value={Boolean(user.walkthroughCompletedAt)} /></td>
+                        <td className="px-3 py-2"><Check value={hasCompletedWalkthrough(user)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.paywallShownAt)} /></td>
                         <td className="px-3 py-2">
                           {user.subscriptionPlan === "monthly"

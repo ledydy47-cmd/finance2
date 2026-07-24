@@ -40,6 +40,7 @@ function createEmptyUser(input: {
     onboardingStartedAt: null,
     onboardingCompletedAt: null,
     walkthroughCompletedAt: null,
+    homeWalkthroughCompleted: null,
     paywallShownAt: null,
     subscribedMonthlyAt: null,
     subscribedYearlyAt: null,
@@ -158,18 +159,81 @@ export async function syncUserSubscriptionPlan(userKey: string) {
   await writeAnalyticsStore(store)
 }
 
-export async function getAnalyticsSummary() {
+export function hasCompletedWalkthrough(user: UserAnalyticsRecord) {
+  if (user.homeWalkthroughCompleted === true) return true
+  if (user.homeWalkthroughCompleted === false) return false
+  return Boolean(user.walkthroughCompletedAt)
+}
+
+const ANALYTICS_TIMEZONE = "Europe/Moscow"
+
+export function formatDateInAnalyticsTimezone(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ANALYTICS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date)
+}
+
+export function countNewUsersOnDate(users: UserAnalyticsRecord[], dateYmd: string) {
+  return users.filter(
+    (user) => user.appOpenedAt && formatDateInAnalyticsTimezone(new Date(user.appOpenedAt)) === dateYmd,
+  ).length
+}
+
+export async function syncUserAppState(input: {
+  userKey: string
+  homeWalkthroughCompleted?: boolean
+  onboardingCompleted?: boolean
+  userName?: string | null
+  age?: number | null
+}) {
+  const store = await readAnalyticsStore()
+  const at = nowIso()
+  const existing =
+    store.users[input.userKey] ??
+    createEmptyUser({ userKey: input.userKey, userName: input.userName, age: input.age })
+
+  if (input.userName) existing.userName = input.userName
+  if (input.age != null) existing.age = input.age
+  existing.lastVisitAt = at
+
+  if (input.onboardingCompleted === true && !existing.onboardingCompletedAt) {
+    applyEvent(existing, "onboarding_completed", at)
+  }
+
+  if (input.homeWalkthroughCompleted != null) {
+    existing.homeWalkthroughCompleted = input.homeWalkthroughCompleted
+
+    if (input.homeWalkthroughCompleted) {
+      if (!existing.walkthroughCompletedAt) {
+        applyEvent(existing, "walkthrough_completed", at)
+      }
+    }
+  }
+
+  store.users[input.userKey] = existing
+  await writeAnalyticsStore(store)
+  return existing
+}
+
+export async function getAnalyticsSummary(dateYmd?: string | null) {
   const users = Object.values((await readAnalyticsStore()).users)
+  const selectedDate = dateYmd ?? formatDateInAnalyticsTimezone(new Date())
 
   return {
     totalAppOpened: users.filter((u) => u.appOpenedAt).length,
     totalOnboardingStarted: users.filter((u) => u.onboardingStartedAt).length,
     totalOnboardingCompleted: users.filter((u) => u.onboardingCompletedAt).length,
-    totalWalkthroughCompleted: users.filter((u) => u.walkthroughCompletedAt).length,
+    totalWalkthroughCompleted: users.filter((u) => hasCompletedWalkthrough(u)).length,
     totalPaywallShown: users.filter((u) => u.paywallShownAt).length,
     totalSubscribedMonthly: users.filter((u) => u.subscribedMonthlyAt).length,
     totalSubscribedYearly: users.filter((u) => u.subscribedYearlyAt).length,
     totalAutoRenewCanceled: users.filter((u) => u.autoRenewCanceledAt).length,
+    newUsersOnDate: countNewUsersOnDate(users, selectedDate),
+    selectedDate,
+    analyticsTimezone: ANALYTICS_TIMEZONE,
   }
 }
 

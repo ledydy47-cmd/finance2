@@ -82,10 +82,7 @@ function migrateData(data: AppData, defaults: AppData): AppData {
         Boolean(data.settings.userName?.trim()),
       homeWalkthroughCompleted:
         data.settings.homeWalkthroughCompleted ??
-        Boolean(
-          (data.settings as { setupTourCompleted?: boolean }).setupTourCompleted ??
-            data.settings.onboardingCompleted,
-        ),
+        Boolean((data.settings as { setupTourCompleted?: boolean }).setupTourCompleted),
       themeId: isThemeId(data.settings.themeId ?? "")
         ? data.settings.themeId
         : DEFAULT_THEME_ID,

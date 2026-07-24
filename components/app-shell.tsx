@@ -97,10 +97,26 @@ export function AppShell() {
       void fetch("/api/analytics/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userKey }),
+        body: JSON.stringify({
+          userKey,
+          homeWalkthroughCompleted: data.settings.homeWalkthroughCompleted,
+          onboardingCompleted: data.settings.onboardingCompleted,
+          userName: data.settings.userName || user.first_name,
+          age: data.settings.age,
+        }),
       })
     })()
-  }, [user?.id, user?.username, user?.first_name, confirmPendingPayment, syncSubscriptionFromServer])
+  }, [
+    user?.id,
+    user?.username,
+    user?.first_name,
+    data.settings.age,
+    data.settings.homeWalkthroughCompleted,
+    data.settings.onboardingCompleted,
+    data.settings.userName,
+    confirmPendingPayment,
+    syncSubscriptionFromServer,
+  ])
 
   useEffect(() => {
     if (!isTelegram) return
