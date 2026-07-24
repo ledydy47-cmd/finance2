@@ -67,6 +67,10 @@ function formatSelectedDate(dateYmd: string) {
   })
 }
 
+function hasAddedFirstExpense(user: UserAnalyticsRecord) {
+  return user.firstExpenseAdded === true
+}
+
 function userLabel(user: UserAnalyticsRecord) {
   return [
     user.userName,
@@ -348,6 +352,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
         { label: "Нажали «Начать»", value: summary.totalOnboardingStarted },
         { label: "Закончили онбординг", value: summary.totalOnboardingCompleted },
         { label: "Прошли обучение", value: summary.totalWalkthroughCompleted },
+        { label: "Добавили расход", value: summary.totalFirstExpenseAdded },
         { label: "Увидели paywall", value: summary.totalPaywallShown },
         { label: "Оплатили месяц", value: summary.totalSubscribedMonthly },
         { label: "Оплатили год", value: summary.totalSubscribedYearly },
@@ -469,6 +474,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                       <th className="px-3 py-2">Начал</th>
                       <th className="px-3 py-2">Онбординг</th>
                       <th className="px-3 py-2">Обучение</th>
+                      <th className="px-3 py-2">Расход</th>
                       <th className="px-3 py-2">Paywall</th>
                       <th className="px-3 py-2">Подписка</th>
                       <th className="px-3 py-2">Автооткл.</th>
@@ -490,6 +496,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                         <td className="px-3 py-2"><Check value={Boolean(user.onboardingStartedAt)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.onboardingCompletedAt)} /></td>
                         <td className="px-3 py-2"><Check value={hasCompletedWalkthrough(user)} /></td>
+                        <td className="px-3 py-2"><Check value={hasAddedFirstExpense(user)} /></td>
                         <td className="px-3 py-2"><Check value={Boolean(user.paywallShownAt)} /></td>
                         <td className="px-3 py-2">
                           {user.subscriptionPlan === "monthly"

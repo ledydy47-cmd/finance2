@@ -4,6 +4,7 @@ export interface RemoteAppResetPayload {
   resetId: string
   settingsPatch: Partial<Settings>
   clearExpenseTransactions: boolean
+  resetToOnboarding?: boolean
 }
 
 const APPLIED_RESET_KEY = "kopilka-applied-reset-id"
@@ -19,6 +20,21 @@ export function markResetApplied(resetId: string) {
 }
 
 export function applyRemoteAppReset(data: AppData, reset: RemoteAppResetPayload): AppData {
+  if (reset.resetToOnboarding) {
+    return {
+      ...data,
+      goals: [],
+      categories: [],
+      transactions: [],
+      budgetPlan: undefined,
+      settings: {
+        ...data.settings,
+        ...reset.settingsPatch,
+        primaryGoalId: null,
+      },
+    }
+  }
+
   return {
     ...data,
     settings: {
@@ -43,6 +59,7 @@ export async function fetchPendingAppReset(userKey: string) {
     resetId?: string
     settingsPatch?: Partial<Settings>
     clearExpenseTransactions?: boolean
+    resetToOnboarding?: boolean
   }
 
   if (!payload.apply || !payload.resetId) return null
@@ -52,5 +69,6 @@ export async function fetchPendingAppReset(userKey: string) {
     resetId: payload.resetId,
     settingsPatch: payload.settingsPatch ?? {},
     clearExpenseTransactions: payload.clearExpenseTransactions ?? false,
+    resetToOnboarding: payload.resetToOnboarding ?? false,
   } satisfies RemoteAppResetPayload
 }

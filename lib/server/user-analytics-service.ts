@@ -41,6 +41,7 @@ function createEmptyUser(input: {
     onboardingCompletedAt: null,
     walkthroughCompletedAt: null,
     homeWalkthroughCompleted: null,
+    firstExpenseAdded: null,
     paywallShownAt: null,
     subscribedMonthlyAt: null,
     subscribedYearlyAt: null,
@@ -165,6 +166,10 @@ export function hasCompletedWalkthrough(user: UserAnalyticsRecord) {
   return Boolean(user.walkthroughCompletedAt)
 }
 
+export function hasAddedFirstExpense(user: UserAnalyticsRecord) {
+  return user.firstExpenseAdded === true
+}
+
 const ANALYTICS_TIMEZONE = "Europe/Moscow"
 
 export function formatDateInAnalyticsTimezone(date: Date) {
@@ -186,6 +191,7 @@ export async function syncUserAppState(input: {
   userKey: string
   homeWalkthroughCompleted?: boolean
   onboardingCompleted?: boolean
+  firstExpenseAdded?: boolean
   userName?: string | null
   age?: number | null
 }) {
@@ -213,6 +219,10 @@ export async function syncUserAppState(input: {
     }
   }
 
+  if (input.firstExpenseAdded != null) {
+    existing.firstExpenseAdded = input.firstExpenseAdded
+  }
+
   store.users[input.userKey] = existing
   await writeAnalyticsStore(store)
   return existing
@@ -227,6 +237,7 @@ export async function getAnalyticsSummary(dateYmd?: string | null) {
     totalOnboardingStarted: users.filter((u) => u.onboardingStartedAt).length,
     totalOnboardingCompleted: users.filter((u) => u.onboardingCompletedAt).length,
     totalWalkthroughCompleted: users.filter((u) => hasCompletedWalkthrough(u)).length,
+    totalFirstExpenseAdded: users.filter((u) => hasAddedFirstExpense(u)).length,
     totalPaywallShown: users.filter((u) => u.paywallShownAt).length,
     totalSubscribedMonthly: users.filter((u) => u.subscribedMonthlyAt).length,
     totalSubscribedYearly: users.filter((u) => u.subscribedYearlyAt).length,

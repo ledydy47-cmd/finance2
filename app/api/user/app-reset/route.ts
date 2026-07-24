@@ -21,6 +21,7 @@ export async function GET(request: Request) {
       resetId: reset.resetId,
       settingsPatch: reset.settingsPatch,
       clearExpenseTransactions: reset.clearExpenseTransactions,
+      resetToOnboarding: reset.resetToOnboarding ?? false,
       previewSettings: preview.settings,
     })
   } catch (error) {

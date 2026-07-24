@@ -8,18 +8,21 @@ export interface AppResetPayload {
   createdAt: string
   settingsPatch: Partial<Settings>
   clearExpenseTransactions: boolean
+  resetToOnboarding?: boolean
 }
 
 export async function queueAppReset(input: {
   userKey: string
   settingsPatch?: Partial<Settings>
   clearExpenseTransactions?: boolean
+  resetToOnboarding?: boolean
 }) {
   const payload: AppResetPayload = {
     resetId: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     settingsPatch: input.settingsPatch ?? {},
     clearExpenseTransactions: input.clearExpenseTransactions ?? false,
+    resetToOnboarding: input.resetToOnboarding ?? false,
   }
 
   const wrote = await kvRestSet(resetKey(input.userKey), JSON.stringify(payload))
@@ -44,6 +47,21 @@ export async function consumeAppReset(userKey: string) {
 }
 
 export function applyAppReset(data: AppData, reset: AppResetPayload): AppData {
+  if (reset.resetToOnboarding) {
+    return {
+      ...data,
+      goals: [],
+      categories: [],
+      transactions: [],
+      budgetPlan: undefined,
+      settings: {
+        ...data.settings,
+        ...reset.settingsPatch,
+        primaryGoalId: null,
+      },
+    }
+  }
+
   const next: AppData = {
     ...data,
     settings: {
@@ -69,4 +87,10 @@ export const WALKTHROUGH_RESET_PATCH: Partial<Settings> = {
   lastPaymentId: null,
   autoRenew: true,
   subscriptionStatus: undefined,
+}
+
+export const ONBOARDING_RESET_PATCH: Partial<Settings> = {
+  ...WALKTHROUGH_RESET_PATCH,
+  onboardingCompleted: false,
+  primaryGoalId: null,
 }

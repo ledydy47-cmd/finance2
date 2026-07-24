@@ -28,6 +28,7 @@ export interface UserAnalyticsRecord {
   onboardingCompletedAt: string | null
   walkthroughCompletedAt: string | null
   homeWalkthroughCompleted: boolean | null
+  firstExpenseAdded: boolean | null
   paywallShownAt: string | null
   subscribedMonthlyAt: string | null
   subscribedYearlyAt: string | null

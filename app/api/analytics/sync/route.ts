@@ -10,6 +10,7 @@ export async function POST(request: Request) {
       userKey?: string
       homeWalkthroughCompleted?: boolean
       onboardingCompleted?: boolean
+      firstExpenseAdded?: boolean
       userName?: string | null
       age?: number | null
     }
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
       userKey,
       homeWalkthroughCompleted: body.homeWalkthroughCompleted,
       onboardingCompleted: body.onboardingCompleted,
+      firstExpenseAdded: body.firstExpenseAdded,
       userName: body.userName,
       age: body.age,
     })

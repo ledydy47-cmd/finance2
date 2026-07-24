@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { clearFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
 import { clearFlashSaleReminder, clearFlashSaleStartedAt } from "@/lib/server/flash-sale-store"
 import {
+  ONBOARDING_RESET_PATCH,
   queueAppReset,
   WALKTHROUGH_RESET_PATCH,
 } from "@/lib/server/app-reset"
@@ -19,6 +20,12 @@ function isAuthorized(request: Request) {
   return url.searchParams.get("secret") === secret
 }
 
+async function clearFlashSaleState(userKey: string) {
+  await clearFlashSaleStartedAt(userKey)
+  await clearFlashSaleReminder(userKey)
+  await clearFlashSaleLifecycle(userKey)
+}
+
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 })
@@ -27,6 +34,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       telegramUserId?: number
+      resetToOnboarding?: boolean
       resetToWalkthrough?: boolean
       clearExpenseTransactions?: boolean
       settingsPatch?: Record<string, unknown>
@@ -37,20 +45,24 @@ export async function POST(request: Request) {
     }
 
     const userKey = `tg-${body.telegramUserId}`
-    const settingsPatch = body.resetToWalkthrough
-      ? WALKTHROUGH_RESET_PATCH
-      : (body.settingsPatch ?? {})
+    const resetToOnboarding = body.resetToOnboarding ?? false
+    const resetToWalkthrough = body.resetToWalkthrough ?? false
+    const settingsPatch = resetToOnboarding
+      ? ONBOARDING_RESET_PATCH
+      : resetToWalkthrough
+        ? WALKTHROUGH_RESET_PATCH
+        : (body.settingsPatch ?? {})
 
     const reset = await queueAppReset({
       userKey,
       settingsPatch,
-      clearExpenseTransactions: body.clearExpenseTransactions ?? body.resetToWalkthrough ?? false,
+      clearExpenseTransactions:
+        body.clearExpenseTransactions ?? resetToOnboarding ?? resetToWalkthrough ?? false,
+      resetToOnboarding,
     })
 
-    if (body.resetToWalkthrough) {
-      await clearFlashSaleStartedAt(userKey)
-      await clearFlashSaleReminder(userKey)
-      await clearFlashSaleLifecycle(userKey)
+    if (resetToOnboarding || resetToWalkthrough) {
+      await clearFlashSaleState(userKey)
     }
 
     try {
@@ -69,8 +81,13 @@ export async function POST(request: Request) {
     const analytics = await readAnalyticsStore()
     const record = analytics.users[userKey]
     if (record) {
+      if (resetToOnboarding) {
+        record.onboardingStartedAt = null
+        record.onboardingCompletedAt = null
+      }
       record.walkthroughCompletedAt = null
       record.homeWalkthroughCompleted = false
+      record.firstExpenseAdded = false
       record.paywallShownAt = null
       record.subscribedMonthlyAt = null
       record.subscribedYearlyAt = null
@@ -78,6 +95,9 @@ export async function POST(request: Request) {
       record.subscriptionPlan = "none"
       record.events = record.events.filter(
         (event) =>
+          (resetToOnboarding
+            ? event.type !== "onboarding_started" && event.type !== "onboarding_completed"
+            : true) &&
           event.type !== "walkthrough_completed" &&
           event.type !== "paywall_shown" &&
           event.type !== "subscription_paid_monthly" &&
