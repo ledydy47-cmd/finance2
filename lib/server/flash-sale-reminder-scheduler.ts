@@ -1,9 +1,8 @@
+import type { FlashSaleTiming } from "@/lib/server/flash-sale-timing"
 import {
-  FLASH_SALE_DURATION_MS,
-  FLASH_SALE_REMINDER_DELAY_MS,
-  FLASH_SALE_REOFFER_24H_MS,
-  FLASH_SALE_REOFFER_4H_MS,
-} from "@/lib/paywall-experiment"
+  getFlashSaleTiming,
+  getReofferScheduleDelayMs,
+} from "@/lib/server/flash-sale-timing"
 
 export type FlashSaleReofferType = "4h" | "24h"
 
@@ -27,13 +26,6 @@ function getQStashConfig() {
   return { token, baseUrl, cronSecret }
 }
 
-export function getFlashSaleReofferDelayMs(offer: FlashSaleReofferType) {
-  return (
-    FLASH_SALE_DURATION_MS +
-    (offer === "4h" ? FLASH_SALE_REOFFER_4H_MS : FLASH_SALE_REOFFER_24H_MS)
-  )
-}
-
 async function scheduleQStashDelivery(input: {
   callbackPath: string
   delayMs: number
@@ -50,7 +42,7 @@ async function scheduleQStashDelivery(input: {
   }
 
   const callbackUrl = `${config.baseUrl}${input.callbackPath}`
-  const delaySeconds = Math.ceil(input.delayMs / 1000)
+  const delaySeconds = Math.max(1, Math.ceil(input.delayMs / 1000))
 
   const response = await fetch(
     `${getQStashBaseUrl()}/v2/publish/${encodeURIComponent(callbackUrl)}`,
@@ -85,11 +77,24 @@ async function scheduleQStashDelivery(input: {
   }
 }
 
-export async function scheduleFlashSaleReminderDelivery(userKey: string, startedAt: string) {
+function dedupeSuffix(timing: FlashSaleTiming) {
+  return timing.isTest ? ":test" : ""
+}
+
+async function resolveTiming(userKey: string, startedAt: string, timing?: FlashSaleTiming) {
+  return timing ?? (await getFlashSaleTiming(userKey, startedAt))
+}
+
+export async function scheduleFlashSaleReminderDelivery(
+  userKey: string,
+  startedAt: string,
+  timing?: FlashSaleTiming,
+) {
+  const resolved = await resolveTiming(userKey, startedAt, timing)
   return scheduleQStashDelivery({
     callbackPath: "/api/subscription/flash-sale-reminder-deliver",
-    delayMs: FLASH_SALE_REMINDER_DELAY_MS,
-    deduplicationId: `flash-sale-reminder:${userKey}:${startedAt}`,
+    delayMs: resolved.reminderDelayMs,
+    deduplicationId: `flash-sale-reminder:${userKey}:${startedAt}${dedupeSuffix(resolved)}`,
     body: { userKey, startedAt },
     logLabel: "flash-sale-reminder",
   })
@@ -99,21 +104,37 @@ export async function scheduleFlashSaleReofferDelivery(
   userKey: string,
   startedAt: string,
   offer: FlashSaleReofferType,
+  timing?: FlashSaleTiming,
 ) {
+  const resolved = await resolveTiming(userKey, startedAt, timing)
   return scheduleQStashDelivery({
     callbackPath: "/api/subscription/flash-sale-offer-deliver",
-    delayMs: getFlashSaleReofferDelayMs(offer),
-    deduplicationId: `flash-sale-offer-${offer}:${userKey}:${startedAt}`,
+    delayMs: getReofferScheduleDelayMs(resolved, offer),
+    deduplicationId: `flash-sale-offer-${offer}:${userKey}:${startedAt}${dedupeSuffix(resolved)}`,
     body: { userKey, startedAt, offer },
     logLabel: `flash-sale-offer-${offer}`,
   })
 }
 
-export async function scheduleFlashSaleReofferDeliveries(userKey: string, startedAt: string) {
+export async function scheduleFlashSaleReofferDeliveries(
+  userKey: string,
+  startedAt: string,
+  timing?: FlashSaleTiming,
+) {
   const [offer4h, offer24h] = await Promise.all([
-    scheduleFlashSaleReofferDelivery(userKey, startedAt, "4h"),
-    scheduleFlashSaleReofferDelivery(userKey, startedAt, "24h"),
+    scheduleFlashSaleReofferDelivery(userKey, startedAt, "4h", timing),
+    scheduleFlashSaleReofferDelivery(userKey, startedAt, "24h", timing),
   ])
 
   return { offer4h, offer24h }
+}
+
+export async function scheduleFlashSaleTestDeliveries(userKey: string, startedAt: string) {
+  const timing = await getFlashSaleTiming(userKey, startedAt)
+  const [reminder, reoffers] = await Promise.all([
+    scheduleFlashSaleReminderDelivery(userKey, startedAt, timing),
+    scheduleFlashSaleReofferDeliveries(userKey, startedAt, timing),
+  ])
+
+  return { timing, reminder, reoffers }
 }

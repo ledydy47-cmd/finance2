@@ -4,6 +4,10 @@ import {
   FLASH_SALE_REOFFER_24H_MS,
 } from "@/lib/paywall-experiment"
 import {
+  getFlashSaleTiming,
+  getReofferDelayMs as getTimingReofferDelayMs,
+} from "@/lib/server/flash-sale-timing"
+import {
   getFlashSaleStartedAt,
   readFlashSaleReminders,
   scheduleFlashSaleReminder,
@@ -29,12 +33,14 @@ export const FLASH_SALE_OFFER_24H_MESSAGE =
 
 export type FlashSaleReofferType = "4h" | "24h"
 
-function getReofferMessage(offer: FlashSaleReofferType) {
-  return offer === "4h" ? FLASH_SALE_OFFER_4H_MESSAGE : FLASH_SALE_OFFER_24H_MESSAGE
+function getReofferMessage(offer: FlashSaleReofferType, isTest: boolean) {
+  const message =
+    offer === "4h" ? FLASH_SALE_OFFER_4H_MESSAGE : FLASH_SALE_OFFER_24H_MESSAGE
+  return isTest ? `🧪 [тест] ${message}` : message
 }
 
-function getReofferDelayMs(offer: FlashSaleReofferType) {
-  return offer === "4h" ? FLASH_SALE_REOFFER_4H_MS : FLASH_SALE_REOFFER_24H_MS
+function formatReminderMessage(isTest: boolean) {
+  return isTest ? `🧪 [тест] ${FLASH_SALE_REMINDER_MESSAGE}` : FLASH_SALE_REMINDER_MESSAGE
 }
 
 export async function tryDeliverFlashSaleReoffer(input: {
@@ -66,16 +72,18 @@ export async function tryDeliverFlashSaleReoffer(input: {
     return { sent: false as const, reason: "STALE" as const }
   }
 
+  const timing = await getFlashSaleTiming(input.userKey, input.startedAt)
   const alreadySent =
     input.offer === "4h" ? lifecycle.offer4hSentAt : lifecycle.offer24hSentAt
   if (alreadySent) {
     return { sent: false as const, reason: "ALREADY_SENT" as const }
   }
 
-  const saleExpiresMs = startedMs + FLASH_SALE_DURATION_MS
-  const dueMs = saleExpiresMs + getReofferDelayMs(input.offer)
+  const saleExpiresMs = startedMs + timing.saleDurationMs
+  const dueMs = saleExpiresMs + getTimingReofferDelayMs(timing, input.offer)
+  const earlyToleranceMs = timing.isTest ? 5_000 : 60_000
 
-  if (nowMs < dueMs - 60_000) {
+  if (nowMs < dueMs - earlyToleranceMs) {
     return { sent: false as const, reason: "NOT_DUE" as const }
   }
 
@@ -89,7 +97,7 @@ export async function tryDeliverFlashSaleReoffer(input: {
 
   const result = await sendMessageToUser({
     userKey: input.userKey,
-    message: getReofferMessage(input.offer),
+    message: getReofferMessage(input.offer, timing.isTest),
   })
 
   if (result.ok) {
@@ -147,8 +155,9 @@ export async function tryDeliverFlashSaleReminder(input: {
     return { sent: false as const, reason: "STALE" as const }
   }
 
-  const expiresMs = new Date(activeStartedAt).getTime() + FLASH_SALE_DURATION_MS
-  const deliveryGraceMs = 5 * 60 * 1000
+  const timing = await getFlashSaleTiming(input.userKey, reminder.startedAt)
+  const expiresMs = new Date(activeStartedAt).getTime() + timing.saleDurationMs
+  const deliveryGraceMs = timing.isTest ? 60_000 : 5 * 60 * 1000
   if (nowMs >= expiresMs + deliveryGraceMs) {
     reminder.sent = true
     await writeFlashSaleReminders(reminders)
@@ -157,7 +166,7 @@ export async function tryDeliverFlashSaleReminder(input: {
 
   const result = await sendMessageToUser({
     userKey: input.userKey,
-    message: FLASH_SALE_REMINDER_MESSAGE,
+    message: formatReminderMessage(timing.isTest),
   })
 
   if (result.ok) {
@@ -225,7 +234,8 @@ async function processReengagementOffers(now: Date) {
     }
 
     lifecycle.startedAt = startedAt
-    const saleExpiresMs = new Date(startedAt).getTime() + FLASH_SALE_DURATION_MS
+    const timing = await getFlashSaleTiming(lifecycle.userKey, startedAt)
+    const saleExpiresMs = new Date(startedAt).getTime() + timing.saleDurationMs
 
     if (!lifecycle.expiredAt && nowMs >= saleExpiresMs) {
       lifecycle.expiredAt = new Date(saleExpiresMs).toISOString()
@@ -240,8 +250,9 @@ async function processReengagementOffers(now: Date) {
 
     const current = (await getFlashSaleLifecycle(lifecycle.userKey)) ?? lifecycle
     const expiredMs = new Date(current.expiredAt ?? lifecycle.expiredAt!).getTime()
+    const currentTiming = await getFlashSaleTiming(current.userKey, current.startedAt)
 
-    if (!current.offer4hSentAt && nowMs >= expiredMs + FLASH_SALE_REOFFER_4H_MS) {
+    if (!current.offer4hSentAt && nowMs >= expiredMs + currentTiming.reoffer4hMs) {
       const result = await tryDeliverFlashSaleReoffer({
         userKey: current.userKey,
         startedAt: current.startedAt,
@@ -251,7 +262,7 @@ async function processReengagementOffers(now: Date) {
       if (result.sent) sent4h += 1
     }
 
-    if (!current.offer24hSentAt && nowMs >= expiredMs + FLASH_SALE_REOFFER_24H_MS) {
+    if (!current.offer24hSentAt && nowMs >= expiredMs + currentTiming.reoffer24hMs) {
       const result = await tryDeliverFlashSaleReoffer({
         userKey: current.userKey,
         startedAt: current.startedAt,

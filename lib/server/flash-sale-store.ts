@@ -51,11 +51,15 @@ export async function writeFlashSaleReminders(reminders: FlashSaleReminderRecord
   return kvRestSet(REMINDERS_KEY, JSON.stringify(reminders))
 }
 
-export async function scheduleFlashSaleReminder(userKey: string, startedAt: string) {
+export async function scheduleFlashSaleReminder(
+  userKey: string,
+  startedAt: string,
+  reminderDelayMs = FLASH_SALE_REMINDER_DELAY_MS,
+) {
   const startedMs = new Date(startedAt).getTime()
   if (Number.isNaN(startedMs)) return false
 
-  const remindAt = new Date(startedMs + FLASH_SALE_REMINDER_DELAY_MS).toISOString()
+  const remindAt = new Date(startedMs + reminderDelayMs).toISOString()
 
   const reminders = await readFlashSaleReminders()
   const alreadyScheduled = reminders.some(
