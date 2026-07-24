@@ -74,25 +74,32 @@ export function getFlashSaleState(settings: Settings, now = Date.now()) {
   }
 }
 
-export function resolvePaywallAccess(
-  settings: Settings,
-  transactions: Transaction[] = [],
-): {
+export function resolvePaywallAccess(settings: Settings): {
   isContentLocked: boolean
   requiresPremiumAfterWalkthrough: boolean
-  showPaywallOnFirstExpense: boolean
 } {
   const subscribed = isUserSubscribed(settings)
-  const savedExpenses = countExpenseTransactions(transactions)
+  const paywallActive = settings.paywallShown && !subscribed
 
   return {
-    isContentLocked: savedExpenses >= 1 && !subscribed,
+    isContentLocked: paywallActive,
     requiresPremiumAfterWalkthrough:
-      settings.homeWalkthroughCompleted && savedExpenses >= 1 && !subscribed,
-    showPaywallOnFirstExpense: false,
+      paywallActive && settings.homeWalkthroughCompleted,
   }
 }
 
 export function isAddingFirstExpense(transactions: Transaction[], type: Transaction["type"]) {
   return type === "expense" && countExpenseTransactions(transactions) === 0
+}
+
+export function isAddingSecondExpenseAttempt(
+  transactions: Transaction[],
+  type: Transaction["type"],
+  settings: Settings,
+) {
+  return (
+    type === "expense" &&
+    countExpenseTransactions(transactions) >= 1 &&
+    !isUserSubscribed(settings)
+  )
 }

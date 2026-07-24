@@ -31,6 +31,7 @@ import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
 import { scheduleFlashSaleReminderChecks } from "@/lib/client/flash-sale-reminder-client"
 import {
+  isAddingSecondExpenseAttempt,
   resolvePaywallAccess,
 } from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
@@ -279,8 +280,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const telegramUserId = getWebApp()?.initDataUnsafe?.user?.id
   const paywallAccess = useMemo(
-    () => resolvePaywallAccess(data.settings, data.transactions),
-    [data.settings, data.transactions],
+    () => resolvePaywallAccess(data.settings),
+    [data.settings],
   )
   const isContentLocked = paywallAccess.isContentLocked
   const requiresPremiumAfterWalkthrough = paywallAccess.requiresPremiumAfterWalkthrough
@@ -450,19 +451,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           settings: {
             ...prev.settings,
             paywallFlashSaleStartedAt: payload.startedAt,
-            paywallShown: true,
           },
         }))
-        setShowPaywall(true)
-
-        void trackClientAnalytics({
-          event: "paywall_shown",
-          userKey,
-          telegramUserId,
-          telegramUsername: getWebApp()?.initDataUnsafe?.user?.username,
-          userName: data.settings.userName || getWebApp()?.initDataUnsafe?.user?.first_name,
-          age: data.settings.age,
-        })
 
         return true
       } catch {
@@ -548,31 +538,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
   }, [activateSubscription, data.settings.lastPaymentId])
 
-  const setShowAddTransaction = useCallback(
-    (open: boolean) => {
-      if (open && isContentLocked) {
-        markPaywallShown()
-        return
-      }
-      if (!open) {
-        setAddTransactionDraft(null)
-      }
-      setShowAddTransactionState(open)
-    },
-    [isContentLocked, markPaywallShown],
-  )
+  const setShowAddTransaction = useCallback((open: boolean) => {
+    if (!open) {
+      setAddTransactionDraft(null)
+    }
+    setShowAddTransactionState(open)
+  }, [])
 
-  const openAddTransactionForCategory = useCallback(
-    (categoryId: string) => {
-      if (isContentLocked) {
-        markPaywallShown()
-        return
-      }
-      setAddTransactionDraft({ categoryId, type: "expense" })
-      setShowAddTransactionState(true)
-    },
-    [isContentLocked, markPaywallShown],
-  )
+  const openAddTransactionForCategory = useCallback((categoryId: string) => {
+    setAddTransactionDraft({ categoryId, type: "expense" })
+    setShowAddTransactionState(true)
+  }, [])
 
   const setShowBudgetPlanner = useCallback(
     (open: boolean) => {
@@ -620,8 +596,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       note: string
       date?: string
     }) => {
-      const expenseCount = data.transactions.filter((tx) => tx.type === "expense").length
-      const isFirstExpense = input.type === "expense" && expenseCount === 0
+      const isFirstExpense =
+        input.type === "expense" &&
+        data.transactions.filter((tx) => tx.type === "expense").length === 0
+
+      if (isAddingSecondExpenseAttempt(data.transactions, input.type, data.settings)) {
+        markPaywallShown()
+        return
+      }
 
       if (!isFirstExpense && isContentLocked) {
         markPaywallShown()
