@@ -29,6 +29,22 @@ export function extendPeriodEnd(plan: SubscriptionPlan, fromIso: string) {
   return computeSubscriptionExpiry(plan, new Date(fromIso))
 }
 
+function subscriptionActivationResult(
+  record: SubscriptionRecord,
+  paymentId: string,
+  plan: SubscriptionPlan,
+) {
+  return {
+    paymentId,
+    userKey: record.userKey,
+    plan,
+    currentPeriodEnd: record.currentPeriodEnd,
+    autoRenew: record.autoRenew,
+    status: record.status,
+    paymentMethodId: record.paymentMethodId,
+  }
+}
+
 export async function activateSubscriptionFromPayment(payment: YooKassaPayment) {
   if (payment.status !== "succeeded" || !payment.paid) return null
 
@@ -37,6 +53,10 @@ export async function activateSubscriptionFromPayment(payment: YooKassaPayment) 
   if ((plan !== "yearly" && plan !== "monthly") || !userKey) return null
 
   const existing = await getSubscriptionByUserKey(userKey)
+  if (existing?.lastPaymentId === payment.id) {
+    return subscriptionActivationResult(existing, payment.id, existing.subscriptionType)
+  }
+
   const baseDate =
     existing && isSubscriptionActive(existing.currentPeriodEnd)
       ? existing.currentPeriodEnd
@@ -103,16 +123,24 @@ export async function cancelAutoRenewal(userKey: string) {
 
   await upsertSubscription(updated)
 
-  await recordAnalyticsEvent({
-    event: "auto_renew_canceled",
-    userKey,
-    telegramUserId: updated.telegramUserId,
-  })
+  try {
+    await recordAnalyticsEvent({
+      event: "auto_renew_canceled",
+      userKey,
+      telegramUserId: updated.telegramUserId,
+    })
+  } catch (error) {
+    console.error("[subscription] auto_renew analytics failed", userKey, error)
+  }
 
-  await sendTelegramNotification({
-    telegramUserId: updated.telegramUserId,
-    text: `Автопродление подписки «Мани.точка» отключено. Доступ сохранится до ${formatPeriodEnd(updated.currentPeriodEnd)}.`,
-  })
+  try {
+    await sendTelegramNotification({
+      telegramUserId: updated.telegramUserId,
+      text: `Автопродление подписки «Мани.точка» отключено. Доступ сохранится до ${formatPeriodEnd(updated.currentPeriodEnd)}.`,
+    })
+  } catch (error) {
+    console.error("[subscription] auto_renew notify failed", userKey, error)
+  }
 
   return {
     ok: true as const,
@@ -301,6 +329,42 @@ export async function grantManualSubscription(input: {
     autoRenew: true,
     status: record.status,
     active: true,
+  }
+}
+
+export async function adminUpdateSubscription(input: {
+  telegramUserId: number
+  currentPeriodEnd?: string
+  autoRenew?: boolean
+  status?: SubscriptionStatus
+}) {
+  const userKey = `tg-${input.telegramUserId}`
+  const existing = await getSubscriptionByUserKey(userKey)
+  if (!existing) {
+    return { ok: false as const, error: "NOT_FOUND" as const }
+  }
+
+  const updated: SubscriptionRecord = {
+    ...existing,
+    ...(input.currentPeriodEnd ? { currentPeriodEnd: input.currentPeriodEnd } : {}),
+    ...(input.autoRenew !== undefined ? { autoRenew: input.autoRenew } : {}),
+    ...(input.status ? { status: input.status } : {}),
+    updatedAt: nowIso(),
+  }
+
+  await upsertSubscription(updated)
+
+  return {
+    ok: true as const,
+    subscription: {
+      userKey,
+      subscriptionType: updated.subscriptionType,
+      currentPeriodEnd: updated.currentPeriodEnd,
+      autoRenew: updated.autoRenew,
+      status: updated.status,
+      active: isSubscriptionActive(updated.currentPeriodEnd) && updated.status !== "expired",
+      lastPaymentId: updated.lastPaymentId,
+    },
   }
 }
 

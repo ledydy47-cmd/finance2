@@ -29,11 +29,17 @@ export async function sendTelegramNotification(input: {
 }
 
 export function formatPeriodEnd(iso: string) {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  })
+  try {
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return iso
+    return date.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+  } catch {
+    return iso
+  }
 }
 
 export { SUPPORT_EMAIL }
