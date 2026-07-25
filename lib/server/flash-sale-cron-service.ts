@@ -341,12 +341,13 @@ export async function activatePendingFlashSaleOffer(userKey: string, now = new D
   const offerType = lifecycle.pendingOffer
 
   const { setFlashSaleStartedAt } = await import("@/lib/server/flash-sale-store")
-  const { scheduleFlashSaleReminderDelivery } = await import(
-    "@/lib/server/flash-sale-reminder-scheduler"
-  )
+  const { scheduleFlashSaleReminderDelivery, scheduleFlashSaleReofferDeliveries } =
+    await import("@/lib/server/flash-sale-reminder-scheduler")
   await setFlashSaleStartedAt(userKey, startedAt)
   await scheduleFlashSaleReminder(userKey, startedAt)
   await scheduleFlashSaleReminderDelivery(userKey, startedAt)
+  await registerFlashSaleLifecycle(userKey, startedAt)
+  await scheduleFlashSaleReofferDeliveries(userKey, startedAt)
 
   lifecycle.startedAt = startedAt
   lifecycle.expiredAt = null

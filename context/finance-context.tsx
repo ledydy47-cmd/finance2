@@ -497,8 +497,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           settings: {
             ...prev.settings,
             paywallFlashSaleStartedAt: payload.startedAt,
+            paywallShown: true,
           },
         }))
+        setShowPaywall(true)
+
+        void fetch("/api/subscription/flash-sale-sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userKey,
+            startedAt: payload.startedAt,
+          }),
+        })
 
         return true
       } catch {
