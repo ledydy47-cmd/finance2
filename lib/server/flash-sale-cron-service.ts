@@ -12,6 +12,7 @@ import {
   clearFlashSaleLifecycle,
   getFlashSaleLifecycle,
   listTrackedFlashSaleLifecycles,
+  registerFlashSaleLifecycle,
   saveFlashSaleLifecycle,
 } from "@/lib/server/flash-sale-lifecycle-store"
 import { getServerSubscriptionStatus } from "@/lib/server/subscription-service"
@@ -27,6 +28,25 @@ export const FLASH_SALE_OFFER_24H_MESSAGE =
   "ты уже начала путь к своей цели — не останавливайся! Мы снова открыли для тебя скидку −50%. Загляни в приложение, пока она доступна ✨"
 
 export type FlashSaleReofferType = "4h" | "24h"
+
+const REOFFER_RETRY_REASONS = new Set([
+  "NOT_DUE",
+  "NO_LIFECYCLE",
+  "SALE_ACTIVE",
+  "STALE",
+])
+
+export function shouldRetryFlashSaleReoffer(
+  result: { sent: boolean; reason?: string },
+) {
+  return !result.sent && result.reason != null && REOFFER_RETRY_REASONS.has(result.reason)
+}
+
+export function shouldRetryFlashSaleReminder(
+  result: { sent: boolean; reason?: string },
+) {
+  return !result.sent && (result.reason === "NOT_DUE" || result.reason === "NO_PENDING")
+}
 
 function getReofferMessage(offer: FlashSaleReofferType, isTest: boolean) {
   const message =
@@ -60,33 +80,39 @@ export async function tryDeliverFlashSaleReoffer(input: {
 
   const lifecycle = await getFlashSaleLifecycle(input.userKey)
   if (!lifecycle) {
-    return { sent: false as const, reason: "NO_LIFECYCLE" as const }
+    const activeStartedAt = await getFlashSaleStartedAt(input.userKey)
+    if (!activeStartedAt || activeStartedAt !== input.startedAt) {
+      return { sent: false as const, reason: "NO_LIFECYCLE" as const }
+    }
+    await registerFlashSaleLifecycle(input.userKey, input.startedAt)
   }
 
-  if (lifecycle.startedAt !== input.startedAt) {
+  const resolvedLifecycle = (await getFlashSaleLifecycle(input.userKey))!
+  if (resolvedLifecycle.startedAt !== input.startedAt) {
     return { sent: false as const, reason: "STALE" as const }
   }
 
   const timing = await getFlashSaleTiming(input.userKey, input.startedAt)
   const alreadySent =
-    input.offer === "4h" ? lifecycle.offer4hSentAt : lifecycle.offer24hSentAt
+    input.offer === "4h" ? resolvedLifecycle.offer4hSentAt : resolvedLifecycle.offer24hSentAt
   if (alreadySent) {
     return { sent: false as const, reason: "ALREADY_SENT" as const }
   }
 
   const saleExpiresMs = startedMs + timing.saleDurationMs
   const dueMs = saleExpiresMs + getTimingReofferDelayMs(timing, input.offer)
-  const earlyToleranceMs = timing.isTest ? 5_000 : 60_000
+  const earlyToleranceMs = timing.isTest ? 5_000 : 5 * 60_000
 
   if (nowMs < dueMs - earlyToleranceMs) {
     return { sent: false as const, reason: "NOT_DUE" as const }
   }
 
-  if (!lifecycle.expiredAt && nowMs >= saleExpiresMs) {
-    lifecycle.expiredAt = new Date(saleExpiresMs).toISOString()
+  if (!resolvedLifecycle.expiredAt && nowMs >= saleExpiresMs) {
+    resolvedLifecycle.expiredAt = new Date(saleExpiresMs).toISOString()
+    await saveFlashSaleLifecycle(resolvedLifecycle)
   }
 
-  if (!lifecycle.expiredAt) {
+  if (!resolvedLifecycle.expiredAt) {
     return { sent: false as const, reason: "SALE_ACTIVE" as const }
   }
 
@@ -97,13 +123,13 @@ export async function tryDeliverFlashSaleReoffer(input: {
 
   if (result.ok) {
     if (input.offer === "4h") {
-      lifecycle.offer4hSentAt = now.toISOString()
-      lifecycle.pendingOffer = "4h"
+      resolvedLifecycle.offer4hSentAt = now.toISOString()
+      resolvedLifecycle.pendingOffer = "4h"
     } else {
-      lifecycle.offer24hSentAt = now.toISOString()
-      lifecycle.pendingOffer = "24h"
+      resolvedLifecycle.offer24hSentAt = now.toISOString()
+      resolvedLifecycle.pendingOffer = "24h"
     }
-    await saveFlashSaleLifecycle(lifecycle)
+    await saveFlashSaleLifecycle(resolvedLifecycle)
     return { sent: true as const, offer: input.offer }
   }
 
@@ -205,6 +231,25 @@ async function processFiveMinuteReminders(now: Date) {
 
 export async function processUserFlashSaleReminder(userKey: string, now = new Date()) {
   return tryDeliverFlashSaleReminder({ userKey, now })
+}
+
+export async function processUserFlashSaleReoffers(userKey: string, now = new Date()) {
+  const lifecycle = await getFlashSaleLifecycle(userKey)
+  if (!lifecycle) {
+    return { sent4h: false, sent24h: false, reason: "NO_LIFECYCLE" as const }
+  }
+
+  const startedAt = lifecycle.startedAt
+  const results = {
+    offer4h: await tryDeliverFlashSaleReoffer({ userKey, startedAt, offer: "4h", now }),
+    offer24h: await tryDeliverFlashSaleReoffer({ userKey, startedAt, offer: "24h", now }),
+  }
+
+  return {
+    sent4h: results.offer4h.sent,
+    sent24h: results.offer24h.sent,
+    results,
+  }
 }
 
 async function processReengagementOffers(now: Date) {

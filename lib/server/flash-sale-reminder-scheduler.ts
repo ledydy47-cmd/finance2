@@ -37,21 +37,28 @@ async function scheduleQStashDelivery(input: {
 
   const callbackUrl = `${config.baseUrl}${input.callbackPath}`
   const delaySeconds = Math.max(1, Math.ceil(input.delayMs / 1000))
+  const notBefore = Math.ceil((Date.now() + input.delayMs) / 1000)
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${config.token}`,
+    "Content-Type": "application/json",
+    "Upstash-Forward-Authorization": `Bearer ${config.cronSecret}`,
+    "Upstash-Deduplication-Id": input.deduplicationId,
+    "Upstash-Retries": "5",
+  }
+
+  if (input.delayMs >= 60 * 60 * 1000) {
+    headers["Upstash-Not-Before"] = `${notBefore}`
+  } else {
+    headers["Upstash-Delay"] = `${delaySeconds}s`
+  }
 
   const response = await fetch(`${config.qstashUrl}/v2/publish/${callbackUrl}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        "Content-Type": "application/json",
-        "Upstash-Delay": `${Math.max(1, Math.ceil(input.delayMs / 1000))}s`,
-        "Upstash-Forward-Authorization": `Bearer ${config.cronSecret}`,
-        "Upstash-Deduplication-Id": input.deduplicationId,
-        "Upstash-Retries": "3",
-      },
-      body: JSON.stringify(input.body),
-      cache: "no-store",
-    },
-  )
+    method: "POST",
+    headers,
+    body: JSON.stringify(input.body),
+    cache: "no-store",
+  })
 
   if (!response.ok) {
     const text = await response.text()

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import {
+  shouldRetryFlashSaleReoffer,
   tryDeliverFlashSaleReoffer,
   type FlashSaleReofferType,
 } from "@/lib/server/flash-sale-cron-service"
@@ -36,6 +37,11 @@ export async function POST(request: Request) {
       offer: body.offer,
       now: new Date(),
     })
+
+    if (shouldRetryFlashSaleReoffer(result)) {
+      console.warn("[flash-sale-offer-deliver] retryable", body.userKey, body.offer, result.reason)
+      return NextResponse.json({ ok: false, ...result }, { status: 503 })
+    }
 
     return NextResponse.json({ ok: true, ...result })
   } catch (error) {

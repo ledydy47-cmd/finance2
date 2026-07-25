@@ -51,8 +51,14 @@ export async function saveFlashSaleLifecycle(lifecycle: FlashSaleLifecycle) {
 export async function registerFlashSaleLifecycle(userKey: string, startedAt: string) {
   const existing = await getFlashSaleLifecycle(userKey)
   if (existing) {
-    existing.startedAt = startedAt
-    if (!existing.pendingOffer) {
+    const isNewSale = existing.startedAt !== startedAt
+    if (isNewSale) {
+      existing.startedAt = startedAt
+      existing.expiredAt = null
+      existing.offer4hSentAt = null
+      existing.offer24hSentAt = null
+      existing.pendingOffer = null
+    } else if (!existing.pendingOffer) {
       existing.expiredAt = null
     }
     await saveFlashSaleLifecycle(existing)

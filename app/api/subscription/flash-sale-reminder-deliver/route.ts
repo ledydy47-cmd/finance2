@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
-import { tryDeliverFlashSaleReminder } from "@/lib/server/flash-sale-cron-service"
+import {
+  shouldRetryFlashSaleReminder,
+  tryDeliverFlashSaleReminder,
+} from "@/lib/server/flash-sale-cron-service"
 
 function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET
@@ -27,6 +30,11 @@ export async function POST(request: Request) {
       startedAt: body.startedAt.trim(),
       now: new Date(),
     })
+
+    if (shouldRetryFlashSaleReminder(result)) {
+      console.warn("[flash-sale-reminder-deliver] retryable", body.userKey, result.reason)
+      return NextResponse.json({ ok: false, ...result }, { status: 503 })
+    }
 
     return NextResponse.json({ ok: true, ...result })
   } catch (error) {

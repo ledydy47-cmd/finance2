@@ -25,11 +25,8 @@ export async function POST(request: Request) {
     const activeStartedAt = await resolveFlashSaleStartedAt(userKey, startedAt)
     const reminderScheduled = await scheduleFlashSaleReminder(userKey, activeStartedAt)
     const delivery = await scheduleFlashSaleReminderDelivery(userKey, activeStartedAt)
-    const lifecycle = await registerFlashSaleLifecycle(userKey, activeStartedAt)
-    const reoffers =
-      !lifecycle.offer4hSentAt || !lifecycle.offer24hSentAt
-        ? await scheduleFlashSaleReofferDeliveries(userKey, activeStartedAt)
-        : { skipped: true as const }
+    await registerFlashSaleLifecycle(userKey, activeStartedAt)
+    const reoffers = await scheduleFlashSaleReofferDeliveries(userKey, activeStartedAt)
 
     return NextResponse.json({
       ok: true,
