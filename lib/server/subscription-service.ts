@@ -119,16 +119,16 @@ export async function activateSubscriptionFromPayment(payment: YooKassaPayment) 
     telegramUserId: parseTelegramUserId(userKey),
   })
 
-  void notifyAdminSubscriptionPayment({
-    userKey,
-    plan,
-    paymentId: payment.id,
-    amount: payment.amount.value,
-    currentPeriodEnd,
-    isRenewal,
-  }).catch((error) => {
-    console.error("[subscription/admin-telegram-notify]", userKey, payment.id, error)
-  })
+  await Promise.allSettled([
+    notifyAdminSubscriptionPayment({
+      userKey,
+      plan,
+      paymentId: payment.id,
+      amount: payment.amount.value,
+      currentPeriodEnd,
+      isRenewal,
+    }),
+  ])
 
   return {
     paymentId: payment.id,

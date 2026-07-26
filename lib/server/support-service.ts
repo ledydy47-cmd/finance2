@@ -42,12 +42,10 @@ export async function createSupportTicket(input: {
   }
 
   await upsertSupportTicket(ticket)
-  void notifyNewSupportTicket(ticket).catch((error) => {
-    console.error("[support/email-notify]", error)
-  })
-  void notifyAdminNewSupportTicket(ticket).catch((error) => {
-    console.error("[support/admin-telegram-notify]", error)
-  })
+  await Promise.allSettled([
+    notifyNewSupportTicket(ticket),
+    notifyAdminNewSupportTicket(ticket),
+  ])
   return { ok: true as const, ticketId: ticket.id }
 }
 
