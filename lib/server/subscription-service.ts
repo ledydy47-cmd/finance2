@@ -370,6 +370,7 @@ export async function adminUpdateSubscription(input: {
   currentPeriodEnd?: string
   autoRenew?: boolean
   status?: SubscriptionStatus
+  plan?: SubscriptionPlan
 }) {
   const userKey = `tg-${input.telegramUserId}`
   const existing = await getSubscriptionByUserKey(userKey)
@@ -377,15 +378,25 @@ export async function adminUpdateSubscription(input: {
     return { ok: false as const, error: "NOT_FOUND" as const }
   }
 
+  const plan = input.plan ?? existing.subscriptionType
   const updated: SubscriptionRecord = {
     ...existing,
-    ...(input.currentPeriodEnd ? { currentPeriodEnd: input.currentPeriodEnd } : {}),
+    subscriptionType: plan,
+    ...(input.currentPeriodEnd
+      ? { currentPeriodEnd: input.currentPeriodEnd }
+      : input.plan && input.plan !== existing.subscriptionType
+        ? { currentPeriodEnd: computeSubscriptionExpiry(plan) }
+        : {}),
     ...(input.autoRenew !== undefined ? { autoRenew: input.autoRenew } : {}),
+    ...(input.autoRenew === false ? { paymentMethodId: null } : {}),
     ...(input.status ? { status: input.status } : {}),
     updatedAt: nowIso(),
   }
 
   await upsertSubscription(updated)
+
+  const { syncUserSubscriptionPlan } = await import("@/lib/server/user-analytics-service")
+  await syncUserSubscriptionPlan(userKey)
 
   return {
     ok: true as const,

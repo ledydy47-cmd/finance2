@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       currentPeriodEnd?: string
       autoRenew?: boolean
       status?: "active" | "canceled" | "expired" | "past_due"
+      plan?: "yearly" | "monthly"
     }
 
     if (!body.telegramUserId || !Number.isFinite(body.telegramUserId)) {
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       currentPeriodEnd: body.currentPeriodEnd,
       autoRenew: body.autoRenew,
       status: body.status,
+      plan: body.plan,
     })
 
     if (!result.ok) {
