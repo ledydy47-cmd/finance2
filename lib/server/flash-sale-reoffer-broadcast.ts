@@ -19,16 +19,23 @@ export async function broadcastReofferToPaywallNonSubscribers(input?: {
   message?: string
   offerType?: "4h" | "24h"
   audience?: ReofferBroadcastAudience
+  offset?: number
+  limit?: number
 }) {
   const message = input?.message?.trim() || DEFAULT_REOFFER_BROADCAST_MESSAGE
   const offerType = input?.offerType ?? "4h"
   const audience = input?.audience ?? "paywall_non_subscribers"
+  const offset = Math.max(0, input?.offset ?? 0)
+  const limit = input?.limit && input.limit > 0 ? Math.floor(input.limit) : null
   const store = await readAnalyticsStore()
-  const candidates = Object.values(store.users).filter((user) => {
+  const allCandidates = Object.values(store.users).filter((user) => {
     if (user.subscriptionPlan !== "none") return false
     if (audience === "all_non_subscribers") return true
     return Boolean(user.paywallShownAt)
   })
+  const candidates = limit
+    ? allCandidates.slice(offset, offset + limit)
+    : allCandidates.slice(offset)
 
   const results: Array<{
     userKey: string
@@ -67,7 +74,10 @@ export async function broadcastReofferToPaywallNonSubscribers(input?: {
   }
 
   return {
-    total: candidates.length,
+    total: allCandidates.length,
+    batchOffset: offset,
+    batchLimit: limit,
+    batchSize: candidates.length,
     sent: results.filter((item) => item.sent).length,
     failed: results.filter((item) => !item.sent).length,
     results,
