@@ -11,11 +11,13 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as {
       message?: string
       offerType?: "4h" | "24h"
+      audience?: "paywall_non_subscribers" | "all_non_subscribers"
     }
 
     const result = await broadcastReofferToPaywallNonSubscribers({
       message: body.message,
       offerType: body.offerType,
+      audience: body.audience,
     })
 
     return NextResponse.json({ ok: true, ...result })

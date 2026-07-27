@@ -13,16 +13,22 @@ import { sendMessageToUser } from "@/lib/server/user-analytics-service"
 
 export const DEFAULT_REOFFER_BROADCAST_MESSAGE = FLASH_SALE_OFFER_4H_MESSAGE
 
+export type ReofferBroadcastAudience = "paywall_non_subscribers" | "all_non_subscribers"
+
 export async function broadcastReofferToPaywallNonSubscribers(input?: {
   message?: string
   offerType?: "4h" | "24h"
+  audience?: ReofferBroadcastAudience
 }) {
   const message = input?.message?.trim() || DEFAULT_REOFFER_BROADCAST_MESSAGE
   const offerType = input?.offerType ?? "4h"
+  const audience = input?.audience ?? "paywall_non_subscribers"
   const store = await readAnalyticsStore()
-  const candidates = Object.values(store.users).filter(
-    (user) => Boolean(user.paywallShownAt) && user.subscriptionPlan === "none",
-  )
+  const candidates = Object.values(store.users).filter((user) => {
+    if (user.subscriptionPlan !== "none") return false
+    if (audience === "all_non_subscribers") return true
+    return Boolean(user.paywallShownAt)
+  })
 
   const results: Array<{
     userKey: string
