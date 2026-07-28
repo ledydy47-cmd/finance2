@@ -16,6 +16,7 @@ export const FULL_PRICE_AMOUNTS: Record<SubscriptionPlan, string> = {
 
 export function resolvePaywallPricingPhase(input: {
   paywallFlashSaleStartedAt?: string | null
+  flashSaleDurationMs?: number | null
   isSubscribed?: boolean
   now?: number
 }): PaywallPricingPhase {
@@ -28,8 +29,9 @@ export function resolvePaywallPricingPhase(input: {
     return "standard"
   }
 
+  const durationMs = input.flashSaleDurationMs ?? FLASH_SALE_DURATION_MS
   const now = input.now ?? Date.now()
-  const remainingMs = FLASH_SALE_DURATION_MS - (now - startedAt)
+  const remainingMs = durationMs - (now - startedAt)
   if (remainingMs > 0) {
     return "flash_sale"
   }
@@ -63,6 +65,7 @@ export function getPaywallDisplayPrices(input: {
   const isSubscribed = isUserSubscribed(input.settings)
   const phase = resolvePaywallPricingPhase({
     paywallFlashSaleStartedAt: input.settings.paywallFlashSaleStartedAt,
+    flashSaleDurationMs: input.settings.flashSaleDurationMs,
     isSubscribed,
     now: input.now,
   })

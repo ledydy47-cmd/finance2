@@ -50,7 +50,11 @@ function formatCountdown(remainingMs: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
 }
 
-export function getFlashSaleState(settings: Settings, now = Date.now()) {
+export function getFlashSaleState(
+  settings: Settings,
+  now = Date.now(),
+  durationMs = settings.flashSaleDurationMs ?? FLASH_SALE_DURATION_MS,
+) {
   if (isUserSubscribed(settings) || !settings.paywallFlashSaleStartedAt) {
     return { active: false as const }
   }
@@ -60,7 +64,7 @@ export function getFlashSaleState(settings: Settings, now = Date.now()) {
     return { active: false as const }
   }
 
-  const remainingMs = FLASH_SALE_DURATION_MS - (now - startedAt)
+  const remainingMs = durationMs - (now - startedAt)
   if (remainingMs <= 0) {
     return { active: false as const, expired: true as const }
   }

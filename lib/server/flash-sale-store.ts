@@ -28,15 +28,29 @@ export async function clearFlashSaleStartedAt(userKey: string) {
   return kvRestSet(flashSaleKey(userKey), "")
 }
 
-export function isFlashSaleExpired(startedAt: string, nowMs = Date.now()) {
+export function isFlashSaleExpired(
+  startedAt: string,
+  durationMs = FLASH_SALE_DURATION_MS,
+  nowMs = Date.now(),
+) {
   const startedMs = new Date(startedAt).getTime()
   if (Number.isNaN(startedMs)) return true
-  return nowMs >= startedMs + FLASH_SALE_DURATION_MS
+  return nowMs >= startedMs + durationMs
+}
+
+export async function isFlashSaleExpiredForUser(
+  userKey: string,
+  startedAt: string,
+  nowMs = Date.now(),
+) {
+  const { getFlashSaleTiming } = await import("@/lib/server/flash-sale-timing")
+  const timing = await getFlashSaleTiming(userKey, startedAt)
+  return isFlashSaleExpired(startedAt, timing.saleDurationMs, nowMs)
 }
 
 export async function resolveFlashSaleStartedAt(userKey: string, clientStartedAt: string) {
   const existing = await getFlashSaleStartedAt(userKey)
-  if (!existing || isFlashSaleExpired(existing)) {
+  if (!existing || (await isFlashSaleExpiredForUser(userKey, existing))) {
     await setFlashSaleStartedAt(userKey, clientStartedAt)
     return clientStartedAt
   }

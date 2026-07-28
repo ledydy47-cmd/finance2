@@ -34,3 +34,31 @@ export async function fetchServerSubscriptionSettings(
     return null
   }
 }
+
+export async function fetchServerFlashSaleStatus(userKey: string) {
+  try {
+    const response = await fetch(
+      `/api/subscription/flash-sale-status?userKey=${encodeURIComponent(userKey)}`,
+      { cache: "no-store" },
+    )
+    const payload = (await response.json()) as {
+      active?: boolean
+      startedAt?: string
+      saleDurationMs?: number
+      remainingMs?: number
+      subscribed?: boolean
+    }
+
+    if (!response.ok || !payload.active || !payload.startedAt || !payload.saleDurationMs) {
+      return null
+    }
+
+    return {
+      startedAt: payload.startedAt,
+      saleDurationMs: payload.saleDurationMs,
+      remainingMs: payload.remainingMs ?? 0,
+    }
+  } catch {
+    return null
+  }
+}

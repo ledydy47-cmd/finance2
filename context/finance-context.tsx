@@ -38,7 +38,7 @@ import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/teleg
 import type { SubscriptionPlan } from "@/lib/subscription"
 import { isSubscriptionActive, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
 import { verifyPaymentWithRetry } from "@/lib/pending-payment-verify"
-import { fetchServerSubscriptionSettings } from "@/lib/subscription-sync-client"
+import { fetchServerFlashSaleStatus, fetchServerSubscriptionSettings } from "@/lib/subscription-sync-client"
 import type { ThemeId } from "@/lib/themes"
 import { applyTheme, DEFAULT_THEME_ID } from "@/lib/themes"
 import type {
@@ -85,6 +85,7 @@ interface FinanceContextValue {
   restoreSubscription: () => Promise<{ ok: boolean; message: string }>
   confirmPendingPayment: () => Promise<boolean>
   syncSubscriptionFromServer: (userKey: string) => Promise<boolean>
+  syncFlashSaleFromServer: (userKey: string) => Promise<boolean>
   activatePendingFlashSaleOffer: (userKey: string) => Promise<boolean>
   openAddToGoal: (goalId: string) => void
   closeAddToGoal: () => void
@@ -217,6 +218,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
             loaded = {
               ...loaded,
               settings: { ...loaded.settings, ...subscriptionPatch },
+            }
+          }
+
+          const flashSalePatch = await fetchServerFlashSaleStatus(userKey)
+          if (flashSalePatch && !isUserSubscribed(loaded.settings)) {
+            loaded = {
+              ...loaded,
+              settings: {
+                ...loaded.settings,
+                paywallFlashSaleStartedAt: flashSalePatch.startedAt,
+                flashSaleDurationMs: flashSalePatch.saleDurationMs,
+                paywallShown: true,
+              },
             }
           }
         } catch {
@@ -471,6 +485,32 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       }
     },
     [update],
+  )
+
+  const syncFlashSaleFromServer = useCallback(
+    async (userKey: string) => {
+      if (isUserSubscribed(data.settings)) return false
+
+      try {
+        const flashSale = await fetchServerFlashSaleStatus(userKey)
+        if (!flashSale) return false
+
+        update((prev) => ({
+          ...prev,
+          settings: {
+            ...prev.settings,
+            paywallFlashSaleStartedAt: flashSale.startedAt,
+            flashSaleDurationMs: flashSale.saleDurationMs,
+            paywallShown: true,
+          },
+        }))
+        setShowPaywall(true)
+        return true
+      } catch {
+        return false
+      }
+    },
+    [data.settings, update],
   )
 
   const activatePendingFlashSaleOffer = useCallback(
@@ -1037,6 +1077,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     restoreSubscription,
     confirmPendingPayment,
     syncSubscriptionFromServer,
+    syncFlashSaleFromServer,
     activatePendingFlashSaleOffer,
     openAddToGoal,
     closeAddToGoal,

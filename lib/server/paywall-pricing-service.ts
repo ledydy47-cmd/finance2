@@ -1,5 +1,6 @@
 import { getServerSubscriptionStatus } from "@/lib/server/subscription-service"
 import { getFlashSaleStartedAt } from "@/lib/server/flash-sale-store"
+import { getFlashSaleTiming } from "@/lib/server/flash-sale-timing"
 import {
   getPaymentAmountForPhase,
   resolvePaywallPricingPhase,
@@ -21,8 +22,12 @@ export async function resolveServerPaywallPricing(input: {
   }
 
   const startedAtFromKv = await getFlashSaleStartedAt(input.userKey)
+  const timing = startedAtFromKv
+    ? await getFlashSaleTiming(input.userKey, startedAtFromKv)
+    : null
   const phase = resolvePaywallPricingPhase({
     paywallFlashSaleStartedAt: startedAtFromKv,
+    flashSaleDurationMs: timing?.saleDurationMs,
     now: input.now,
   })
 

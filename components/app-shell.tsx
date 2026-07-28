@@ -52,6 +52,7 @@ export function AppShell() {
     closeAddToGoal,
     confirmPendingPayment,
     syncSubscriptionFromServer,
+    syncFlashSaleFromServer,
     activatePendingFlashSaleOffer,
   } = useFinance()
 
@@ -85,6 +86,7 @@ export function AppShell() {
       })
 
       await syncSubscriptionFromServer(userKey)
+      await syncFlashSaleFromServer(userKey)
       await activatePendingFlashSaleOffer(userKey)
       void confirmPendingPayment()
 
@@ -110,6 +112,7 @@ export function AppShell() {
     user?.first_name,
     confirmPendingPayment,
     syncSubscriptionFromServer,
+    syncFlashSaleFromServer,
     activatePendingFlashSaleOffer,
   ])
 

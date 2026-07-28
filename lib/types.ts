@@ -63,6 +63,7 @@ export interface Settings {
   firstExpenseAdded: boolean
   paywallShown: boolean
   paywallFlashSaleStartedAt?: string | null
+  flashSaleDurationMs?: number | null
   isSubscribed: boolean
   subscriptionPlan?: SubscriptionPlan | null
   subscriptionExpiresAt?: string | null
