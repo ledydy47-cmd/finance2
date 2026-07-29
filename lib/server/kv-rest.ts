@@ -1,8 +1,15 @@
+export function isKvDisabled() {
+  const flag = process.env.DISABLE_KV?.trim().toLowerCase()
+  return flag === "1" || flag === "true" || flag === "yes"
+}
+
 export function hasKvRestConfig() {
+  if (isKvDisabled()) return false
   return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
 }
 
 function kvConfig() {
+  if (isKvDisabled()) return null
   const url = process.env.KV_REST_API_URL
   const token = process.env.KV_REST_API_TOKEN
   if (!url || !token) return null
@@ -17,7 +24,7 @@ type KvCommandResult = { ok: true; result: unknown } | { ok: false; error: strin
 
 async function kvRestCommand(command: string[], retries = 3): Promise<KvCommandResult> {
   const config = kvConfig()
-  if (!config) return { ok: false, error: "NO_CONFIG" }
+  if (!config) return { ok: false, error: "KV_DISABLED" }
 
   for (let attempt = 0; attempt < retries; attempt += 1) {
     try {
@@ -71,6 +78,8 @@ export async function kvRestPipeline(
   commands: string[][],
   retries = 3,
 ): Promise<{ ok: true; result: unknown } | { ok: false; error: string }> {
+  if (isKvDisabled()) return { ok: false, error: "KV_DISABLED" }
+
   const config = kvConfig()
   if (!config) return { ok: false, error: "NO_CONFIG" }
 
@@ -118,6 +127,8 @@ export async function kvRestPipeline(
 }
 
 export async function kvRestGet(key: string, retries = 3): Promise<string | null> {
+  if (isKvDisabled()) return null
+
   const config = kvConfig()
   if (!config) return null
 
@@ -158,6 +169,8 @@ export async function kvRestGet(key: string, retries = 3): Promise<string | null
 }
 
 export async function kvRestSet(key: string, value: string, retries = 3): Promise<boolean> {
+  if (isKvDisabled()) return false
+
   const config = kvConfig()
   if (!config) return false
 
@@ -193,17 +206,21 @@ export async function kvRestSet(key: string, value: string, retries = 3): Promis
 }
 
 export async function kvRestDel(key: string): Promise<boolean> {
+  if (isKvDisabled()) return false
   const result = await kvRestCommand(["DEL", key])
   return result.ok
 }
 
 export async function kvRestSadd(key: string, ...members: string[]): Promise<boolean> {
+  if (isKvDisabled()) return false
   if (members.length === 0) return false
   const result = await kvRestCommand(["SADD", key, ...members])
   return result.ok
 }
 
 export async function kvRestSmembers(key: string): Promise<string[]> {
+  if (isKvDisabled()) return []
+
   const config = kvConfig()
   if (!config) return []
 
@@ -219,7 +236,7 @@ export async function kvRestSmembers(key: string): Promise<string[]> {
 }
 
 export async function kvRestMget<T>(keys: string[]): Promise<Array<T | null>> {
-  if (keys.length === 0) return []
+  if (isKvDisabled() || keys.length === 0) return keys.map(() => null)
 
   const config = kvConfig()
   if (!config) return keys.map(() => null)
@@ -246,6 +263,7 @@ export async function kvRestMget<T>(keys: string[]): Promise<Array<T | null>> {
 }
 
 export async function kvRestGetJson<T>(key: string, fallback: T): Promise<T> {
+  if (isKvDisabled()) return fallback
   const raw = await kvRestGet(key)
   if (!raw) return fallback
 

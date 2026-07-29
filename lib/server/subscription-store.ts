@@ -1,6 +1,6 @@
 import fs from "fs/promises"
 import path from "path"
-import { kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { hasKvRestConfig, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
 import type { SubscriptionRecord, SubscriptionStoreSnapshot } from "@/lib/server/subscription-types"
 
 const STORE_KEY = "kopilka:subscriptions"
@@ -17,17 +17,21 @@ async function readFromFile(): Promise<SubscriptionStoreSnapshot> {
 }
 
 export async function readSubscriptionStore(): Promise<SubscriptionStoreSnapshot> {
-  const fromKv = await kvRestGetJson(STORE_KEY, null)
-  if (fromKv) return fromKv
+  if (hasKvRestConfig()) {
+    const fromKv = await kvRestGetJson(STORE_KEY, null)
+    if (fromKv) return fromKv
+  }
   return readFromFile()
 }
 
 export async function writeSubscriptionStore(snapshot: SubscriptionStoreSnapshot) {
   const payload = JSON.stringify(snapshot)
-  const wroteKv = await kvRestSet(STORE_KEY, payload)
-  if (wroteKv) return
+  if (hasKvRestConfig()) {
+    const wroteKv = await kvRestSet(STORE_KEY, payload)
+    if (wroteKv) return
+    console.error("[subscription-store] KV write failed, falling back to file")
+  }
 
-  console.error("[subscription-store] KV write failed — subscription may not persist on serverless")
   try {
     await fs.mkdir(path.dirname(FILE_PATH), { recursive: true })
     await fs.writeFile(FILE_PATH, payload, "utf8")
