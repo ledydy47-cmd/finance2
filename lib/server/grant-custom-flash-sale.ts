@@ -32,6 +32,8 @@ async function clearFlashSaleState(userKey: string) {
   await clearFlashSaleTestSession(userKey)
 }
 
+export { clearFlashSaleState }
+
 export async function grantCustomFlashSale(input: {
   telegramUserId: number
   telegramUsername?: string | null
