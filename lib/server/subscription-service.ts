@@ -438,8 +438,15 @@ export async function verifyPaymentById(paymentId: string) {
 export async function verifyPaymentByOrderId(orderId: string) {
   const { getPendingPaymentByOrderId } = await import("@/lib/server/pending-payment-store")
   const pending = await getPendingPaymentByOrderId(orderId)
-  if (!pending) return null
-  return verifyPaymentById(pending.paymentId)
+  if (pending) {
+    return verifyPaymentById(pending.paymentId)
+  }
+
+  const { findYooKassaPaymentByOrderId } = await import("@/lib/yookassa/server")
+  const payment = await findYooKassaPaymentByOrderId(orderId)
+  if (!payment) return null
+
+  return activateSubscriptionFromPayment(payment)
 }
 
 export async function tryActivatePendingPaymentForUser(userKey: string) {

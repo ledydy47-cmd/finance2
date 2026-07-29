@@ -192,6 +192,43 @@ export async function fetchYooKassaPayment(paymentId: string): Promise<YooKassaP
   return response.json() as Promise<YooKassaPayment>
 }
 
+interface YooKassaPaymentListResponse {
+  items?: YooKassaPayment[]
+  next_cursor?: string
+}
+
+export async function findYooKassaPaymentByOrderId(orderId: string): Promise<YooKassaPayment | null> {
+  const since = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+  let cursor: string | undefined
+
+  for (let page = 0; page < 5; page += 1) {
+    const url = new URL("https://api.yookassa.ru/v3/payments")
+    url.searchParams.set("created_at.gte", since)
+    url.searchParams.set("limit", "100")
+    if (cursor) url.searchParams.set("cursor", cursor)
+
+    const response = await fetch(url, {
+      headers: { Authorization: authHeader() },
+      cache: "no-store",
+    })
+
+    if (!response.ok) {
+      const details = await response.text()
+      console.error("[yookassa] list payments failed", response.status, details)
+      return null
+    }
+
+    const payload = (await response.json()) as YooKassaPaymentListResponse
+    const match = payload.items?.find((payment) => payment.metadata?.orderId === orderId)
+    if (match) return match
+
+    cursor = payload.next_cursor
+    if (!cursor) break
+  }
+
+  return null
+}
+
 const PRODUCTION_APP_URL = "https://finance2-36rh.vercel.app"
 
 export function getAppBaseUrl() {
