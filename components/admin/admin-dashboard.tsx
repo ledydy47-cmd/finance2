@@ -11,15 +11,53 @@ import type { SupportTicket } from "@/lib/server/support-types"
 const SESSION_KEY = "kopilka-admin-support-key"
 
 const EVENT_LABELS: Record<AnalyticsEventType, string> = {
-  app_opened: "Открыл приложение",
+  app_opened: "Запустил бота",
   onboarding_started: "Нажал «Начать»",
-  onboarding_completed: "Завершил онбординг",
-  walkthrough_completed: "Прошёл обучение",
+  onboarding_completed: "Прошёл онбординг",
+  walkthrough_completed: "Прошёл обучение (+)",
+  first_expense_added: "Добавил расход",
   paywall_shown: "Увидел paywall",
   subscription_paid_monthly: "Оплатил месяц",
   subscription_paid_yearly: "Оплатил год",
   auto_renew_canceled: "Отключил автопродление",
 }
+
+const FUNNEL_EVENT_TYPES: AnalyticsEventType[] = [
+  "app_opened",
+  "onboarding_started",
+  "onboarding_completed",
+  "walkthrough_completed",
+  "first_expense_added",
+  "paywall_shown",
+]
+
+const POST_PAYWALL_EVENT_TYPES: AnalyticsEventType[] = [
+  "subscription_paid_monthly",
+  "subscription_paid_yearly",
+  "auto_renew_canceled",
+]
+
+type AnalyticsBucket = {
+  newUsers?: number
+  appOpened?: number
+  onboardingStarted?: number
+  onboardingCompleted?: number
+  walkthroughCompleted?: number
+  firstExpenseAdded?: number
+  paywallShown?: number
+  subscribedMonthly?: number
+  subscribedYearly?: number
+  autoRenewCanceled?: number
+  totalUsers?: number
+}
+
+type SummaryState = {
+  selectedDate?: string
+  analyticsTimezone?: string
+  daily?: AnalyticsBucket
+  allTime?: AnalyticsBucket
+  newUsersOnDate?: number
+} | null
 
 type TabId = "stats" | "users" | "messages" | "support"
 type UserFilter = "all" | "none" | "monthly" | "yearly"
@@ -68,7 +106,37 @@ function formatSelectedDate(dateYmd: string) {
 }
 
 function hasAddedFirstExpense(user: UserAnalyticsRecord) {
-  return user.firstExpenseAdded === true
+  if (user.firstExpenseAdded === true) return true
+  return user.events.some((event) => event.type === "first_expense_added")
+}
+
+function hasEvent(user: UserAnalyticsRecord, type: AnalyticsEventType) {
+  switch (type) {
+    case "app_opened":
+      return Boolean(user.appOpenedAt)
+    case "onboarding_started":
+      return Boolean(user.onboardingStartedAt)
+    case "onboarding_completed":
+      return Boolean(user.onboardingCompletedAt)
+    case "walkthrough_completed":
+      return hasCompletedWalkthrough(user)
+    case "first_expense_added":
+      return hasAddedFirstExpense(user)
+    case "paywall_shown":
+      return Boolean(user.paywallShownAt)
+    case "subscription_paid_monthly":
+      return Boolean(user.subscribedMonthlyAt)
+    case "subscription_paid_yearly":
+      return Boolean(user.subscribedYearlyAt)
+    case "auto_renew_canceled":
+      return Boolean(user.autoRenewCanceledAt)
+    default:
+      return user.events.some((event) => event.type === type)
+  }
+}
+
+function userDisplayName(user: UserAnalyticsRecord) {
+  return user.userName?.trim() || (user.telegramUsername ? `@${user.telegramUsername}` : user.userKey)
 }
 
 function userLabel(user: UserAnalyticsRecord) {
@@ -95,7 +163,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const [adminKey, setAdminKey] = useState("")
   const [inputKey, setInputKey] = useState("")
   const [tab, setTab] = useState<TabId>(defaultTab)
-  const [summary, setSummary] = useState<Record<string, number | string> | null>(null)
+  const [summary, setSummary] = useState<SummaryState>(null)
   const [statsDate, setStatsDate] = useState(todayYmdMoscow)
   const [users, setUsers] = useState<UserAnalyticsRecord[]>([])
   const [userFilter, setUserFilter] = useState<UserFilter>("all")
@@ -361,26 +429,38 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
     )
   }
 
-  const statCards = summary
+  const statSections = summary
     ? [
         {
-          label: "Всего пользователей",
-          value: summary.totalUsers ?? 0,
-          highlight: true,
+          title: `За ${formatSelectedDate(String(summary.selectedDate ?? statsDate))} (МСК)`,
+          cards: [
+            { label: "Новых пользователей", value: summary.daily?.newUsers ?? 0, highlight: true },
+            { label: "Запустили бота", value: summary.daily?.appOpened ?? 0 },
+            { label: "Нажали «Начать»", value: summary.daily?.onboardingStarted ?? 0 },
+            { label: "Прошли онбординг", value: summary.daily?.onboardingCompleted ?? 0 },
+            { label: "Прошли обучение (+)", value: summary.daily?.walkthroughCompleted ?? 0 },
+            { label: "Добавили расход", value: summary.daily?.firstExpenseAdded ?? 0 },
+            { label: "Увидели paywall", value: summary.daily?.paywallShown ?? 0 },
+            { label: "Оплатили месяц", value: summary.daily?.subscribedMonthly ?? 0 },
+            { label: "Оплатили год", value: summary.daily?.subscribedYearly ?? 0 },
+            { label: "Отключили автопродление", value: summary.daily?.autoRenewCanceled ?? 0 },
+          ],
         },
         {
-          label: `Новых за ${formatSelectedDate(String(summary.selectedDate ?? statsDate))}`,
-          value: summary.newUsersOnDate ?? 0,
+          title: "За всё время",
+          cards: [
+            { label: "Всего пользователей", value: summary.allTime?.totalUsers ?? 0, highlight: true },
+            { label: "Запустили бота", value: summary.allTime?.appOpened ?? 0 },
+            { label: "Нажали «Начать»", value: summary.allTime?.onboardingStarted ?? 0 },
+            { label: "Прошли онбординг", value: summary.allTime?.onboardingCompleted ?? 0 },
+            { label: "Прошли обучение (+)", value: summary.allTime?.walkthroughCompleted ?? 0 },
+            { label: "Добавили расход", value: summary.allTime?.firstExpenseAdded ?? 0 },
+            { label: "Увидели paywall", value: summary.allTime?.paywallShown ?? 0 },
+            { label: "Оплатили месяц", value: summary.allTime?.subscribedMonthly ?? 0 },
+            { label: "Оплатили год", value: summary.allTime?.subscribedYearly ?? 0 },
+            { label: "Отключили автопродление", value: summary.allTime?.autoRenewCanceled ?? 0 },
+          ],
         },
-        { label: "Открыли приложение (всего)", value: summary.totalAppOpened },
-        { label: "Нажали «Начать» (всего)", value: summary.totalOnboardingStarted },
-        { label: "Закончили онбординг (всего)", value: summary.totalOnboardingCompleted },
-        { label: "Прошли обучение (всего)", value: summary.totalWalkthroughCompleted },
-        { label: "Добавили расход (всего)", value: summary.totalFirstExpenseAdded },
-        { label: "Увидели paywall (всего)", value: summary.totalPaywallShown },
-        { label: "Оплатили месяц (всего)", value: summary.totalSubscribedMonthly },
-        { label: "Оплатили год (всего)", value: summary.totalSubscribedYearly },
-        { label: "Отключили автопродление (всего)", value: summary.totalAutoRenewCanceled },
       ]
     : []
 
@@ -427,11 +507,11 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
         {tab === "stats" && (
-          <div>
-            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-block border border-border bg-card p-4">
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-end gap-3 rounded-block border border-border bg-card p-4">
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold text-muted-foreground">
-                  Дата для подсчёта новых пользователей (МСК)
+                  Дата аналитики (МСК)
                 </span>
                 <input
                   type="date"
@@ -441,31 +521,37 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                 />
               </label>
               <p className="text-sm text-muted-foreground">
-                Карточки ниже — накопительные totals по всей базе, кроме «Новых за …»
+                Сверху — уникальные пользователи с событием в выбранный день. Снизу — накопительно
+                по всей базе.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {statCards.map((card) => (
-                <div
-                  key={card.label}
-                  className={`rounded-block border bg-card p-4 shadow-sm ${
-                    "highlight" in card && card.highlight
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-border"
-                  }`}
-                >
-                  <p className="text-xs text-muted-foreground">{card.label}</p>
-                  <p className="mt-1 font-serif text-3xl font-bold">{card.value ?? 0}</p>
+            {statSections.map((section) => (
+              <section key={section.title}>
+                <h2 className="mb-3 font-serif text-lg font-bold">{section.title}</h2>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {section.cards.map((card) => (
+                    <div
+                      key={`${section.title}-${card.label}`}
+                      className={`rounded-block border bg-card p-4 shadow-sm ${
+                        "highlight" in card && card.highlight
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-border"
+                      }`}
+                    >
+                      <p className="text-xs text-muted-foreground">{card.label}</p>
+                      <p className="mt-1 font-serif text-3xl font-bold">{card.value ?? 0}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </section>
+            ))}
           </div>
         )}
 
         {tab === "users" && (
-          <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
-            <div>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+            <div className="min-w-0">
               <div className="mb-3 flex flex-wrap gap-2">
                 {(
                   [
@@ -490,27 +576,25 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
 
               <p className="mb-2 text-xs text-muted-foreground">
                 Показано {users.length} пользователей
-                {userFilter !== "all" ? ` · фильтр: ${userFilter}` : ""}. Колонка «Расход» — хотя бы
-                одна трата. Пролистайте таблицу вправо на узком экране.
+                {userFilter !== "all" ? ` · фильтр: ${userFilter}` : ""}. После paywall — месяц,
+                год, автопродление.
               </p>
 
               <div className="overflow-x-auto rounded-block border border-border bg-card">
-                <table className="min-w-[52rem] w-full text-left text-xs">
+                <table className="min-w-[56rem] w-full text-left text-xs">
                   <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                     <tr>
-                      <th className="sticky left-0 z-10 bg-secondary/95 px-3 py-2">Пользователь</th>
-                      <th className="sticky left-[9rem] z-10 bg-primary/15 px-3 py-2 font-bold text-foreground">
-                        Расход
-                      </th>
+                      <th className="sticky left-0 z-10 bg-secondary/95 px-3 py-2">Имя</th>
                       <th className="px-3 py-2">Возраст</th>
-                      <th className="px-3 py-2">Открыл</th>
-                      <th className="px-3 py-2">Начал</th>
+                      <th className="px-3 py-2">Запустил бота</th>
+                      <th className="px-3 py-2">«Начать»</th>
                       <th className="px-3 py-2">Онбординг</th>
-                      <th className="px-3 py-2">Обучение</th>
+                      <th className="px-3 py-2">Обучение (+)</th>
+                      <th className="px-3 py-2">Расход</th>
                       <th className="px-3 py-2">Paywall</th>
-                      <th className="px-3 py-2">Подписка</th>
+                      <th className="px-3 py-2">Месяц</th>
+                      <th className="px-3 py-2">Год</th>
                       <th className="px-3 py-2">Автооткл.</th>
-                      <th className="px-3 py-2">Последний заход</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -522,25 +606,19 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                           selectedUserKey === user.userKey ? "bg-primary/10" : ""
                         }`}
                       >
-                        <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium">{userLabel(user)}</td>
-                        <td className="sticky left-[9rem] z-10 bg-primary/5 px-3 py-2">
-                          <Check value={hasAddedFirstExpense(user)} />
+                        <td className="sticky left-0 z-10 max-w-[10rem] truncate bg-card px-3 py-2 font-medium">
+                          {userDisplayName(user)}
                         </td>
                         <td className="px-3 py-2">{user.age ?? "—"}</td>
-                        <td className="px-3 py-2"><Check value={Boolean(user.appOpenedAt)} /></td>
-                        <td className="px-3 py-2"><Check value={Boolean(user.onboardingStartedAt)} /></td>
-                        <td className="px-3 py-2"><Check value={Boolean(user.onboardingCompletedAt)} /></td>
-                        <td className="px-3 py-2"><Check value={hasCompletedWalkthrough(user)} /></td>
-                        <td className="px-3 py-2"><Check value={Boolean(user.paywallShownAt)} /></td>
-                        <td className="px-3 py-2">
-                          {user.subscriptionPlan === "monthly"
-                            ? "Месяц"
-                            : user.subscriptionPlan === "yearly"
-                              ? "Год"
-                              : "—"}
-                        </td>
-                        <td className="px-3 py-2"><Check value={Boolean(user.autoRenewCanceledAt)} /></td>
-                        <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(user.lastVisitAt)}</td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "app_opened")} /></td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "onboarding_started")} /></td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "onboarding_completed")} /></td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "walkthrough_completed")} /></td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "first_expense_added")} /></td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "paywall_shown")} /></td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "subscription_paid_monthly")} /></td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "subscription_paid_yearly")} /></td>
+                        <td className="px-3 py-2"><Check value={hasEvent(user, "auto_renew_canceled")} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -548,47 +626,79 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
               </div>
             </div>
 
-            <aside className="rounded-block border border-border bg-card p-4 lg:sticky lg:top-4 lg:self-start">
+            <aside className="flex max-h-[calc(100dvh-3rem)] min-h-[12rem] flex-col overflow-hidden rounded-block border border-border bg-card lg:sticky lg:top-4">
               {!selectedUser ? (
-                <p className="text-sm text-muted-foreground">Выберите пользователя для просмотра истории</p>
+                <p className="p-4 text-sm text-muted-foreground">
+                  Выберите пользователя для просмотра истории
+                </p>
               ) : (
                 <>
-                  <h2 className="font-serif text-base font-bold">{userLabel(selectedUser)}</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Последний заход: {formatDateTime(selectedUser.lastVisitAt)}
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                    <span className="rounded-full bg-secondary px-2.5 py-1">
-                      Расход: {hasAddedFirstExpense(selectedUser) ? "✓ да" : "— нет"}
-                    </span>
-                    <span className="rounded-full bg-secondary px-2.5 py-1">
-                      Обучение: {hasCompletedWalkthrough(selectedUser) ? "✓" : "—"}
-                    </span>
-                    <span className="rounded-full bg-secondary px-2.5 py-1">
-                      Paywall: {selectedUser.paywallShownAt ? "✓" : "—"}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                      Действия
+                  <div className="shrink-0 border-b border-border/70 p-4">
+                    <h2 className="font-serif text-base font-bold">{userDisplayName(selectedUser)}</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {selectedUser.telegramUsername ? `@${selectedUser.telegramUsername} · ` : ""}
+                      Последний заход: {formatDateTime(selectedUser.lastVisitAt)}
                     </p>
-                    {[...selectedUser.events].reverse().map((event, index) => (
-                      <div
-                        key={`${event.type}-${event.at}-${index}`}
-                        className="rounded-block-sm border border-border/70 px-3 py-2 text-xs"
-                      >
-                        <p className="font-semibold text-foreground">{EVENT_LABELS[event.type]}</p>
-                        <p className="mt-0.5 text-muted-foreground">{formatDateTime(event.at)}</p>
-                      </div>
-                    ))}
-                    {selectedUser.events.length === 0 && (
-                      <p className="text-xs text-muted-foreground">Событий пока нет</p>
-                    )}
                   </div>
 
-                  <div className="mt-4 border-t border-border/70 pt-4">
+                  <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                    <div className="space-y-4">
+                      <section>
+                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                          Воронка
+                        </p>
+                        <div className="mt-2 space-y-2">
+                          {FUNNEL_EVENT_TYPES.map((type) => {
+                            const event = selectedUser.events.find((item) => item.type === type)
+                            return (
+                              <div
+                                key={type}
+                                className="rounded-block-sm border border-border/70 px-3 py-2 text-xs"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-semibold text-foreground">{EVENT_LABELS[type]}</p>
+                                  <Check value={hasEvent(selectedUser, type)} />
+                                </div>
+                                {event && (
+                                  <p className="mt-0.5 text-muted-foreground">{formatDateTime(event.at)}</p>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </section>
+
+                      <section>
+                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                          После paywall
+                        </p>
+                        <div className="mt-2 space-y-2">
+                          {POST_PAYWALL_EVENT_TYPES.map((type) => {
+                            const event = selectedUser.events.find((item) => item.type === type)
+                            return (
+                              <div
+                                key={type}
+                                className="rounded-block-sm border border-border/70 px-3 py-2 text-xs"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-semibold text-foreground">{EVENT_LABELS[type]}</p>
+                                  <Check value={hasEvent(selectedUser, type)} />
+                                </div>
+                                {event && (
+                                  <p className="mt-0.5 text-muted-foreground">{formatDateTime(event.at)}</p>
+                                )}
+                              </div>
+                            )
+                          })}
+                          {!POST_PAYWALL_EVENT_TYPES.some((type) => hasEvent(selectedUser, type)) && (
+                            <p className="text-xs text-muted-foreground">Действий после paywall пока нет</p>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 border-t border-border/70 p-4">
                     <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                       Сообщение в бот
                     </p>

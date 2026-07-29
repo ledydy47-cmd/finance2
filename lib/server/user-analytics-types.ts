@@ -5,6 +5,7 @@ export type AnalyticsEventType =
   | "onboarding_started"
   | "onboarding_completed"
   | "walkthrough_completed"
+  | "first_expense_added"
   | "paywall_shown"
   | "subscription_paid_monthly"
   | "subscription_paid_yearly"

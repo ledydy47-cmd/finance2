@@ -3,6 +3,7 @@
 import { Camera, X } from "lucide-react"
 import Image from "next/image"
 import { useState } from "react"
+import { ImagePickerTrigger, readFileAsDataUrl } from "@/components/ui/image-picker-trigger"
 import { useFinance } from "@/context/finance-context"
 import { parseAmount } from "@/lib/budget-planner"
 import { DEFAULT_GOAL_IMAGE } from "@/lib/setup-tour"
@@ -17,13 +18,8 @@ export function HomeGoalSetupSheet() {
   const canSave = name.trim().length > 0 && targetAmount > 0
   const hasCustomPhoto = image.startsWith("data:")
 
-  function handleImageUpload(file: File | undefined) {
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === "string") setImage(reader.result)
-    }
-    reader.readAsDataURL(file)
+  function handleImageUpload(file: File) {
+    void readFileAsDataUrl(file).then(setImage)
   }
 
   function handleSave() {
@@ -47,34 +43,30 @@ export function HomeGoalSetupSheet() {
           </button>
         </div>
 
-        <label className="relative mb-4 block h-36 overflow-hidden rounded-block-inner bg-secondary">
+        <div className="relative mb-4 h-36 overflow-hidden rounded-block-inner bg-secondary">
           {image.startsWith("data:") ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={image} alt="Фото цели" className="size-full object-cover" />
           ) : (
             <Image src={image} alt="Фото цели" fill className="object-cover" sizes="360px" />
           )}
-          <span
+          <ImagePickerTrigger
+            ariaLabel={hasCustomPhoto ? "Изменить фото" : "Добавить фото"}
             className={`absolute inset-0 flex flex-col items-center justify-center gap-2 ${
               hasCustomPhoto
                 ? "bg-gradient-to-t from-black/55 via-black/20 to-transparent"
                 : "bg-black/45"
             }`}
+            onPick={handleImageUpload}
           >
-            <span className="flex size-11 items-center justify-center rounded-full bg-white text-primary shadow-lg">
+            <span className="pointer-events-none flex size-11 items-center justify-center rounded-full bg-white text-primary shadow-lg">
               <Camera className="size-5" strokeWidth={2.4} />
             </span>
-            <span className="rounded-full bg-white px-4 py-1.5 text-sm font-bold text-foreground shadow-md">
+            <span className="pointer-events-none rounded-full bg-white px-4 py-1.5 text-sm font-bold text-foreground shadow-md">
               {hasCustomPhoto ? "Изменить фото" : "Добавить фото"}
             </span>
-          </span>
-          <input
-            type="file"
-            accept="image/*"
-            className="absolute inset-0 cursor-pointer opacity-0"
-            onChange={(e) => handleImageUpload(e.target.files?.[0])}
-          />
-        </label>
+          </ImagePickerTrigger>
+        </div>
 
         <input
           value={name}

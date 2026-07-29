@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Plus, Star, Trash2 } from "lucide-react"
 import { useFinance } from "@/context/finance-context"
 import { GoalCard } from "@/components/finance/goal-card"
+import { ImagePickerTrigger, readFileAsDataUrl } from "@/components/ui/image-picker-trigger"
 import { getActiveGoals, getCompletedGoals } from "@/lib/goals"
 
 export function GoalsScreen() {
@@ -35,13 +36,8 @@ export function GoalsScreen() {
     setShowGoalCreateForm(false)
   }
 
-  function handleImageUpload(file: File | undefined) {
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === "string") setImage(reader.result)
-    }
-    reader.readAsDataURL(file)
+  function handleImageUpload(file: File) {
+    void readFileAsDataUrl(file).then(setImage)
   }
 
   return (
@@ -68,15 +64,13 @@ export function GoalsScreen() {
               inputMode="numeric"
               className="mb-2 w-full rounded-block-sm border border-border bg-background px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
             />
-            <label className="mb-3 flex cursor-pointer items-center justify-center rounded-block-sm border border-dashed border-border py-6 text-xs font-semibold text-muted-foreground">
+            <ImagePickerTrigger
+              ariaLabel="Загрузить фото обложки"
+              className="mb-3 flex w-full cursor-pointer items-center justify-center rounded-block-sm border border-dashed border-border py-6 text-xs font-semibold text-muted-foreground"
+              onPick={handleImageUpload}
+            >
               Загрузить фото обложки
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleImageUpload(e.target.files?.[0])}
-              />
-            </label>
+            </ImagePickerTrigger>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -109,13 +103,9 @@ export function GoalsScreen() {
                   isPrimary={isPrimary}
                   onAdd={() => openAddToGoal(goal.id)}
                   onImageChange={(file) => {
-                    const reader = new FileReader()
-                    reader.onload = () => {
-                      if (typeof reader.result === "string") {
-                        updateGoal(goal.id, { image: reader.result })
-                      }
-                    }
-                    reader.readAsDataURL(file)
+                    void readFileAsDataUrl(file).then((dataUrl) => {
+                      updateGoal(goal.id, { image: dataUrl })
+                    })
                   }}
                 />
                 <div className="absolute right-3 top-3 flex gap-2">

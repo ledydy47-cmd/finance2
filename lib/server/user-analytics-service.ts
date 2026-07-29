@@ -86,6 +86,9 @@ function applyEvent(record: UserAnalyticsRecord, type: AnalyticsEventType, at: s
     case "walkthrough_completed":
       record.walkthroughCompletedAt ??= at
       break
+    case "first_expense_added":
+      record.firstExpenseAdded = true
+      break
     case "paywall_shown":
       record.paywallShownAt ??= at
       break
@@ -199,6 +202,32 @@ export function countNewUsersOnDate(users: UserAnalyticsRecord[], dateYmd: strin
   ).length
 }
 
+function countUsersWithEventOnDate(
+  users: UserAnalyticsRecord[],
+  eventType: AnalyticsEventType,
+  dateYmd: string,
+) {
+  return users.filter((user) =>
+    user.events.some(
+      (event) =>
+        event.type === eventType &&
+        formatDateInAnalyticsTimezone(new Date(event.at)) === dateYmd,
+    ),
+  ).length
+}
+
+function countUsersWithFirstExpenseOnDate(users: UserAnalyticsRecord[], dateYmd: string) {
+  const fromEvent = countUsersWithEventOnDate(users, "first_expense_added", dateYmd)
+  if (fromEvent > 0) return fromEvent
+
+  return users.filter(
+    (user) =>
+      hasAddedFirstExpense(user) &&
+      user.paywallShownAt &&
+      formatDateInAnalyticsTimezone(new Date(user.paywallShownAt)) === dateYmd,
+  ).length
+}
+
 export async function syncUserAppState(input: {
   userKey: string
   homeWalkthroughCompleted?: boolean
@@ -231,7 +260,9 @@ export async function syncUserAppState(input: {
       }
     }
 
-    if (input.firstExpenseAdded != null) {
+    if (input.firstExpenseAdded === true && !record.firstExpenseAdded) {
+      applyEvent(record, "first_expense_added", at)
+    } else if (input.firstExpenseAdded != null) {
       record.firstExpenseAdded = input.firstExpenseAdded
     }
 
@@ -246,21 +277,48 @@ export async function syncUserAppState(input: {
 export async function getAnalyticsSummary(dateYmd?: string | null) {
   const users = Object.values((await readAnalyticsStore()).users)
   const selectedDate = dateYmd ?? formatDateInAnalyticsTimezone(new Date())
+  const allTime = {
+    totalUsers: users.length,
+    appOpened: users.filter((u) => u.appOpenedAt).length,
+    onboardingStarted: users.filter((u) => u.onboardingStartedAt).length,
+    onboardingCompleted: users.filter((u) => u.onboardingCompletedAt).length,
+    walkthroughCompleted: users.filter((u) => hasCompletedWalkthrough(u)).length,
+    firstExpenseAdded: users.filter((u) => hasAddedFirstExpense(u)).length,
+    paywallShown: users.filter((u) => u.paywallShownAt).length,
+    subscribedMonthly: users.filter((u) => u.subscribedMonthlyAt).length,
+    subscribedYearly: users.filter((u) => u.subscribedYearlyAt).length,
+    autoRenewCanceled: users.filter((u) => u.autoRenewCanceledAt).length,
+  }
+
+  const daily = {
+    newUsers: countNewUsersOnDate(users, selectedDate),
+    appOpened: countUsersWithEventOnDate(users, "app_opened", selectedDate),
+    onboardingStarted: countUsersWithEventOnDate(users, "onboarding_started", selectedDate),
+    onboardingCompleted: countUsersWithEventOnDate(users, "onboarding_completed", selectedDate),
+    walkthroughCompleted: countUsersWithEventOnDate(users, "walkthrough_completed", selectedDate),
+    firstExpenseAdded: countUsersWithFirstExpenseOnDate(users, selectedDate),
+    paywallShown: countUsersWithEventOnDate(users, "paywall_shown", selectedDate),
+    subscribedMonthly: countUsersWithEventOnDate(users, "subscription_paid_monthly", selectedDate),
+    subscribedYearly: countUsersWithEventOnDate(users, "subscription_paid_yearly", selectedDate),
+    autoRenewCanceled: countUsersWithEventOnDate(users, "auto_renew_canceled", selectedDate),
+  }
 
   return {
-    totalUsers: users.length,
-    totalAppOpened: users.filter((u) => u.appOpenedAt).length,
-    totalOnboardingStarted: users.filter((u) => u.onboardingStartedAt).length,
-    totalOnboardingCompleted: users.filter((u) => u.onboardingCompletedAt).length,
-    totalWalkthroughCompleted: users.filter((u) => hasCompletedWalkthrough(u)).length,
-    totalFirstExpenseAdded: users.filter((u) => hasAddedFirstExpense(u)).length,
-    totalPaywallShown: users.filter((u) => u.paywallShownAt).length,
-    totalSubscribedMonthly: users.filter((u) => u.subscribedMonthlyAt).length,
-    totalSubscribedYearly: users.filter((u) => u.subscribedYearlyAt).length,
-    totalAutoRenewCanceled: users.filter((u) => u.autoRenewCanceledAt).length,
-    newUsersOnDate: countNewUsersOnDate(users, selectedDate),
     selectedDate,
     analyticsTimezone: ANALYTICS_TIMEZONE,
+    daily,
+    allTime,
+    totalUsers: allTime.totalUsers,
+    totalAppOpened: allTime.appOpened,
+    totalOnboardingStarted: allTime.onboardingStarted,
+    totalOnboardingCompleted: allTime.onboardingCompleted,
+    totalWalkthroughCompleted: allTime.walkthroughCompleted,
+    totalFirstExpenseAdded: allTime.firstExpenseAdded,
+    totalPaywallShown: allTime.paywallShown,
+    totalSubscribedMonthly: allTime.subscribedMonthly,
+    totalSubscribedYearly: allTime.subscribedYearly,
+    totalAutoRenewCanceled: allTime.autoRenewCanceled,
+    newUsersOnDate: daily.newUsers,
   }
 }
 

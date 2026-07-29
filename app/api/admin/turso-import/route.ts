@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server"
+import {
+  readBundledAnalyticsStore,
+  readBundledCampaignStore,
+  readBundledSubscriptionStore,
+  readBundledSupportStore,
+  readBundledTelegramUsers,
+} from "@/lib/db/bundled-data"
 import { getDb, hasTursoConfig } from "@/lib/db/client"
 import { initTursoSchema } from "@/lib/db/init"
 import {
@@ -15,11 +22,19 @@ import {
   userAnalytics,
 } from "@/lib/db/schema"
 import { isAdminSupportAuthorized } from "@/lib/server/admin-auth"
-import { readAnalyticsStore, readCampaignStore } from "@/lib/server/user-analytics-store"
-import { readSubscriptionStore } from "@/lib/server/subscription-store"
-import { readSupportStore } from "@/lib/server/support-store"
 
-export const maxDuration = 120
+export const maxDuration = 300
+
+async function upsertInBatches<T>(
+  items: T[],
+  write: (item: T) => Promise<unknown>,
+  batchSize = 50,
+) {
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batch = items.slice(index, index + batchSize)
+    await Promise.all(batch.map((item) => write(item)))
+  }
+}
 
 export async function POST(request: Request) {
   if (!isAdminSupportAuthorized(request)) {
@@ -34,46 +49,44 @@ export async function POST(request: Request) {
     await initTursoSchema()
     const db = getDb()
 
-    const analytics = await readAnalyticsStore()
-    const analyticsUsers = Object.values(analytics.users)
-    for (const record of analyticsUsers) {
-      await db
+    const analyticsUsers = Object.values((await readBundledAnalyticsStore()).users)
+    const subscriptionRecords = Object.values((await readBundledSubscriptionStore()).records)
+    const tickets = Object.values((await readBundledSupportStore()).tickets)
+    const telegramUserRecords = await readBundledTelegramUsers()
+    const campaigns = Object.values((await readBundledCampaignStore()).campaigns)
+
+    await upsertInBatches(analyticsUsers, (record) =>
+      db
         .insert(userAnalytics)
         .values(userAnalyticsToRow(record))
         .onConflictDoUpdate({
           target: userAnalytics.userKey,
           set: userAnalyticsToRow(record),
-        })
-    }
+        }),
+    )
 
-    const subscriptionsSnapshot = await readSubscriptionStore()
-    const subscriptionRecords = Object.values(subscriptionsSnapshot.records)
-    for (const record of subscriptionRecords) {
-      await db
+    await upsertInBatches(subscriptionRecords, (record) =>
+      db
         .insert(subscriptions)
         .values(subscriptionToRow(record))
         .onConflictDoUpdate({
           target: subscriptions.userKey,
           set: subscriptionToRow(record),
-        })
-    }
+        }),
+    )
 
-    const supportSnapshot = await readSupportStore()
-    const tickets = Object.values(supportSnapshot.tickets)
-    for (const ticket of tickets) {
-      await db
+    await upsertInBatches(tickets, (ticket) =>
+      db
         .insert(supportTickets)
         .values(supportTicketToRow(ticket))
         .onConflictDoUpdate({
           target: supportTickets.id,
           set: supportTicketToRow(ticket),
-        })
-    }
+        }),
+    )
 
-    const { listRegisteredTelegramUsers } = await import("@/lib/server/telegram-users")
-    const telegramUserRecords = await listRegisteredTelegramUsers()
-    for (const record of telegramUserRecords) {
-      await db
+    await upsertInBatches(telegramUserRecords, (record) =>
+      db
         .insert(telegramUsers)
         .values({
           userKey: record.userKey,
@@ -90,20 +103,18 @@ export async function POST(request: Request) {
             firstName: record.firstName,
             updatedAt: record.updatedAt,
           },
-        })
-    }
+        }),
+    )
 
-    const campaignsSnapshot = await readCampaignStore()
-    const campaigns = Object.values(campaignsSnapshot.campaigns)
-    for (const campaign of campaigns) {
-      await db
+    await upsertInBatches(campaigns, (campaign) =>
+      db
         .insert(messageCampaigns)
         .values(messageCampaignToRow(campaign))
         .onConflictDoUpdate({
           target: messageCampaigns.id,
           set: messageCampaignToRow(campaign),
-        })
-    }
+        }),
+    )
 
     return NextResponse.json({
       ok: true,

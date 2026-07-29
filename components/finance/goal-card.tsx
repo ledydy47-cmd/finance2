@@ -1,5 +1,6 @@
 import Image from "next/image"
 import { Camera, Plus } from "lucide-react"
+import { ImagePickerTrigger } from "@/components/ui/image-picker-trigger"
 
 interface GoalCardProps {
   name: string
@@ -47,7 +48,7 @@ export function GoalCard({
         )}
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-foreground/25 to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-foreground/25 to-transparent"
         />
         {isPrimary && !completed && (
           <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground">
@@ -59,19 +60,14 @@ export function GoalCard({
             Достигнута ✨
           </span>
         )}
-        {!completed && (
-        <label className="absolute bottom-3 right-3 flex size-9 cursor-pointer items-center justify-center rounded-full bg-card/85 text-foreground/80 shadow-sm backdrop-blur-sm transition-transform active:scale-95">
+        {!completed && onImageChange && (
+        <ImagePickerTrigger
+          ariaLabel="Изменить фото цели"
+          className="absolute bottom-3 right-3 flex size-9 cursor-pointer items-center justify-center rounded-full bg-card/85 text-foreground/80 shadow-sm backdrop-blur-sm transition-transform active:scale-95"
+          onPick={onImageChange}
+        >
           <Camera className="size-4" strokeWidth={2.2} />
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file && onImageChange) onImageChange(file)
-            }}
-          />
-        </label>
+        </ImagePickerTrigger>
         )}
       </div>
 
