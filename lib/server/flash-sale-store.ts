@@ -1,9 +1,11 @@
-import { kvRestDel, kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { hasKvRestConfig, kvRestDel, kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
 import {
   FLASH_SALE_DURATION_MS,
   FLASH_SALE_REMINDER_DELAY_MS,
 } from "@/lib/paywall-experiment"
 
+const FILE_NAME = "flash-sales.json"
 const flashSaleKey = (userKey: string) => `kopilka:flash-sale:${userKey}`
 const REMINDERS_KEY = "kopilka:flash-sale-reminders"
 
@@ -14,18 +16,60 @@ export interface FlashSaleReminderRecord {
   sent: boolean
 }
 
+interface FlashSaleStoreSnapshot {
+  startedAtByUserKey: Record<string, string>
+  reminders: FlashSaleReminderRecord[]
+}
+
+const EMPTY_STORE: FlashSaleStoreSnapshot = {
+  startedAtByUserKey: {},
+  reminders: [],
+}
+
+async function readFileStore() {
+  return readJsonDataFile(FILE_NAME, EMPTY_STORE)
+}
+
+async function writeFileStore(snapshot: FlashSaleStoreSnapshot) {
+  await writeJsonDataFile(FILE_NAME, snapshot)
+}
+
 export async function setFlashSaleStartedAt(userKey: string, startedAt: string) {
-  return kvRestSet(flashSaleKey(userKey), startedAt)
+  if (hasKvRestConfig()) {
+    const wrote = await kvRestSet(flashSaleKey(userKey), startedAt)
+    if (wrote) {
+      const store = await readFileStore()
+      store.startedAtByUserKey[userKey] = startedAt
+      await writeFileStore(store)
+      return true
+    }
+  }
+
+  const store = await readFileStore()
+  store.startedAtByUserKey[userKey] = startedAt
+  await writeFileStore(store)
+  return true
 }
 
 export async function getFlashSaleStartedAt(userKey: string) {
-  return kvRestGet(flashSaleKey(userKey))
+  if (hasKvRestConfig()) {
+    const fromKv = await kvRestGet(flashSaleKey(userKey))
+    if (fromKv) return fromKv
+  }
+
+  const store = await readFileStore()
+  return store.startedAtByUserKey[userKey] ?? null
 }
 
 export async function clearFlashSaleStartedAt(userKey: string) {
-  const deleted = await kvRestDel(flashSaleKey(userKey))
-  if (deleted) return true
-  return kvRestSet(flashSaleKey(userKey), "")
+  if (hasKvRestConfig()) {
+    await kvRestDel(flashSaleKey(userKey))
+  }
+
+  const store = await readFileStore()
+  delete store.startedAtByUserKey[userKey]
+  await writeFileStore(store)
+  return true
 }
 
 export function isFlashSaleExpired(
@@ -58,11 +102,30 @@ export async function resolveFlashSaleStartedAt(userKey: string, clientStartedAt
 }
 
 export async function readFlashSaleReminders() {
-  return kvRestGetJson<FlashSaleReminderRecord[]>(REMINDERS_KEY, [])
+  if (hasKvRestConfig()) {
+    const fromKv = await kvRestGetJson<FlashSaleReminderRecord[]>(REMINDERS_KEY, null)
+    if (fromKv) return fromKv
+  }
+
+  const store = await readFileStore()
+  return store.reminders
 }
 
 export async function writeFlashSaleReminders(reminders: FlashSaleReminderRecord[]) {
-  return kvRestSet(REMINDERS_KEY, JSON.stringify(reminders))
+  if (hasKvRestConfig()) {
+    const wrote = await kvRestSet(REMINDERS_KEY, JSON.stringify(reminders))
+    if (wrote) {
+      const store = await readFileStore()
+      store.reminders = reminders
+      await writeFileStore(store)
+      return true
+    }
+  }
+
+  const store = await readFileStore()
+  store.reminders = reminders
+  await writeFileStore(store)
+  return true
 }
 
 export async function scheduleFlashSaleReminder(

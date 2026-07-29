@@ -185,7 +185,13 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
       const response = await fetch("/api/payments/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, userKey, orderId }),
+        body: JSON.stringify({
+          plan,
+          userKey,
+          orderId,
+          paywallFlashSaleStartedAt: data.settings.paywallFlashSaleStartedAt,
+          flashSaleDurationMs: data.settings.flashSaleDurationMs,
+        }),
       })
 
       const payload = await response.json()

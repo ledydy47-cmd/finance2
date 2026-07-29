@@ -22,6 +22,8 @@ export async function POST(request: Request) {
       plan?: SubscriptionPlan
       userKey?: string
       orderId?: string
+      paywallFlashSaleStartedAt?: string | null
+      flashSaleDurationMs?: number | null
     }
 
     if (body.plan !== "yearly" && body.plan !== "monthly") {
@@ -49,6 +51,8 @@ export async function POST(request: Request) {
     const pricing = await resolveServerPaywallPricing({
       userKey,
       plan: body.plan,
+      paywallFlashSaleStartedAt: body.paywallFlashSaleStartedAt,
+      flashSaleDurationMs: body.flashSaleDurationMs,
     })
     const returnUrl = `${getAppBaseUrl()}/payment/success?orderId=${encodeURIComponent(orderId)}`
 
