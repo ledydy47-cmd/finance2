@@ -1,6 +1,5 @@
-import fs from "fs/promises"
-import path from "path"
 import { hasKvRestConfig, kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
 import type {
   MessageCampaignStoreSnapshot,
   UserAnalyticsRecord,
@@ -9,25 +8,11 @@ import type {
 
 const LEGACY_ANALYTICS_KEY = "kopilka:user-analytics"
 const CAMPAIGNS_KEY = "kopilka:message-campaigns"
-const ANALYTICS_FILE = path.join(process.cwd(), "data", "user-analytics.json")
-const CAMPAIGNS_FILE = path.join(process.cwd(), "data", "message-campaigns.json")
+const ANALYTICS_FILE = "user-analytics.json"
+const CAMPAIGNS_FILE = "message-campaigns.json"
 
 const EMPTY_ANALYTICS: UserAnalyticsStoreSnapshot = { users: {} }
 const EMPTY_CAMPAIGNS: MessageCampaignStoreSnapshot = { campaigns: {} }
-
-async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
-  try {
-    const raw = await fs.readFile(filePath, "utf8")
-    return JSON.parse(raw) as T
-  } catch {
-    return fallback
-  }
-}
-
-async function writeJsonFile(filePath: string, value: unknown) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.writeFile(filePath, JSON.stringify(value), "utf8")
-}
 
 async function readLegacyAnalyticsSnapshot(): Promise<UserAnalyticsStoreSnapshot | null> {
   if (hasKvRestConfig()) {
@@ -41,7 +26,7 @@ async function readLegacyAnalyticsSnapshot(): Promise<UserAnalyticsStoreSnapshot
     }
   }
 
-  const fromFile = await readJsonFile(ANALYTICS_FILE, null as UserAnalyticsStoreSnapshot | null)
+  const fromFile = await readJsonDataFile(ANALYTICS_FILE, null as UserAnalyticsStoreSnapshot | null)
   if (fromFile?.users && Object.keys(fromFile.users).length > 0) {
     return fromFile
   }
@@ -56,7 +41,7 @@ async function writeLegacyAnalyticsSnapshot(snapshot: UserAnalyticsStoreSnapshot
     console.error("[user-analytics-store] KV write failed, falling back to file")
   }
 
-  await writeJsonFile(ANALYTICS_FILE, snapshot)
+  await writeJsonDataFile(ANALYTICS_FILE, snapshot)
 }
 
 export async function readAnalyticsStore(): Promise<UserAnalyticsStoreSnapshot> {
@@ -89,7 +74,7 @@ export async function readCampaignStore(): Promise<MessageCampaignStoreSnapshot>
     const fromKv = await kvRestGetJson(CAMPAIGNS_KEY, null)
     if (fromKv) return fromKv
   }
-  return readJsonFile(CAMPAIGNS_FILE, EMPTY_CAMPAIGNS)
+  return readJsonDataFile(CAMPAIGNS_FILE, EMPTY_CAMPAIGNS)
 }
 
 export async function writeCampaignStore(snapshot: MessageCampaignStoreSnapshot) {
@@ -98,5 +83,5 @@ export async function writeCampaignStore(snapshot: MessageCampaignStoreSnapshot)
     const wrote = await kvRestSet(CAMPAIGNS_KEY, payload)
     if (wrote) return
   }
-  await writeJsonFile(CAMPAIGNS_FILE, snapshot)
+  await writeJsonDataFile(CAMPAIGNS_FILE, snapshot)
 }

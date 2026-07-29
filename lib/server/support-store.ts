@@ -1,27 +1,17 @@
-import fs from "fs/promises"
-import path from "path"
 import { hasKvRestConfig, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
 import type { SupportStoreSnapshot, SupportTicket } from "@/lib/server/support-types"
 
 const STORE_KEY = "kopilka:support-tickets"
-const FILE_PATH = path.join(process.cwd(), "data", "support-tickets.json")
+const FILE_NAME = "support-tickets.json"
 const EMPTY_STORE: SupportStoreSnapshot = { tickets: {} }
-
-async function readFromFile(): Promise<SupportStoreSnapshot> {
-  try {
-    const raw = await fs.readFile(FILE_PATH, "utf8")
-    return JSON.parse(raw) as SupportStoreSnapshot
-  } catch {
-    return EMPTY_STORE
-  }
-}
 
 export async function readSupportStore(): Promise<SupportStoreSnapshot> {
   if (hasKvRestConfig()) {
     const fromKv = await kvRestGetJson(STORE_KEY, null)
     if (fromKv) return fromKv
   }
-  return readFromFile()
+  return readJsonDataFile(FILE_NAME, EMPTY_STORE)
 }
 
 export async function writeSupportStore(snapshot: SupportStoreSnapshot) {
@@ -32,8 +22,7 @@ export async function writeSupportStore(snapshot: SupportStoreSnapshot) {
     console.error("[support-store] KV write failed, falling back to file")
   }
 
-  await fs.mkdir(path.dirname(FILE_PATH), { recursive: true })
-  await fs.writeFile(FILE_PATH, payload, "utf8")
+  await writeJsonDataFile(FILE_NAME, snapshot)
 }
 
 export async function listSupportTickets() {

@@ -1,9 +1,8 @@
-import fs from "fs/promises"
-import path from "path"
 import { hasKvRestConfig, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
 
 const USERS_KEY = "kopilka:telegram-users"
-const FILE_PATH = path.join(process.cwd(), "data", "telegram-users.json")
+const FILE_NAME = "telegram-users.json"
 
 export interface TelegramUserRecord {
   telegramUserId: number
@@ -27,8 +26,7 @@ async function readUsers(): Promise<TelegramUsersSnapshot> {
   }
 
   try {
-    const raw = await fs.readFile(FILE_PATH, "utf8")
-    return JSON.parse(raw) as TelegramUsersSnapshot
+    return await readJsonDataFile(FILE_NAME, EMPTY_USERS)
   } catch {
     return EMPTY_USERS
   }
@@ -42,8 +40,7 @@ async function writeUsers(snapshot: TelegramUsersSnapshot) {
     console.error("[telegram-users] KV write failed, falling back to file")
   }
 
-  await fs.mkdir(path.dirname(FILE_PATH), { recursive: true })
-  await fs.writeFile(FILE_PATH, payload, "utf8")
+  await writeJsonDataFile(FILE_NAME, snapshot)
 }
 
 export async function registerTelegramUser(input: {
