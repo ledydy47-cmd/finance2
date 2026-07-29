@@ -143,14 +143,20 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
     const query = statsDate ? `?date=${encodeURIComponent(statsDate)}` : ""
     const response = await fetch(`/api/admin/analytics/summary${query}`, { headers: authHeaders() })
     const data = await response.json()
-    if (response.ok) setSummary(data.summary)
+    if (!response.ok) {
+      throw new Error(data.error ?? "SUMMARY_FAILED")
+    }
+    setSummary(data.summary)
   }, [authHeaders, statsDate])
 
   const loadUsers = useCallback(async () => {
     const query = userFilter === "all" ? "" : `?filter=${userFilter}`
     const response = await fetch(`/api/admin/analytics/users${query}`, { headers: authHeaders() })
     const data = await response.json()
-    if (response.ok) setUsers(data.users ?? [])
+    if (!response.ok) {
+      throw new Error(data.error ?? "LIST_FAILED")
+    }
+    setUsers(data.users ?? [])
   }, [authHeaders, userFilter])
 
   const loadCampaigns = useCallback(async () => {
@@ -162,7 +168,10 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const loadTickets = useCallback(async () => {
     const response = await fetch("/api/admin/support/tickets", { headers: authHeaders() })
     const data = await response.json()
-    if (response.ok) setTickets(data.tickets ?? [])
+    if (!response.ok) {
+      throw new Error(data.error ?? "TICKETS_FAILED")
+    }
+    setTickets(data.tickets ?? [])
   }, [authHeaders])
 
   const refresh = useCallback(async () => {
@@ -171,12 +180,23 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
     setError(null)
     try {
       await Promise.all([loadSummary(), loadUsers(), loadCampaigns(), loadTickets()])
-    } catch {
-      setError("Не удалось загрузить данные")
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? `Не удалось загрузить данные: ${loadError.message}`
+          : "Не удалось загрузить данные",
+      )
     } finally {
       setLoading(false)
     }
   }, [adminKey, loadSummary, loadUsers, loadCampaigns, loadTickets])
+
+  function switchTab(nextTab: TabId) {
+    setTab(nextTab)
+    const params = new URLSearchParams(window.location.search)
+    params.set("tab", nextTab)
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`)
+  }
 
   useEffect(() => {
     if (!adminKey) return
@@ -344,19 +364,23 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const statCards = summary
     ? [
         {
-          label: `Новых за ${formatSelectedDate(String(summary.selectedDate ?? statsDate))}`,
-          value: summary.newUsersOnDate ?? 0,
+          label: "Всего пользователей",
+          value: summary.totalUsers ?? 0,
           highlight: true,
         },
-        { label: "Открыли приложение", value: summary.totalAppOpened },
-        { label: "Нажали «Начать»", value: summary.totalOnboardingStarted },
-        { label: "Закончили онбординг", value: summary.totalOnboardingCompleted },
-        { label: "Прошли обучение", value: summary.totalWalkthroughCompleted },
-        { label: "Добавили расход", value: summary.totalFirstExpenseAdded },
-        { label: "Увидели paywall", value: summary.totalPaywallShown },
-        { label: "Оплатили месяц", value: summary.totalSubscribedMonthly },
-        { label: "Оплатили год", value: summary.totalSubscribedYearly },
-        { label: "Отключили автопродление", value: summary.totalAutoRenewCanceled },
+        {
+          label: `Новых за ${formatSelectedDate(String(summary.selectedDate ?? statsDate))}`,
+          value: summary.newUsersOnDate ?? 0,
+        },
+        { label: "Открыли приложение (всего)", value: summary.totalAppOpened },
+        { label: "Нажали «Начать» (всего)", value: summary.totalOnboardingStarted },
+        { label: "Закончили онбординг (всего)", value: summary.totalOnboardingCompleted },
+        { label: "Прошли обучение (всего)", value: summary.totalWalkthroughCompleted },
+        { label: "Добавили расход (всего)", value: summary.totalFirstExpenseAdded },
+        { label: "Увидели paywall (всего)", value: summary.totalPaywallShown },
+        { label: "Оплатили месяц (всего)", value: summary.totalSubscribedMonthly },
+        { label: "Оплатили год (всего)", value: summary.totalSubscribedYearly },
+        { label: "Отключили автопродление (всего)", value: summary.totalAutoRenewCanceled },
       ]
     : []
 
@@ -390,7 +414,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => switchTab(id)}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 tab === id ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"
               }`}
@@ -407,7 +431,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
             <div className="mb-4 flex flex-wrap items-end gap-3 rounded-block border border-border bg-card p-4">
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold text-muted-foreground">
-                  Новые пользователи за день (МСК)
+                  Дата для подсчёта новых пользователей (МСК)
                 </span>
                 <input
                   type="date"
@@ -417,7 +441,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                 />
               </label>
               <p className="text-sm text-muted-foreground">
-                Считаются те, кто впервые открыл приложение в выбранный день
+                Карточки ниже — накопительные totals по всей базе, кроме «Новых за …»
               </p>
             </div>
 
@@ -465,8 +489,9 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
               </div>
 
               <p className="mb-2 text-xs text-muted-foreground">
-                Колонка «Расход» — пользователь добавил хотя бы одну трату. Пролистайте таблицу вправо на
-                узком экране.
+                Показано {users.length} пользователей
+                {userFilter !== "all" ? ` · фильтр: ${userFilter}` : ""}. Колонка «Расход» — хотя бы
+                одна трата. Пролистайте таблицу вправо на узком экране.
               </p>
 
               <div className="overflow-x-auto rounded-block border border-border bg-card">

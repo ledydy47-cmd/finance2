@@ -32,8 +32,8 @@ function formatRubAmount(value: string) {
 
 async function formatPaymentUserLabel(userKey: string) {
   const telegramUserId = parseTelegramUserId(userKey)
-  const { readAnalyticsStore } = await import("@/lib/server/user-analytics-store")
-  const analyticsUser = (await readAnalyticsStore()).users[userKey]
+  const { getUserAnalyticsRecord } = await import("@/lib/server/user-analytics-store")
+  const analyticsUser = await getUserAnalyticsRecord(userKey)
 
   const parts = [
     analyticsUser?.userName?.trim() || null,

@@ -7,7 +7,7 @@ import {
   WALKTHROUGH_RESET_PATCH,
 } from "@/lib/server/app-reset"
 import { adminUpdateSubscription } from "@/lib/server/subscription-service"
-import { readAnalyticsStore, writeAnalyticsStore } from "@/lib/server/user-analytics-store"
+import { getUserAnalyticsRecord, updateUserAnalyticsRecord } from "@/lib/server/user-analytics-store"
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -78,34 +78,35 @@ export async function POST(request: Request) {
       // ignore subscription reset errors
     }
 
-    const analytics = await readAnalyticsStore()
-    const record = analytics.users[userKey]
-    if (record) {
-      if (resetToOnboarding) {
-        record.onboardingStartedAt = null
-        record.onboardingCompletedAt = null
-      }
-      record.walkthroughCompletedAt = null
-      record.homeWalkthroughCompleted = false
-      record.firstExpenseAdded = false
-      record.paywallShownAt = null
-      record.subscribedMonthlyAt = null
-      record.subscribedYearlyAt = null
-      record.autoRenewCanceledAt = null
-      record.subscriptionPlan = "none"
-      record.events = record.events.filter(
-        (event) =>
-          (resetToOnboarding
-            ? event.type !== "onboarding_started" && event.type !== "onboarding_completed"
-            : true) &&
-          event.type !== "walkthrough_completed" &&
-          event.type !== "paywall_shown" &&
-          event.type !== "subscription_paid_monthly" &&
-          event.type !== "subscription_paid_yearly" &&
-          event.type !== "auto_renew_canceled",
-      )
-      analytics.users[userKey] = record
-      await writeAnalyticsStore(analytics)
+    const existing = await getUserAnalyticsRecord(userKey)
+    if (existing) {
+      await updateUserAnalyticsRecord(userKey, (record) => {
+        if (!record) return existing
+        if (resetToOnboarding) {
+          record.onboardingStartedAt = null
+          record.onboardingCompletedAt = null
+        }
+        record.walkthroughCompletedAt = null
+        record.homeWalkthroughCompleted = false
+        record.firstExpenseAdded = false
+        record.paywallShownAt = null
+        record.subscribedMonthlyAt = null
+        record.subscribedYearlyAt = null
+        record.autoRenewCanceledAt = null
+        record.subscriptionPlan = "none"
+        record.events = record.events.filter(
+          (event) =>
+            (resetToOnboarding
+              ? event.type !== "onboarding_started" && event.type !== "onboarding_completed"
+              : true) &&
+            event.type !== "walkthrough_completed" &&
+            event.type !== "paywall_shown" &&
+            event.type !== "subscription_paid_monthly" &&
+            event.type !== "subscription_paid_yearly" &&
+            event.type !== "auto_renew_canceled",
+        )
+        return record
+      })
     }
 
     return NextResponse.json({ ok: true, userKey, reset })

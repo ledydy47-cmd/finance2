@@ -4,9 +4,10 @@ import { getSubscriptionByUserKey } from "@/lib/server/subscription-store"
 import { isSubscriptionActive } from "@/lib/subscription"
 import { sendTelegramNotification } from "@/lib/server/telegram-notify"
 import {
+  getUserAnalyticsRecord,
   readAnalyticsStore,
   readCampaignStore,
-  writeAnalyticsStore,
+  updateUserAnalyticsRecord,
   writeCampaignStore,
 } from "@/lib/server/user-analytics-store"
 import type {
@@ -68,8 +69,8 @@ function applyEvent(record: UserAnalyticsRecord, type: AnalyticsEventType, at: s
   if (shouldSkipDuplicateEvent(record, type, at)) return
 
   record.events.push({ type, at })
-  if (record.events.length > 100) {
-    record.events = record.events.slice(-100)
+  if (record.events.length > 25) {
+    record.events = record.events.slice(-25)
   }
 
   switch (type) {
@@ -110,20 +111,20 @@ export async function recordAnalyticsEvent(input: {
   userName?: string | null
   age?: number | null
 }) {
-  const store = await readAnalyticsStore()
   const at = nowIso()
-  const existing = store.users[input.userKey] ?? createEmptyUser(input)
 
-  if (input.telegramUserId) existing.telegramUserId = input.telegramUserId
-  if (input.telegramUsername) existing.telegramUsername = input.telegramUsername
-  if (input.userName) existing.userName = input.userName
-  if (input.age != null) existing.age = input.age
-  existing.lastVisitAt = at
+  return updateUserAnalyticsRecord(input.userKey, (existing) => {
+    const record = existing ?? createEmptyUser(input)
 
-  applyEvent(existing, input.event, at)
-  store.users[input.userKey] = existing
-  await writeAnalyticsStore(store)
-  return existing
+    if (input.telegramUserId) record.telegramUserId = input.telegramUserId
+    if (input.telegramUsername) record.telegramUsername = input.telegramUsername
+    if (input.userName) record.userName = input.userName
+    if (input.age != null) record.age = input.age
+    record.lastVisitAt = at
+
+    applyEvent(record, input.event, at)
+    return record
+  })
 }
 
 export async function ensureAnalyticsUser(input: {
@@ -133,44 +134,42 @@ export async function ensureAnalyticsUser(input: {
   userName?: string | null
   age?: number | null
 }) {
-  const store = await readAnalyticsStore()
   const at = nowIso()
-  const existing = store.users[input.userKey]
 
-  if (existing) {
-    if (input.telegramUserId) existing.telegramUserId = input.telegramUserId
-    if (input.telegramUsername) existing.telegramUsername = input.telegramUsername
-    if (input.userName) existing.userName = input.userName
-    if (input.age != null) existing.age = input.age
-    existing.lastVisitAt = at
-    store.users[input.userKey] = existing
-    await writeAnalyticsStore(store)
-    return existing
-  }
+  return updateUserAnalyticsRecord(input.userKey, (existing) => {
+    if (existing) {
+      if (input.telegramUserId) existing.telegramUserId = input.telegramUserId
+      if (input.telegramUsername) existing.telegramUsername = input.telegramUsername
+      if (input.userName) existing.userName = input.userName
+      if (input.age != null) existing.age = input.age
+      existing.lastVisitAt = at
+      return existing
+    }
 
-  const created = createEmptyUser(input)
-  created.appOpenedAt = at
-  store.users[input.userKey] = created
-  await writeAnalyticsStore(store)
-  return created
+    const created = createEmptyUser(input)
+    created.appOpenedAt = at
+    return created
+  })
 }
 
 export async function syncUserSubscriptionPlan(userKey: string) {
   const subscription = await getSubscriptionByUserKey(userKey)
   if (!subscription || !isSubscriptionActive(subscription.currentPeriodEnd)) return
 
-  const store = await readAnalyticsStore()
-  const record = store.users[userKey]
-  if (!record) return
+  const existing = await getUserAnalyticsRecord(userKey)
+  if (!existing) return
 
-  record.subscriptionPlan = planToFilter(subscription.subscriptionType)
-  if (subscription.subscriptionType === "monthly" && !record.subscribedMonthlyAt) {
-    record.subscribedMonthlyAt = subscription.updatedAt
-  }
-  if (subscription.subscriptionType === "yearly" && !record.subscribedYearlyAt) {
-    record.subscribedYearlyAt = subscription.updatedAt
-  }
-  await writeAnalyticsStore(store)
+  await updateUserAnalyticsRecord(userKey, (record) => {
+    if (!record) return existing
+    record.subscriptionPlan = planToFilter(subscription.subscriptionType)
+    if (subscription.subscriptionType === "monthly" && !record.subscribedMonthlyAt) {
+      record.subscribedMonthlyAt = subscription.updatedAt
+    }
+    if (subscription.subscriptionType === "yearly" && !record.subscribedYearlyAt) {
+      record.subscribedYearlyAt = subscription.updatedAt
+    }
+    return record
+  })
 }
 
 export function hasCompletedWalkthrough(user: UserAnalyticsRecord) {
@@ -209,41 +208,39 @@ export async function syncUserAppState(input: {
   userName?: string | null
   age?: number | null
 }) {
-  const store = await readAnalyticsStore()
   const at = nowIso()
-  const existing =
-    store.users[input.userKey] ??
-    createEmptyUser({ userKey: input.userKey, userName: input.userName, age: input.age })
 
-  if (input.userName) existing.userName = input.userName
-  if (input.age != null) existing.age = input.age
-  existing.lastVisitAt = at
+  return updateUserAnalyticsRecord(input.userKey, (existing) => {
+    const record =
+      existing ??
+      createEmptyUser({ userKey: input.userKey, userName: input.userName, age: input.age })
 
-  if (input.onboardingCompleted === true && !existing.onboardingCompletedAt) {
-    applyEvent(existing, "onboarding_completed", at)
-  }
+    if (input.userName) record.userName = input.userName
+    if (input.age != null) record.age = input.age
+    record.lastVisitAt = at
 
-  if (input.homeWalkthroughCompleted != null) {
-    existing.homeWalkthroughCompleted = input.homeWalkthroughCompleted
+    if (input.onboardingCompleted === true && !record.onboardingCompletedAt) {
+      applyEvent(record, "onboarding_completed", at)
+    }
 
-    if (input.homeWalkthroughCompleted) {
-      if (!existing.walkthroughCompletedAt) {
-        applyEvent(existing, "walkthrough_completed", at)
+    if (input.homeWalkthroughCompleted != null) {
+      record.homeWalkthroughCompleted = input.homeWalkthroughCompleted
+
+      if (input.homeWalkthroughCompleted && !record.walkthroughCompletedAt) {
+        applyEvent(record, "walkthrough_completed", at)
       }
     }
-  }
 
-  if (input.firstExpenseAdded != null) {
-    existing.firstExpenseAdded = input.firstExpenseAdded
-  }
+    if (input.firstExpenseAdded != null) {
+      record.firstExpenseAdded = input.firstExpenseAdded
+    }
 
-  if (input.paywallShown === true && !existing.paywallShownAt) {
-    applyEvent(existing, "paywall_shown", at)
-  }
+    if (input.paywallShown === true && !record.paywallShownAt) {
+      applyEvent(record, "paywall_shown", at)
+    }
 
-  store.users[input.userKey] = existing
-  await writeAnalyticsStore(store)
-  return existing
+    return record
+  })
 }
 
 export async function getAnalyticsSummary(dateYmd?: string | null) {
@@ -251,6 +248,7 @@ export async function getAnalyticsSummary(dateYmd?: string | null) {
   const selectedDate = dateYmd ?? formatDateInAnalyticsTimezone(new Date())
 
   return {
+    totalUsers: users.length,
     totalAppOpened: users.filter((u) => u.appOpenedAt).length,
     totalOnboardingStarted: users.filter((u) => u.onboardingStartedAt).length,
     totalOnboardingCompleted: users.filter((u) => u.onboardingCompletedAt).length,
@@ -281,12 +279,20 @@ function matchesCampaignFilter(user: UserAnalyticsRecord, filter: MessageCampaig
   return user.subscriptionPlan === filter
 }
 
+function toAdminListUser(user: UserAnalyticsRecord): UserAnalyticsRecord {
+  return {
+    ...user,
+    events: user.events.slice(-15),
+  }
+}
+
 export async function listAnalyticsUsers(filter?: UserSubscriptionFilter) {
   const users = Object.values((await readAnalyticsStore()).users).sort(
     (a, b) => new Date(b.lastVisitAt).getTime() - new Date(a.lastVisitAt).getTime(),
   )
-  if (!filter) return users
-  return users.filter((user) => matchesFilter(user, filter))
+  const mapped = users.map(toAdminListUser)
+  if (!filter) return mapped
+  return mapped.filter((user) => matchesFilter(user, filter))
 }
 
 export function formatMessageWithName(userName: string | null, message: string) {
