@@ -3,6 +3,8 @@ import { isAdminSupportAuthorized } from "@/lib/server/admin-auth"
 import { listAnalyticsUsers } from "@/lib/server/user-analytics-service"
 import type { UserSubscriptionFilter } from "@/lib/server/user-analytics-types"
 
+export const maxDuration = 60
+
 export async function GET(request: Request) {
   if (!isAdminSupportAuthorized(request)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 })

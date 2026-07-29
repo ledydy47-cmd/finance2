@@ -12,12 +12,11 @@ import {
 import type { SupportStoreSnapshot, SupportTicket } from "@/lib/server/support-types"
 
 const LEGACY_STORE_KEY = "kopilka:support-tickets"
-const SUPPORT_MIGRATED_KEY = "kopilka:support:v2-migrated"
 const TICKET_INDEX_KEY = "kopilka:support:ticket-index"
 const TICKET_RECORD_PREFIX = "kopilka:support:ticket:"
 const FILE_PATH = path.join(process.cwd(), "data", "support-tickets.json")
 const EMPTY_STORE: SupportStoreSnapshot = { tickets: {} }
-const MGET_BATCH_SIZE = 100
+const MGET_BATCH_SIZE = 25
 
 function ticketRecordKey(ticketId: string) {
   return `${TICKET_RECORD_PREFIX}${ticketId}`
@@ -60,47 +59,53 @@ async function saveSupportTicketRecord(ticket: SupportTicket) {
   await kvRestSadd(TICKET_INDEX_KEY, ticket.id)
 }
 
-export async function ensureSupportMigrated() {
-  if (!hasKvRestConfig()) return
-
-  const migrated = await kvRestGetJson<boolean>(SUPPORT_MIGRATED_KEY, false)
-  if (migrated) return
-
-  const legacy = await readLegacySupportSnapshot()
-  if (legacy?.tickets) {
-    for (const ticket of Object.values(legacy.tickets)) {
-      await saveSupportTicketRecord(ticket)
-    }
-  }
-
-  await kvRestSet(SUPPORT_MIGRATED_KEY, "true")
+function isSupportFullyMigrated(indexCount: number, legacyCount: number) {
+  if (legacyCount === 0) return indexCount > 0
+  return indexCount >= legacyCount * 0.95
 }
 
-async function readSupportStore(): Promise<SupportStoreSnapshot> {
-  await ensureSupportMigrated()
-
-  if (!hasKvRestConfig()) {
-    return readFromFile()
-  }
-
-  const ticketIds = await kvRestSmembers(TICKET_INDEX_KEY)
-  if (ticketIds.length === 0) {
-    return EMPTY_STORE
-  }
-
-  const tickets: Record<string, SupportTicket> = {}
+async function loadShardedTickets(
+  ticketIds: string[],
+  legacy: SupportStoreSnapshot | null,
+): Promise<Record<string, SupportTicket>> {
+  const tickets: Record<string, SupportTicket> = { ...(legacy?.tickets ?? {}) }
 
   for (let offset = 0; offset < ticketIds.length; offset += MGET_BATCH_SIZE) {
     const chunk = ticketIds.slice(offset, offset + MGET_BATCH_SIZE)
     const records = await kvRestMget<SupportTicket>(chunk.map(ticketRecordKey))
     chunk.forEach((ticketId, index) => {
-      const ticket = records[index]
+      const ticket = records[index] ?? legacy?.tickets[ticketId]
       if (ticket) {
         tickets[ticketId] = ticket
       }
     })
   }
 
+  return tickets
+}
+
+async function readSupportStore(): Promise<SupportStoreSnapshot> {
+  if (!hasKvRestConfig()) {
+    return readFromFile()
+  }
+
+  const legacy = await readLegacySupportSnapshot()
+  const legacyCount = legacy?.tickets ? Object.keys(legacy.tickets).length : 0
+  const ticketIds = await kvRestSmembers(TICKET_INDEX_KEY)
+
+  if (ticketIds.length === 0) {
+    return legacy ?? EMPTY_STORE
+  }
+
+  if (legacyCount > 0 && !isSupportFullyMigrated(ticketIds.length, legacyCount)) {
+    const tickets = await loadShardedTickets(ticketIds, legacy)
+    if (Object.keys(tickets).length >= legacyCount) {
+      return { tickets }
+    }
+    return legacy
+  }
+
+  const tickets = await loadShardedTickets(ticketIds, legacy)
   return { tickets }
 }
 
@@ -126,17 +131,16 @@ export async function listSupportTickets() {
 }
 
 export async function getSupportTicket(id: string) {
-  await ensureSupportMigrated()
   if (hasKvRestConfig()) {
-    return kvRestGetJson<SupportTicket | null>(ticketRecordKey(id), null)
+    const fromShard = await kvRestGetJson<SupportTicket | null>(ticketRecordKey(id), null)
+    if (fromShard) return fromShard
   }
 
-  const store = await readFromFile()
-  return store.tickets[id] ?? null
+  const legacy = await readLegacySupportSnapshot()
+  return legacy?.tickets[id] ?? null
 }
 
 export async function upsertSupportTicket(ticket: SupportTicket) {
-  await ensureSupportMigrated()
   if (hasKvRestConfig()) {
     await saveSupportTicketRecord(ticket)
     return ticket
