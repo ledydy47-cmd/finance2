@@ -1,8 +1,8 @@
 import {
   kvRestGet,
   kvRestGetJson,
+  kvRestSadd,
   kvRestSet,
-  kvRestSetWithIndex,
   kvRestSmembers,
 } from "@/lib/server/kv-rest"
 
@@ -41,14 +41,15 @@ async function readTelegramUserRecord(userKey: string) {
 }
 
 async function saveTelegramUserRecord(record: TelegramUserRecord) {
-  const wrote = await kvRestSetWithIndex({
-    recordKey: userRecordKey(record.userKey),
-    value: JSON.stringify(record),
-    indexKey: USER_INDEX_KEY,
-    indexMember: record.userKey,
-  })
-  if (!wrote) {
+  const recordKey = userRecordKey(record.userKey)
+  const setOk = await kvRestSet(recordKey, JSON.stringify(record))
+  if (!setOk) {
     throw new Error(`TELEGRAM_USER_WRITE_FAILED:${record.userKey}`)
+  }
+
+  const indexOk = await kvRestSadd(USER_INDEX_KEY, record.userKey)
+  if (!indexOk) {
+    console.error("[telegram-users] index add failed", record.userKey)
   }
 
   if (record.username) {

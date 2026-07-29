@@ -67,7 +67,10 @@ async function kvRestCommand(command: string[], retries = 3): Promise<KvCommandR
   return { ok: false, error: "RETRIES_EXHAUSTED" }
 }
 
-async function kvRestPipeline(commands: string[][], retries = 3): Promise<KvCommandResult> {
+export async function kvRestPipeline(
+  commands: string[][],
+  retries = 3,
+): Promise<{ ok: true; result: unknown } | { ok: false; error: string }> {
   const config = kvConfig()
   if (!config) return { ok: false, error: "NO_CONFIG" }
 
@@ -122,8 +125,40 @@ export async function kvRestGet(key: string, retries = 3): Promise<string | null
 }
 
 export async function kvRestSet(key: string, value: string, retries = 3): Promise<boolean> {
-  const result = await kvRestCommand(["SET", key, value], retries)
-  return result.ok
+  const commandResult = await kvRestCommand(["SET", key, value], retries)
+  if (commandResult.ok) return true
+
+  const config = kvConfig()
+  if (!config) return false
+
+  for (let attempt = 0; attempt < retries; attempt += 1) {
+    try {
+      const response = await fetch(`${config.url}/set/${encodeURIComponent(key)}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${config.token}` },
+        body: value,
+        cache: "no-store",
+      })
+
+      if (response.ok) return true
+      if (attempt < retries - 1) {
+        await sleep(100 * (attempt + 1))
+        continue
+      }
+      const raw = await response.text().catch(() => "")
+      console.error("[kv-rest] SET failed", key, response.status, raw, "commandError:", commandResult.error)
+      return false
+    } catch (error) {
+      if (attempt < retries - 1) {
+        await sleep(100 * (attempt + 1))
+        continue
+      }
+      console.error("[kv-rest] SET error", key, error)
+      return false
+    }
+  }
+
+  return false
 }
 
 export async function kvRestDel(key: string): Promise<boolean> {

@@ -5,8 +5,8 @@ import {
   kvRestGet,
   kvRestGetJson,
   kvRestMget,
+  kvRestSadd,
   kvRestSet,
-  kvRestSetWithIndex,
   kvRestSmembers,
 } from "@/lib/server/kv-rest"
 import type {
@@ -78,14 +78,17 @@ async function readLegacyAnalyticsSnapshot(): Promise<UserAnalyticsStoreSnapshot
 }
 
 async function saveUserAnalyticsRecord(record: UserAnalyticsRecord) {
-  const wrote = await kvRestSetWithIndex({
-    recordKey: userRecordKey(record.userKey),
-    value: JSON.stringify(record),
-    indexKey: USER_INDEX_KEY,
-    indexMember: record.userKey,
-  })
-  if (!wrote) {
+  const recordKey = userRecordKey(record.userKey)
+  const payload = JSON.stringify(record)
+
+  const setOk = await kvRestSet(recordKey, payload)
+  if (!setOk) {
     throw new Error(`ANALYTICS_USER_WRITE_FAILED:${record.userKey}`)
+  }
+
+  const indexOk = await kvRestSadd(USER_INDEX_KEY, record.userKey)
+  if (!indexOk) {
+    console.error("[user-analytics-store] index add failed", record.userKey)
   }
 }
 
