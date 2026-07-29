@@ -5,8 +5,8 @@ import {
   kvRestGet,
   kvRestGetJson,
   kvRestMget,
-  kvRestSadd,
   kvRestSet,
+  kvRestSetWithIndex,
   kvRestSmembers,
 } from "@/lib/server/kv-rest"
 import type {
@@ -16,16 +16,18 @@ import type {
 } from "@/lib/server/user-analytics-types"
 
 const LEGACY_ANALYTICS_KEY = "kopilka:user-analytics"
-const ANALYTICS_MIGRATED_KEY = "kopilka:analytics:v2-migrated"
 const USER_INDEX_KEY = "kopilka:analytics:user-index"
 const USER_RECORD_PREFIX = "kopilka:analytics:user:"
 const CAMPAIGNS_KEY = "kopilka:message-campaigns"
 const ANALYTICS_FILE = path.join(process.cwd(), "data", "user-analytics.json")
 const CAMPAIGNS_FILE = path.join(process.cwd(), "data", "message-campaigns.json")
 const MGET_BATCH_SIZE = 25
+const LEGACY_CACHE_MS = 30_000
 
 const EMPTY_ANALYTICS: UserAnalyticsStoreSnapshot = { users: {} }
 const EMPTY_CAMPAIGNS: MessageCampaignStoreSnapshot = { campaigns: {} }
+
+let legacyCache: { at: number; snapshot: UserAnalyticsStoreSnapshot | null } | null = null
 
 function userRecordKey(userKey: string) {
   return `${USER_RECORD_PREFIX}${userKey}`
@@ -46,36 +48,45 @@ async function writeJsonFile(filePath: string, value: unknown) {
 }
 
 async function readLegacyAnalyticsSnapshot(): Promise<UserAnalyticsStoreSnapshot | null> {
+  const now = Date.now()
+  if (legacyCache && now - legacyCache.at < LEGACY_CACHE_MS) {
+    return legacyCache.snapshot
+  }
+
+  let snapshot: UserAnalyticsStoreSnapshot | null = null
+
   if (hasKvRestConfig()) {
     const raw = await kvRestGet(LEGACY_ANALYTICS_KEY, 5)
     if (raw) {
       try {
-        return JSON.parse(raw) as UserAnalyticsStoreSnapshot
+        snapshot = JSON.parse(raw) as UserAnalyticsStoreSnapshot
       } catch (error) {
         console.error("[user-analytics-store] invalid legacy KV payload", error)
       }
     }
   }
 
-  const fromFile = await readJsonFile(ANALYTICS_FILE, null as UserAnalyticsStoreSnapshot | null)
-  if (fromFile?.users && Object.keys(fromFile.users).length > 0) {
-    return fromFile
+  if (!snapshot) {
+    const fromFile = await readJsonFile(ANALYTICS_FILE, null as UserAnalyticsStoreSnapshot | null)
+    if (fromFile?.users && Object.keys(fromFile.users).length > 0) {
+      snapshot = fromFile
+    }
   }
 
-  return null
+  legacyCache = { at: now, snapshot }
+  return snapshot
 }
 
 async function saveUserAnalyticsRecord(record: UserAnalyticsRecord) {
-  const wrote = await kvRestSet(userRecordKey(record.userKey), JSON.stringify(record))
+  const wrote = await kvRestSetWithIndex({
+    recordKey: userRecordKey(record.userKey),
+    value: JSON.stringify(record),
+    indexKey: USER_INDEX_KEY,
+    indexMember: record.userKey,
+  })
   if (!wrote) {
     throw new Error(`ANALYTICS_USER_WRITE_FAILED:${record.userKey}`)
   }
-  await kvRestSadd(USER_INDEX_KEY, record.userKey)
-}
-
-function isAnalyticsFullyMigrated(indexCount: number, legacyCount: number) {
-  if (legacyCount === 0) return indexCount > 0
-  return indexCount >= legacyCount * 0.95
 }
 
 async function loadShardedUsers(
@@ -104,22 +115,15 @@ export async function readAnalyticsStore(): Promise<UserAnalyticsStoreSnapshot> 
   }
 
   const legacy = await readLegacyAnalyticsSnapshot()
-  const legacyCount = legacy?.users ? Object.keys(legacy.users).length : 0
+  const legacyUsers = legacy?.users ?? {}
   const indexed = await kvRestSmembers(USER_INDEX_KEY)
+  const allKeys = Array.from(new Set([...Object.keys(legacyUsers), ...indexed]))
 
-  if (indexed.length === 0) {
+  if (allKeys.length === 0) {
     return legacy ?? EMPTY_ANALYTICS
   }
 
-  if (legacyCount > 0 && !isAnalyticsFullyMigrated(indexed.length, legacyCount)) {
-    const users = await loadShardedUsers(indexed, legacy)
-    if (Object.keys(users).length >= legacyCount) {
-      return { users }
-    }
-    return legacy
-  }
-
-  const users = await loadShardedUsers(indexed, legacy)
+  const users = await loadShardedUsers(allKeys, legacy)
   return { users }
 }
 

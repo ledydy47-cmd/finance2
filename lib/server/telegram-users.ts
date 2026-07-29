@@ -1,6 +1,15 @@
-import { kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import {
+  kvRestGet,
+  kvRestGetJson,
+  kvRestSet,
+  kvRestSetWithIndex,
+  kvRestSmembers,
+} from "@/lib/server/kv-rest"
 
-const USERS_KEY = "kopilka:telegram-users"
+const LEGACY_USERS_KEY = "kopilka:telegram-users"
+const USER_RECORD_PREFIX = "kopilka:telegram-user:"
+const USER_INDEX_KEY = "kopilka:telegram-user-index"
+const USERNAME_PREFIX = "kopilka:telegram-username:"
 
 export interface TelegramUserRecord {
   telegramUserId: number
@@ -15,17 +24,38 @@ interface TelegramUsersSnapshot {
   byUsername: Record<string, string>
 }
 
-const EMPTY_USERS: TelegramUsersSnapshot = { byUserKey: {}, byUsername: {} }
-
-async function readUsers(): Promise<TelegramUsersSnapshot> {
-  const fromKv = await kvRestGetJson(USERS_KEY, null)
-  return fromKv ?? EMPTY_USERS
+function userRecordKey(userKey: string) {
+  return `${USER_RECORD_PREFIX}${userKey}`
 }
 
-async function writeUsers(snapshot: TelegramUsersSnapshot) {
-  const wrote = await kvRestSet(USERS_KEY, JSON.stringify(snapshot))
+function usernameLookupKey(username: string) {
+  return `${USERNAME_PREFIX}${username}`
+}
+
+async function readLegacyUsersSnapshot(): Promise<TelegramUsersSnapshot | null> {
+  return kvRestGetJson<TelegramUsersSnapshot | null>(LEGACY_USERS_KEY, null)
+}
+
+async function readTelegramUserRecord(userKey: string) {
+  return kvRestGetJson<TelegramUserRecord | null>(userRecordKey(userKey), null)
+}
+
+async function saveTelegramUserRecord(record: TelegramUserRecord) {
+  const wrote = await kvRestSetWithIndex({
+    recordKey: userRecordKey(record.userKey),
+    value: JSON.stringify(record),
+    indexKey: USER_INDEX_KEY,
+    indexMember: record.userKey,
+  })
   if (!wrote) {
-    throw new Error("Failed to write telegram users store")
+    throw new Error(`TELEGRAM_USER_WRITE_FAILED:${record.userKey}`)
+  }
+
+  if (record.username) {
+    const usernameWrote = await kvRestSet(usernameLookupKey(record.username), record.userKey)
+    if (!usernameWrote) {
+      console.error("[telegram-users] username index write failed", record.username)
+    }
   }
 }
 
@@ -35,7 +65,6 @@ export async function registerTelegramUser(input: {
   firstName?: string | null
 }) {
   const userKey = `tg-${input.telegramUserId}`
-  const snapshot = await readUsers()
   const username = input.username?.replace(/^@/, "").toLowerCase() || null
 
   const record: TelegramUserRecord = {
@@ -46,24 +75,36 @@ export async function registerTelegramUser(input: {
     updatedAt: new Date().toISOString(),
   }
 
-  snapshot.byUserKey[userKey] = record
-  if (username) {
-    snapshot.byUsername[username] = userKey
-  }
-
-  await writeUsers(snapshot)
+  await saveTelegramUserRecord(record)
   return record
 }
 
 export async function findTelegramUserByUsername(username: string) {
   const normalized = username.replace(/^@/, "").toLowerCase()
-  const snapshot = await readUsers()
-  const userKey = snapshot.byUsername[normalized]
-  if (!userKey) return null
-  return snapshot.byUserKey[userKey] ?? null
+  const userKey = await kvRestGet(usernameLookupKey(normalized))
+  if (userKey) {
+    return readTelegramUserRecord(userKey)
+  }
+
+  const legacy = await readLegacyUsersSnapshot()
+  const legacyUserKey = legacy?.byUsername[normalized]
+  if (!legacyUserKey) return null
+  return legacy?.byUserKey[legacyUserKey] ?? readTelegramUserRecord(legacyUserKey)
 }
 
 export async function listRegisteredTelegramUsers() {
-  const snapshot = await readUsers()
-  return Object.values(snapshot.byUserKey)
+  const indexed = await kvRestSmembers(USER_INDEX_KEY)
+  const legacy = await readLegacyUsersSnapshot()
+  const allKeys = Array.from(
+    new Set([...Object.keys(legacy?.byUserKey ?? {}), ...indexed]),
+  )
+
+  const records: TelegramUserRecord[] = []
+  for (const userKey of allKeys) {
+    const fromShard = await readTelegramUserRecord(userKey)
+    const record = fromShard ?? legacy?.byUserKey[userKey]
+    if (record) records.push(record)
+  }
+
+  return records
 }
