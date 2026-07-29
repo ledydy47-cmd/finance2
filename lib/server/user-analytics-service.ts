@@ -52,7 +52,21 @@ function createEmptyUser(input: {
   }
 }
 
+function shouldSkipDuplicateEvent(
+  record: UserAnalyticsRecord,
+  type: AnalyticsEventType,
+  at: string,
+) {
+  const last = record.events.at(-1)
+  if (!last || last.type !== type) return false
+
+  const gapMs = new Date(at).getTime() - new Date(last.at).getTime()
+  return gapMs >= 0 && gapMs < 30_000
+}
+
 function applyEvent(record: UserAnalyticsRecord, type: AnalyticsEventType, at: string) {
+  if (shouldSkipDuplicateEvent(record, type, at)) return
+
   record.events.push({ type, at })
   if (record.events.length > 100) {
     record.events = record.events.slice(-100)
@@ -136,7 +150,6 @@ export async function ensureAnalyticsUser(input: {
 
   const created = createEmptyUser(input)
   created.appOpenedAt = at
-  created.events.push({ type: "app_opened", at })
   store.users[input.userKey] = created
   await writeAnalyticsStore(store)
   return created

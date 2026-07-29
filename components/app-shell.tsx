@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { BottomNav } from "@/components/finance/bottom-nav"
 import { HomeWalkthrough } from "@/components/home-walkthrough/home-walkthrough"
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow"
@@ -71,8 +71,15 @@ export function AppShell() {
     return () => document.documentElement.classList.remove("telegram-mini-app")
   }, [isTelegram])
 
+  const appOpenHandledForUserId = useRef<number | null>(null)
+
   useEffect(() => {
-    if (!user?.id) return
+    if (!user?.id) {
+      appOpenHandledForUserId.current = null
+      return
+    }
+    if (appOpenHandledForUserId.current === user.id) return
+    appOpenHandledForUserId.current = user.id
 
     void (async () => {
       const userKey = getClientUserKey(user.id)
@@ -106,15 +113,8 @@ export function AppShell() {
         body: JSON.stringify({ userKey }),
       })
     })()
-  }, [
-    user?.id,
-    user?.username,
-    user?.first_name,
-    confirmPendingPayment,
-    syncSubscriptionFromServer,
-    syncFlashSaleFromServer,
-    activatePendingFlashSaleOffer,
-  ])
+    // Run once per Telegram user per app session — callback identity changes after sync.
+  }, [user?.id, user?.username, user?.first_name, confirmPendingPayment, syncSubscriptionFromServer, syncFlashSaleFromServer, activatePendingFlashSaleOffer])
 
   useEffect(() => {
     if (!user?.id) return
