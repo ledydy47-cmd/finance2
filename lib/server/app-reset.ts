@@ -1,6 +1,12 @@
+import { eq } from "drizzle-orm"
 import type { AppData, Settings } from "@/lib/types"
+import { getDb, hasTursoConfig } from "@/lib/db/client"
+import { initTursoSchema } from "@/lib/db/init"
+import { appResets } from "@/lib/db/schema"
+import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
 import { kvRestGet, kvRestSet } from "@/lib/server/kv-rest"
 
+const FILE_NAME = "app-resets.json"
 const resetKey = (userKey: string) => `kopilka:app-reset:${userKey}`
 
 export interface AppResetPayload {
@@ -9,6 +15,21 @@ export interface AppResetPayload {
   settingsPatch: Partial<Settings>
   clearExpenseTransactions: boolean
   resetToOnboarding?: boolean
+}
+
+interface AppResetSnapshot {
+  byUserKey: Record<string, AppResetPayload>
+}
+
+const EMPTY_SNAPSHOT: AppResetSnapshot = { byUserKey: {} }
+
+let schemaReady = false
+
+async function ensureTursoSchema() {
+  if (!schemaReady) {
+    await initTursoSchema()
+    schemaReady = true
+  }
 }
 
 export async function queueAppReset(input: {
@@ -25,17 +46,53 @@ export async function queueAppReset(input: {
     resetToOnboarding: input.resetToOnboarding ?? false,
   }
 
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    await getDb()
+      .insert(appResets)
+      .values({
+        userKey: input.userKey,
+        payloadJson: JSON.stringify(payload),
+      })
+      .onConflictDoUpdate({
+        target: appResets.userKey,
+        set: { payloadJson: JSON.stringify(payload) },
+      })
+    return payload
+  }
+
   const wrote = await kvRestSet(resetKey(input.userKey), JSON.stringify(payload))
   if (!wrote) {
-    throw new Error("Failed to queue app reset")
+    const snapshot = await readJsonDataFile(FILE_NAME, EMPTY_SNAPSHOT)
+    snapshot.byUserKey[input.userKey] = payload
+    await writeJsonDataFile(FILE_NAME, snapshot)
   }
 
   return payload
 }
 
 export async function consumeAppReset(userKey: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    const row = await getDb().select().from(appResets).where(eq(appResets.userKey, userKey)).get()
+    if (!row) return null
+    await getDb().delete(appResets).where(eq(appResets.userKey, userKey))
+    try {
+      return JSON.parse(row.payloadJson) as AppResetPayload
+    } catch {
+      return null
+    }
+  }
+
   const raw = await kvRestGet(resetKey(userKey))
-  if (!raw) return null
+  if (!raw) {
+    const snapshot = await readJsonDataFile(FILE_NAME, EMPTY_SNAPSHOT)
+    const payload = snapshot.byUserKey[userKey]
+    if (!payload) return null
+    delete snapshot.byUserKey[userKey]
+    await writeJsonDataFile(FILE_NAME, snapshot)
+    return payload
+  }
 
   await kvRestSet(resetKey(userKey), "")
 

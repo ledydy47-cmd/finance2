@@ -1,5 +1,10 @@
-import { hasKvRestConfig, kvRestDel, kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { and, eq } from "drizzle-orm"
+import { getDb, hasTursoConfig } from "@/lib/db/client"
+import { initTursoSchema } from "@/lib/db/init"
+import { flashSaleReminderFromRow } from "@/lib/db/mappers"
+import { flashSaleReminders, flashSales } from "@/lib/db/schema"
 import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
+import { hasKvRestConfig, kvRestDel, kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
 import {
   FLASH_SALE_DURATION_MS,
   FLASH_SALE_REMINDER_DELAY_MS,
@@ -26,6 +31,15 @@ const EMPTY_STORE: FlashSaleStoreSnapshot = {
   reminders: [],
 }
 
+let schemaReady = false
+
+async function ensureTursoSchema() {
+  if (!schemaReady) {
+    await initTursoSchema()
+    schemaReady = true
+  }
+}
+
 async function readFileStore() {
   return readJsonDataFile(FILE_NAME, EMPTY_STORE)
 }
@@ -35,6 +49,18 @@ async function writeFileStore(snapshot: FlashSaleStoreSnapshot) {
 }
 
 export async function setFlashSaleStartedAt(userKey: string, startedAt: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    await getDb()
+      .insert(flashSales)
+      .values({ userKey, startedAt })
+      .onConflictDoUpdate({
+        target: flashSales.userKey,
+        set: { startedAt },
+      })
+    return true
+  }
+
   if (hasKvRestConfig()) {
     const wrote = await kvRestSet(flashSaleKey(userKey), startedAt)
     if (wrote) {
@@ -52,6 +78,12 @@ export async function setFlashSaleStartedAt(userKey: string, startedAt: string) 
 }
 
 export async function getFlashSaleStartedAt(userKey: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    const row = await getDb().select().from(flashSales).where(eq(flashSales.userKey, userKey)).get()
+    return row?.startedAt ?? null
+  }
+
   if (hasKvRestConfig()) {
     const fromKv = await kvRestGet(flashSaleKey(userKey))
     if (fromKv) return fromKv
@@ -62,6 +94,12 @@ export async function getFlashSaleStartedAt(userKey: string) {
 }
 
 export async function clearFlashSaleStartedAt(userKey: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    await getDb().delete(flashSales).where(eq(flashSales.userKey, userKey))
+    return true
+  }
+
   if (hasKvRestConfig()) {
     await kvRestDel(flashSaleKey(userKey))
   }
@@ -102,6 +140,12 @@ export async function resolveFlashSaleStartedAt(userKey: string, clientStartedAt
 }
 
 export async function readFlashSaleReminders() {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    const rows = await getDb().select().from(flashSaleReminders)
+    return rows.map(flashSaleReminderFromRow)
+  }
+
   if (hasKvRestConfig()) {
     const fromKv = await kvRestGetJson<FlashSaleReminderRecord[]>(REMINDERS_KEY, null)
     if (fromKv) return fromKv
@@ -112,6 +156,23 @@ export async function readFlashSaleReminders() {
 }
 
 export async function writeFlashSaleReminders(reminders: FlashSaleReminderRecord[]) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    const db = getDb()
+    await db.delete(flashSaleReminders)
+    if (reminders.length > 0) {
+      await db.insert(flashSaleReminders).values(
+        reminders.map((item) => ({
+          userKey: item.userKey,
+          startedAt: item.startedAt,
+          remindAt: item.remindAt,
+          sent: item.sent,
+        })),
+      )
+    }
+    return true
+  }
+
   if (hasKvRestConfig()) {
     const wrote = await kvRestSet(REMINDERS_KEY, JSON.stringify(reminders))
     if (wrote) {
@@ -137,7 +198,6 @@ export async function scheduleFlashSaleReminder(
   if (Number.isNaN(startedMs)) return false
 
   const remindAt = new Date(startedMs + reminderDelayMs).toISOString()
-
   const reminders = await readFlashSaleReminders()
   const alreadyScheduled = reminders.some(
     (item) => item.userKey === userKey && item.startedAt === startedAt && !item.sent,
@@ -149,10 +209,30 @@ export async function scheduleFlashSaleReminder(
     { userKey, startedAt, remindAt, sent: false },
   ]
 
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    await getDb()
+      .delete(flashSaleReminders)
+      .where(and(eq(flashSaleReminders.userKey, userKey), eq(flashSaleReminders.sent, false)))
+    await getDb().insert(flashSaleReminders).values({
+      userKey,
+      startedAt,
+      remindAt,
+      sent: false,
+    })
+    return true
+  }
+
   return writeFlashSaleReminders(next)
 }
 
 export async function clearFlashSaleReminder(userKey: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    await getDb().delete(flashSaleReminders).where(eq(flashSaleReminders.userKey, userKey))
+    return true
+  }
+
   const reminders = await readFlashSaleReminders()
   const next = reminders.filter((item) => item.userKey !== userKey)
   if (next.length === reminders.length) return true

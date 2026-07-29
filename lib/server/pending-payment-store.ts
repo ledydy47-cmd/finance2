@@ -1,5 +1,10 @@
-import { hasKvRestConfig, kvRestDel, kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
+import { eq } from "drizzle-orm"
+import { getDb, hasTursoConfig } from "@/lib/db/client"
+import { initTursoSchema } from "@/lib/db/init"
+import { pendingPaymentToRecord } from "@/lib/db/mappers"
+import { pendingPayments } from "@/lib/db/schema"
 import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
+import { hasKvRestConfig, kvRestDel, kvRestGet, kvRestGetJson, kvRestSet } from "@/lib/server/kv-rest"
 import type { SubscriptionPlan } from "@/lib/subscription"
 
 const FILE_NAME = "pending-payments.json"
@@ -28,6 +33,15 @@ const EMPTY_STORE: PendingPaymentStoreSnapshot = {
   paymentOwners: {},
 }
 
+let schemaReady = false
+
+async function ensureTursoSchema() {
+  if (!schemaReady) {
+    await initTursoSchema()
+    schemaReady = true
+  }
+}
+
 async function readFileStore() {
   return readJsonDataFile(FILE_NAME, EMPTY_STORE)
 }
@@ -54,6 +68,29 @@ function removeFromSnapshot(
 }
 
 export async function savePendingPayment(record: PendingPaymentRecord) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    await getDb()
+      .insert(pendingPayments)
+      .values({
+        userKey: record.userKey,
+        paymentId: record.paymentId,
+        orderId: record.orderId,
+        plan: record.plan,
+        createdAt: record.createdAt,
+      })
+      .onConflictDoUpdate({
+        target: pendingPayments.userKey,
+        set: {
+          paymentId: record.paymentId,
+          orderId: record.orderId,
+          plan: record.plan,
+          createdAt: record.createdAt,
+        },
+      })
+    return record
+  }
+
   if (hasKvRestConfig()) {
     await kvRestSet(pendingKey(record.userKey), JSON.stringify(record))
     await kvRestSet(orderKey(record.orderId), JSON.stringify(record))
@@ -67,6 +104,16 @@ export async function savePendingPayment(record: PendingPaymentRecord) {
 }
 
 export async function getPendingPaymentByOrderId(orderId: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    const row = await getDb()
+      .select()
+      .from(pendingPayments)
+      .where(eq(pendingPayments.orderId, orderId))
+      .get()
+    return row ? pendingPaymentToRecord(row) : null
+  }
+
   if (hasKvRestConfig()) {
     const fromKv = await kvRestGetJson<PendingPaymentRecord | null>(orderKey(orderId), null)
     if (fromKv) return fromKv
@@ -77,6 +124,16 @@ export async function getPendingPaymentByOrderId(orderId: string) {
 }
 
 export async function getPendingPayment(userKey: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    const row = await getDb()
+      .select()
+      .from(pendingPayments)
+      .where(eq(pendingPayments.userKey, userKey))
+      .get()
+    return row ? pendingPaymentToRecord(row) : null
+  }
+
   if (hasKvRestConfig()) {
     const fromKv = await kvRestGetJson<PendingPaymentRecord | null>(pendingKey(userKey), null)
     if (fromKv) return fromKv
@@ -87,6 +144,16 @@ export async function getPendingPayment(userKey: string) {
 }
 
 export async function getPendingPaymentOwner(paymentId: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    const row = await getDb()
+      .select()
+      .from(pendingPayments)
+      .where(eq(pendingPayments.paymentId, paymentId))
+      .get()
+    return row?.userKey ?? null
+  }
+
   if (hasKvRestConfig()) {
     const fromKv = await kvRestGet(paymentOwnerKey(paymentId))
     if (fromKv) return fromKv
@@ -100,6 +167,12 @@ export async function clearPendingPayment(userKey: string, paymentId?: string) {
   const pending = await getPendingPayment(userKey)
   const resolvedPaymentId = paymentId ?? pending?.paymentId
   const resolvedOrderId = pending?.orderId
+
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    await getDb().delete(pendingPayments).where(eq(pendingPayments.userKey, userKey))
+    return
+  }
 
   if (hasKvRestConfig()) {
     await kvRestDel(pendingKey(userKey))
