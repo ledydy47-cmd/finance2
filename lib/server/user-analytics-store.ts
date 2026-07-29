@@ -77,7 +77,7 @@ async function readLegacyAnalyticsSnapshot(): Promise<UserAnalyticsStoreSnapshot
   return snapshot
 }
 
-async function saveUserAnalyticsRecord(record: UserAnalyticsRecord) {
+async function saveUserAnalyticsRecord(record: UserAnalyticsRecord, isNewUser: boolean) {
   const recordKey = userRecordKey(record.userKey)
   const payload = JSON.stringify(record)
 
@@ -86,9 +86,27 @@ async function saveUserAnalyticsRecord(record: UserAnalyticsRecord) {
     throw new Error(`ANALYTICS_USER_WRITE_FAILED:${record.userKey}`)
   }
 
-  const indexOk = await kvRestSadd(USER_INDEX_KEY, record.userKey)
-  if (!indexOk) {
-    console.error("[user-analytics-store] index add failed", record.userKey)
+  void kvRestSadd(USER_INDEX_KEY, record.userKey)
+
+  if (isNewUser) {
+    await patchLegacyWithUser(record)
+  }
+}
+
+async function patchLegacyWithUser(record: UserAnalyticsRecord) {
+  const legacy = await readLegacyAnalyticsSnapshot()
+  if (legacy?.users[record.userKey]) return
+
+  const updated: UserAnalyticsStoreSnapshot = {
+    users: {
+      ...(legacy?.users ?? {}),
+      [record.userKey]: record,
+    },
+  }
+
+  const wrote = await kvRestSet(LEGACY_ANALYTICS_KEY, JSON.stringify(updated))
+  if (wrote) {
+    legacyCache = { at: Date.now(), snapshot: updated }
   }
 }
 
@@ -120,13 +138,17 @@ export async function readAnalyticsStore(): Promise<UserAnalyticsStoreSnapshot> 
   const legacy = await readLegacyAnalyticsSnapshot()
   const legacyUsers = legacy?.users ?? {}
   const indexed = await kvRestSmembers(USER_INDEX_KEY)
-  const allKeys = Array.from(new Set([...Object.keys(legacyUsers), ...indexed]))
+  const indexOnlyKeys = indexed.filter((userKey) => !legacyUsers[userKey])
 
-  if (allKeys.length === 0) {
+  if (Object.keys(legacyUsers).length === 0 && indexOnlyKeys.length === 0) {
+    return EMPTY_ANALYTICS
+  }
+
+  if (indexOnlyKeys.length === 0) {
     return legacy ?? EMPTY_ANALYTICS
   }
 
-  const users = await loadShardedUsers(allKeys, legacy)
+  const users = await loadShardedUsers(indexOnlyKeys, legacy)
   return { users }
 }
 
@@ -145,10 +167,11 @@ export async function updateUserAnalyticsRecord(
   mutator: (existing: UserAnalyticsRecord | null) => UserAnalyticsRecord,
 ) {
   const existing = await getUserAnalyticsRecord(userKey)
+  const isNewUser = !existing
   const record = mutator(existing)
 
   if (hasKvRestConfig()) {
-    await saveUserAnalyticsRecord(record)
+    await saveUserAnalyticsRecord(record, isNewUser)
     return record
   }
 
@@ -170,7 +193,7 @@ export async function writeAnalyticsStore(snapshot: UserAnalyticsStoreSnapshot) 
   }
 
   for (const record of Object.values(snapshot.users)) {
-    await saveUserAnalyticsRecord(record)
+    await saveUserAnalyticsRecord(record, false)
   }
 }
 

@@ -6,7 +6,6 @@ import {
   kvRestGet,
   kvRestPipeline,
   kvRestSet,
-  kvRestType,
 } from "@/lib/server/kv-rest"
 
 export const maxDuration = 30
@@ -22,15 +21,13 @@ export async function GET(request: Request) {
 
   const probeKey = "kopilka:kv-probe"
   const probeValue = `probe-${Date.now()}`
-  const indexKey = "kopilka:analytics:user-index"
 
   const setResult = await kvRestSet(probeKey, probeValue)
   const getResult = await kvRestGet(probeKey)
   const pipelineResult = await kvRestPipeline([
     ["SET", `${probeKey}:pipe`, probeValue],
-    ["SADD", indexKey, "kv-probe-user"],
+    ["SADD", "kopilka:analytics:user-index", "kv-probe-user"],
   ])
-  const indexType = await kvRestType(indexKey)
   await kvRestDel(probeKey)
   await kvRestDel(`${probeKey}:pipe`)
 
@@ -39,6 +36,5 @@ export async function GET(request: Request) {
     getMatches: getResult === probeValue,
     pipelineOk: pipelineResult.ok,
     pipelineError: pipelineResult.ok ? null : pipelineResult.error,
-    indexType,
   })
 }
