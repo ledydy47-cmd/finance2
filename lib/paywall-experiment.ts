@@ -78,17 +78,33 @@ export function getFlashSaleState(
   }
 }
 
+export function hasFreemiumTrialCompleted(settings: Settings) {
+  return settings.homeWalkthroughCompleted && settings.firstExpenseAdded
+}
+
+export function canActivatePaywall(settings: Settings) {
+  return hasFreemiumTrialCompleted(settings) && !isUserSubscribed(settings)
+}
+
+export function shouldStartFlashSaleTimer(settings: Settings, transactions: Transaction[]) {
+  if (isUserSubscribed(settings) || settings.paywallFlashSaleStartedAt) {
+    return false
+  }
+
+  return settings.firstExpenseAdded || hasSavedExpense(transactions)
+}
+
 export function resolvePaywallAccess(settings: Settings): {
   isContentLocked: boolean
   requiresPremiumAfterWalkthrough: boolean
 } {
   const subscribed = isUserSubscribed(settings)
-  const paywallActive = settings.paywallShown && !subscribed
+  const paywallActive =
+    settings.paywallShown && !subscribed && hasFreemiumTrialCompleted(settings)
 
   return {
     isContentLocked: paywallActive,
-    requiresPremiumAfterWalkthrough:
-      paywallActive && settings.homeWalkthroughCompleted,
+    requiresPremiumAfterWalkthrough: paywallActive,
   }
 }
 

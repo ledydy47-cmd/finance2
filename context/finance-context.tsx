@@ -31,8 +31,11 @@ import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
 import { scheduleFlashSaleReminderChecks } from "@/lib/client/flash-sale-reminder-client"
 import {
+  canActivatePaywall,
+  hasFreemiumTrialCompleted,
   isAddingSecondExpenseAttempt,
   resolvePaywallAccess,
+  shouldStartFlashSaleTimer,
 } from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
@@ -222,14 +225,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           }
 
           const flashSalePatch = await fetchServerFlashSaleStatus(userKey)
-          if (flashSalePatch && !isUserSubscribed(loaded.settings)) {
+          if (
+            flashSalePatch &&
+            !isUserSubscribed(loaded.settings) &&
+            hasFreemiumTrialCompleted(loaded.settings)
+          ) {
             loaded = {
               ...loaded,
               settings: {
                 ...loaded.settings,
                 paywallFlashSaleStartedAt: flashSalePatch.startedAt,
                 flashSaleDurationMs: flashSalePatch.saleDurationMs,
-                paywallShown: true,
               },
             }
           }
@@ -340,9 +346,39 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const isContentLocked = paywallAccess.isContentLocked
   const requiresPremiumAfterWalkthrough = paywallAccess.requiresPremiumAfterWalkthrough
 
+  const persistFlashSaleStart = useCallback(
+    (startedAt: string, durationMs?: number | null) => {
+      update((prev) => ({
+        ...prev,
+        settings: {
+          ...prev.settings,
+          paywallFlashSaleStartedAt: startedAt,
+          ...(durationMs ? { flashSaleDurationMs: durationMs } : {}),
+        },
+      }))
+
+      const userKey = getClientUserKey(telegramUserId)
+      scheduleFlashSaleReminderChecks(userKey, startedAt)
+
+      void fetch("/api/subscription/flash-sale-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userKey,
+          startedAt,
+        }),
+      })
+    },
+    [telegramUserId, update],
+  )
+
   const markPaywallShown = useCallback(() => {
     if (isUserSubscribed(data.settings)) {
       setShowPaywall(false)
+      return
+    }
+
+    if (!canActivatePaywall(data.settings)) {
       return
     }
 
@@ -400,12 +436,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       })
     }
   }, [
-    data.settings.age,
-    data.settings.isSubscribed,
-    data.settings.paywallFlashSaleStartedAt,
-    data.settings.paywallShown,
-    data.settings.subscriptionExpiresAt,
-    data.settings.userName,
+    data.settings,
     telegramUserId,
     update,
   ])
@@ -490,6 +521,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const syncFlashSaleFromServer = useCallback(
     async (userKey: string) => {
       if (isUserSubscribed(data.settings)) return false
+      if (!hasFreemiumTrialCompleted(data.settings)) return false
 
       try {
         const flashSale = await fetchServerFlashSaleStatus(userKey)
@@ -501,10 +533,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
             ...prev.settings,
             paywallFlashSaleStartedAt: flashSale.startedAt,
             flashSaleDurationMs: flashSale.saleDurationMs,
-            paywallShown: true,
           },
         }))
-        setShowPaywall(true)
+        scheduleFlashSaleReminderChecks(userKey, flashSale.startedAt)
         return true
       } catch {
         return false
@@ -514,8 +545,20 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   )
 
   const activatePendingFlashSaleOffer = useCallback(
-    async (userKey: string) => {
-      if (isUserSubscribed(data.settings)) return false
+    async (
+      userKey: string,
+      options?: { showPaywall?: boolean; settings?: Settings; transactions?: Transaction[] },
+    ) => {
+      const settings = options?.settings ?? data.settings
+      const transactions = options?.transactions ?? data.transactions
+
+      if (isUserSubscribed(settings)) return false
+
+      const showPaywall = options?.showPaywall ?? false
+      if (showPaywall && !canActivatePaywall(settings)) return false
+      if (!showPaywall && !shouldStartFlashSaleTimer(settings, transactions)) {
+        return false
+      }
 
       try {
         const response = await fetch("/api/subscription/activate-flash-offer", {
@@ -532,39 +575,51 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           return false
         }
 
-        update((prev) => ({
-          ...prev,
-          settings: {
-            ...prev.settings,
-            paywallFlashSaleStartedAt: payload.startedAt,
-            paywallShown: true,
-          },
-        }))
-        setShowPaywall(true)
+        persistFlashSaleStart(payload.startedAt)
 
-        void fetch("/api/subscription/flash-sale-sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userKey,
-            startedAt: payload.startedAt,
-          }),
-        })
+        if (showPaywall) {
+          update((prev) => ({
+            ...prev,
+            settings: {
+              ...prev.settings,
+              paywallShown: true,
+            },
+          }))
+          setShowPaywall(true)
+        }
 
         return true
       } catch {
         return false
       }
     },
-    [
-      data.settings.age,
-      data.settings.subscriptionExpiresAt,
-      data.settings.isSubscribed,
-      data.settings.userName,
-      telegramUserId,
-      update,
-    ],
+    [data.settings, data.transactions, persistFlashSaleStart, update],
   )
+
+  const maybeStartFlashSaleTimer = useCallback(async (overrides?: {
+    settings?: Settings
+    transactions?: Transaction[]
+  }) => {
+    const settings = overrides?.settings ?? data.settings
+    const transactions = overrides?.transactions ?? data.transactions
+    if (!shouldStartFlashSaleTimer(settings, transactions)) return
+
+    const userKey = getClientUserKey(telegramUserId)
+    const activated = await activatePendingFlashSaleOffer(userKey, {
+      showPaywall: false,
+      settings,
+      transactions,
+    })
+    if (activated) return
+
+    persistFlashSaleStart(new Date().toISOString())
+  }, [
+    activatePendingFlashSaleOffer,
+    data.settings,
+    data.transactions,
+    persistFlashSaleStart,
+    telegramUserId,
+  ])
 
   const confirmPendingPayment = useCallback(async (): Promise<boolean> => {
     const paymentId = localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)
@@ -698,7 +753,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         data.transactions.filter((tx) => tx.type === "expense").length === 0
 
       if (isAddingSecondExpenseAttempt(data.transactions, input.type, data.settings)) {
-        markPaywallShown()
+        if (canActivatePaywall(data.settings)) {
+          markPaywallShown()
+        }
         return
       }
 
@@ -726,10 +783,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           settings: nextSettings,
         }
       })
+      if (isFirstExpense) {
+        void maybeStartFlashSaleTimer({
+          settings: { ...data.settings, firstExpenseAdded: true },
+          transactions: [tx, ...data.transactions],
+        })
+      }
       setShowAddTransactionState(false)
       setActiveTab("home")
     },
-    [data.transactions, isContentLocked, markPaywallShown, update],
+    [data.settings, data.transactions, isContentLocked, markPaywallShown, maybeStartFlashSaleTimer, update],
   )
 
   const deleteTransaction = useCallback(
@@ -1006,7 +1069,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       userName: data.settings.userName || webAppUser?.first_name,
       age: data.settings.age,
     })
-  }, [data.settings.userName, data.settings.age, update])
+    void maybeStartFlashSaleTimer({
+      settings: { ...data.settings, homeWalkthroughCompleted: true },
+    })
+  }, [data.settings.userName, data.settings.age, maybeStartFlashSaleTimer, update])
 
   const confirmNewMonthReset = useCallback(() => {
     update((prev) => applyNewMonthReset(prev))
