@@ -581,7 +581,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
               </p>
 
               <div className="overflow-x-auto rounded-block border border-border bg-card">
-                <table className="min-w-[56rem] w-full text-left text-xs">
+                <table className="min-w-[64rem] w-full text-left text-xs">
                   <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                     <tr>
                       <th className="sticky left-0 z-10 bg-secondary/95 px-3 py-2">Имя</th>
@@ -595,6 +595,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                       <th className="px-3 py-2">Месяц</th>
                       <th className="px-3 py-2">Год</th>
                       <th className="px-3 py-2">Автооткл.</th>
+                      <th className="px-3 py-2">Последний заход</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -619,6 +620,9 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                         <td className="px-3 py-2"><Check value={hasEvent(user, "subscription_paid_monthly")} /></td>
                         <td className="px-3 py-2"><Check value={hasEvent(user, "subscription_paid_yearly")} /></td>
                         <td className="px-3 py-2"><Check value={hasEvent(user, "auto_renew_canceled")} /></td>
+                        <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                          {formatDateTime(user.lastVisitAt)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
