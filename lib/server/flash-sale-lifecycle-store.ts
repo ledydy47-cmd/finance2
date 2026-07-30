@@ -10,7 +10,7 @@ const FILE_NAME = "flash-sale-lifecycle.json"
 const lifecycleKey = (userKey: string) => `kopilka:flash-sale-lifecycle:${userKey}`
 const INDEX_KEY = "kopilka:flash-sale-lifecycle-index"
 
-export type FlashSalePendingOffer = "4h" | "24h"
+export type FlashSalePendingOffer = "1h" | "4h" | "24h"
 
 export interface FlashSaleLifecycle {
   userKey: string

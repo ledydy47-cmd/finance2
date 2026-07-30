@@ -85,6 +85,8 @@ export async function POST(request: Request) {
         if (resetToOnboarding) {
           record.onboardingStartedAt = null
           record.onboardingCompletedAt = null
+          record.onboardingReoffer1hScheduledAt = null
+          record.onboardingReoffer1hSentAt = null
         }
         record.walkthroughCompletedAt = null
         record.homeWalkthroughCompleted = false

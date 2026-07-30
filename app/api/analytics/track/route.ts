@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { scheduleOnboardingReoffer1hIfNeeded } from "@/lib/server/onboarding-reoffer-service"
+import { getUserAnalyticsRecord } from "@/lib/server/user-analytics-store"
 import { recordAnalyticsEvent } from "@/lib/server/user-analytics-service"
 import type { AnalyticsEventType } from "@/lib/server/user-analytics-types"
 
@@ -25,14 +27,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "INVALID_REQUEST" }, { status: 400 })
     }
 
+    const userKey = body.userKey.trim()
+    const hadOnboardingStarted = Boolean((await getUserAnalyticsRecord(userKey))?.onboardingStartedAt)
+
     await recordAnalyticsEvent({
       event: body.event,
-      userKey: body.userKey.trim(),
+      userKey,
       telegramUserId: body.telegramUserId,
       telegramUsername: body.telegramUsername,
       userName: body.userName,
       age: body.age,
     })
+
+    if (body.event === "onboarding_started" && !hadOnboardingStarted) {
+      const user = await getUserAnalyticsRecord(userKey)
+      if (user?.onboardingStartedAt) {
+        await scheduleOnboardingReoffer1hIfNeeded(userKey, user.onboardingStartedAt)
+      }
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

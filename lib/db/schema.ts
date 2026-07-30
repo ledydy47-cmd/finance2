@@ -10,6 +10,8 @@ export const userAnalytics = sqliteTable(
     age: integer("age"),
     appOpenedAt: text("app_opened_at"),
     onboardingStartedAt: text("onboarding_started_at"),
+    onboardingReoffer1hScheduledAt: text("onboarding_reoffer_1h_scheduled_at"),
+    onboardingReoffer1hSentAt: text("onboarding_reoffer_1h_sent_at"),
     onboardingCompletedAt: text("onboarding_completed_at"),
     walkthroughCompletedAt: text("walkthrough_completed_at"),
     homeWalkthroughCompleted: integer("home_walkthrough_completed", { mode: "boolean" }),

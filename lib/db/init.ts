@@ -114,6 +114,11 @@ const INIT_STATEMENTS = [
   )`,
 ]
 
+const MIGRATION_STATEMENTS = [
+  `ALTER TABLE user_analytics ADD COLUMN onboarding_reoffer_1h_scheduled_at TEXT`,
+  `ALTER TABLE user_analytics ADD COLUMN onboarding_reoffer_1h_sent_at TEXT`,
+]
+
 export async function initTursoSchema() {
   if (!hasTursoConfig()) {
     throw new Error("TURSO_NOT_CONFIGURED")
@@ -122,5 +127,13 @@ export async function initTursoSchema() {
   const client = getTursoClient()
   for (const statement of INIT_STATEMENTS) {
     await client.execute(statement)
+  }
+
+  for (const statement of MIGRATION_STATEMENTS) {
+    try {
+      await client.execute(statement)
+    } catch {
+      // Column may already exist on older databases.
+    }
   }
 }

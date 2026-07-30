@@ -26,6 +26,8 @@ export interface UserAnalyticsRecord {
   age: number | null
   appOpenedAt: string | null
   onboardingStartedAt: string | null
+  onboardingReoffer1hScheduledAt: string | null
+  onboardingReoffer1hSentAt: string | null
   onboardingCompletedAt: string | null
   walkthroughCompletedAt: string | null
   homeWalkthroughCompleted: boolean | null

@@ -22,6 +22,8 @@ export const FLASH_SALE_REMINDER_DELAY_MS = 10 * 60 * 1000
 export const FLASH_SALE_REMINDER_BEFORE_MS = 5 * 60 * 1000
 export const FLASH_SALE_REOFFER_4H_MS = 4 * 60 * 60 * 1000
 export const FLASH_SALE_REOFFER_24H_MS = 24 * 60 * 60 * 1000
+/** Bot re-offer: 1 hour after the user taps «Начать» in onboarding. */
+export const ONBOARDING_REOFFER_1H_MS = 60 * 60 * 1000
 
 export const FLASH_SALE_LIST_PRICES = {
   yearly: {

@@ -39,6 +39,8 @@ function createEmptyUser(input: {
     age: input.age ?? null,
     appOpenedAt: null,
     onboardingStartedAt: null,
+    onboardingReoffer1hScheduledAt: null,
+    onboardingReoffer1hSentAt: null,
     onboardingCompletedAt: null,
     walkthroughCompletedAt: null,
     homeWalkthroughCompleted: null,
