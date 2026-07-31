@@ -143,6 +143,63 @@ interface FinanceContextValue {
 
 const FinanceContext = createContext<FinanceContextValue | null>(null)
 
+function hydrationTimeout(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+async function syncHydrationFromServer(input: {
+  userKey: string
+  loaded: AppData
+  appliedOnboardingReset: boolean
+}) {
+  let loaded = input.loaded
+
+  const pendingReset = await fetchPendingAppReset(input.userKey)
+  if (pendingReset) {
+    loaded = applyRemoteAppReset(loaded, pendingReset)
+    markResetApplied(pendingReset.resetId)
+    saveAppData(loaded)
+    if (pendingReset.resetToOnboarding) {
+      return { loaded, appliedOnboardingReset: true }
+    }
+  }
+
+  if (!input.appliedOnboardingReset) {
+    const progress = await fetchUserProgress(input.userKey)
+    if (progress) {
+      loaded = mergeServerProgressIntoAppData(loaded, progress)
+    }
+  }
+
+  const subscriptionPatch = await fetchServerSubscriptionSettings(input.userKey)
+  if (subscriptionPatch) {
+    loaded = {
+      ...loaded,
+      settings: { ...loaded.settings, ...subscriptionPatch },
+    }
+  }
+
+  const flashSalePatch = await fetchServerFlashSaleStatus(input.userKey)
+  if (
+    flashSalePatch &&
+    !isUserSubscribed(loaded.settings) &&
+    hasFreemiumTrialCompleted(loaded.settings)
+  ) {
+    loaded = {
+      ...loaded,
+      settings: {
+        ...loaded.settings,
+        paywallFlashSaleStartedAt: flashSalePatch.startedAt,
+        flashSaleDurationMs: flashSalePatch.saleDurationMs,
+      },
+    }
+  }
+
+  return { loaded, appliedOnboardingReset: input.appliedOnboardingReset }
+}
+
 function isUserSubscribed(settings: Settings) {
   if (settings.isSubscribed) return true
   if (settings.subscriptionExpiresAt) {
@@ -201,100 +258,64 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
+    const safetyTimer = window.setTimeout(() => {
+      if (!cancelled) setHydrated(true)
+    }, 8000)
 
     const finishHydration = async () => {
-      if (cancelled) return
-
-      await waitForTelegramWebApp(5000)
-      if (cancelled) return
-
-      await ensureTelegramSdk().catch(() => undefined)
-      if (cancelled) return
-
-      const webAppUser = getWebApp()?.initDataUnsafe?.user
-      const userKey = getClientUserKey(webAppUser?.id)
-
-      let loaded = loadAppData()
-      let appliedOnboardingReset = false
+      let loaded = createDefaultData()
 
       try {
-        const pendingReset = await fetchPendingAppReset(userKey)
-        if (pendingReset) {
-          loaded = applyRemoteAppReset(loaded, pendingReset)
-          appliedOnboardingReset = pendingReset.resetToOnboarding ?? false
-          markResetApplied(pendingReset.resetId)
-          saveAppData(loaded)
-        }
-      } catch {
-        // ignore remote reset errors
-      }
+        await waitForTelegramWebApp(5000)
+        if (cancelled) return
 
-      if (userKey.startsWith("tg-")) {
-        try {
-          if (!appliedOnboardingReset) {
-            const progress = await fetchUserProgress(userKey)
-            if (progress) {
-              loaded = mergeServerProgressIntoAppData(loaded, progress)
-            }
-          }
+        await ensureTelegramSdk().catch(() => undefined)
+        if (cancelled) return
 
-          const subscriptionPatch = await fetchServerSubscriptionSettings(userKey)
-          if (subscriptionPatch) {
-            loaded = {
-              ...loaded,
-              settings: { ...loaded.settings, ...subscriptionPatch },
-            }
-          }
+        loaded = loadAppData()
+        const webAppUser = getWebApp()?.initDataUnsafe?.user
+        const userKey = getClientUserKey(webAppUser?.id)
 
-          const flashSalePatch = await fetchServerFlashSaleStatus(userKey)
-          if (
-            flashSalePatch &&
-            !isUserSubscribed(loaded.settings) &&
-            hasFreemiumTrialCompleted(loaded.settings)
-          ) {
-            loaded = {
-              ...loaded,
-              settings: {
-                ...loaded.settings,
-                paywallFlashSaleStartedAt: flashSalePatch.startedAt,
-                flashSaleDurationMs: flashSalePatch.saleDurationMs,
-              },
-            }
-          }
-        } catch {
-          // ignore subscription sync errors
-        }
-
-        const pendingPaymentId = localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)
-        if (pendingPaymentId && !isUserSubscribed(loaded.settings)) {
+        if (userKey.startsWith("tg-")) {
           try {
-            const verified = await verifyPaymentWithRetry(pendingPaymentId)
-            if (verified) {
-              loaded = {
-                ...loaded,
-                settings: {
-                  ...loaded.settings,
-                  isSubscribed: true,
-                  subscriptionPlan: verified.plan,
-                  subscriptionExpiresAt: verified.expiresAt,
-                  lastPaymentId: verified.paymentId,
-                  autoRenew: verified.autoRenew,
-                  subscriptionStatus:
-                    (verified.status as Settings["subscriptionStatus"]) ?? "active",
-                },
-              }
-              localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
+            const synced = await Promise.race([
+              syncHydrationFromServer({
+                userKey,
+                loaded,
+                appliedOnboardingReset: false,
+              }),
+              hydrationTimeout(5000).then(() => ({
+                loaded,
+                appliedOnboardingReset: false,
+              })),
+            ])
+            loaded = synced.loaded
+          } catch {
+            // keep local data if remote sync fails
+          }
+        } else {
+          try {
+            const pendingReset = await fetchPendingAppReset(userKey)
+            if (pendingReset) {
+              loaded = applyRemoteAppReset(loaded, pendingReset)
+              markResetApplied(pendingReset.resetId)
+              saveAppData(loaded)
             }
           } catch {
-            // ignore pending payment verification errors
+            // ignore remote reset errors
           }
         }
+
+        if (loaded.settings.isSubscribed !== isUserSubscribed(loaded.settings)) {
+          loaded.settings.isSubscribed = isUserSubscribed(loaded.settings)
+        }
+      } catch (error) {
+        console.error("[finance] hydration failed", error)
+        loaded = loadAppData()
       }
 
-      const subscribed = isUserSubscribed(loaded.settings)
-      if (loaded.settings.isSubscribed !== subscribed) {
-        loaded.settings.isSubscribed = subscribed
-      }
+      if (cancelled) return
+
       setData(loaded)
       applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
       if (isNewPeriodPending(loaded)) {
@@ -305,12 +326,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         setCelebratingGoal(goalToCelebrate)
       }
       setHydrated(true)
+      window.clearTimeout(safetyTimer)
     }
 
     void finishHydration()
 
     return () => {
       cancelled = true
+      window.clearTimeout(safetyTimer)
     }
   }, [])
 
