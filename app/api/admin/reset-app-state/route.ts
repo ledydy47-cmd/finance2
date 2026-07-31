@@ -83,10 +83,22 @@ export async function POST(request: Request) {
       await updateUserAnalyticsRecord(userKey, (record) => {
         if (!record) return existing
         if (resetToOnboarding) {
+          record.appOpenedAt = null
           record.onboardingStartedAt = null
           record.onboardingCompletedAt = null
           record.onboardingReoffer1hScheduledAt = null
           record.onboardingReoffer1hSentAt = null
+          record.age = null
+          record.events = []
+        } else {
+          record.events = record.events.filter(
+            (event) =>
+              event.type !== "walkthrough_completed" &&
+              event.type !== "paywall_shown" &&
+              event.type !== "subscription_paid_monthly" &&
+              event.type !== "subscription_paid_yearly" &&
+              event.type !== "auto_renew_canceled",
+          )
         }
         record.walkthroughCompletedAt = null
         record.homeWalkthroughCompleted = false
@@ -96,17 +108,6 @@ export async function POST(request: Request) {
         record.subscribedYearlyAt = null
         record.autoRenewCanceledAt = null
         record.subscriptionPlan = "none"
-        record.events = record.events.filter(
-          (event) =>
-            (resetToOnboarding
-              ? event.type !== "onboarding_started" && event.type !== "onboarding_completed"
-              : true) &&
-            event.type !== "walkthrough_completed" &&
-            event.type !== "paywall_shown" &&
-            event.type !== "subscription_paid_monthly" &&
-            event.type !== "subscription_paid_yearly" &&
-            event.type !== "auto_renew_canceled",
-        )
         return record
       })
     }
