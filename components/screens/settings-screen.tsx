@@ -106,16 +106,21 @@ export function SettingsScreen() {
           <label className="mb-1 block text-xs font-semibold text-muted-foreground">
             День начала месяца (зарплата)
           </label>
-          <input
-            type="number"
-            min={1}
-            max={28}
+          <select
             value={data.settings.monthStartDay}
-            onChange={(e) =>
-              updateSettings({ monthStartDay: Math.min(28, Math.max(1, Number(e.target.value))) })
-            }
-            className="mb-3 w-full rounded-block-sm border border-border bg-background px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
-          />
+            onChange={(e) => updateSettings({ monthStartDay: Number(e.target.value) })}
+            className="mb-2 w-full rounded-block-sm border border-border bg-background px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
+          >
+            {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
+              <option key={day} value={day}>
+                {day}-е число
+              </option>
+            ))}
+          </select>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Месяц в приложении начинается с этого дня. Если зарплата приходит 29–31 числа,
+            выберите 28 — так период будет считаться стабильно во всех месяцах.
+          </p>
           <p className="text-xs text-muted-foreground">Валюта: ₽ (рубль)</p>
         </section>
 
