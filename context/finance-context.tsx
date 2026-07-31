@@ -23,6 +23,10 @@ import {
 } from "@/lib/period-reset"
 import { loadAppData, saveAppData } from "@/lib/storage"
 import {
+  fetchUserProgress,
+  mergeServerProgressIntoAppData,
+} from "@/lib/user-progress-client"
+import {
   applyRemoteAppReset,
   fetchPendingAppReset,
   markResetApplied,
@@ -71,6 +75,7 @@ interface FinanceContextValue {
   showCreateGoalPrompt: boolean
   showGoalCreateForm: boolean
   isContentLocked: boolean
+  hydrated: boolean
   setActiveTab: (tab: TabId) => void
   setShowAddTransaction: (open: boolean) => void
   openAddTransactionForCategory: (categoryId: string) => void
@@ -199,14 +204,24 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
     const finishHydration = async () => {
       if (cancelled) return
-      let loaded = loadAppData()
+
+      await waitForTelegramWebApp(5000)
+      if (cancelled) return
+
+      await ensureTelegramSdk().catch(() => undefined)
+      if (cancelled) return
+
       const webAppUser = getWebApp()?.initDataUnsafe?.user
       const userKey = getClientUserKey(webAppUser?.id)
+
+      let loaded = loadAppData()
+      let appliedOnboardingReset = false
 
       try {
         const pendingReset = await fetchPendingAppReset(userKey)
         if (pendingReset) {
           loaded = applyRemoteAppReset(loaded, pendingReset)
+          appliedOnboardingReset = pendingReset.resetToOnboarding ?? false
           markResetApplied(pendingReset.resetId)
           saveAppData(loaded)
         }
@@ -216,6 +231,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
       if (userKey.startsWith("tg-")) {
         try {
+          if (!appliedOnboardingReset) {
+            const progress = await fetchUserProgress(userKey)
+            if (progress) {
+              loaded = mergeServerProgressIntoAppData(loaded, progress)
+            }
+          }
+
           const subscriptionPatch = await fetchServerSubscriptionSettings(userKey)
           if (subscriptionPatch) {
             loaded = {
@@ -285,19 +307,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setHydrated(true)
     }
 
-    const timeoutId = window.setTimeout(finishHydration, 1500)
-
-    void waitForTelegramWebApp(1500)
-      .then(() => ensureTelegramSdk())
-      .catch(() => undefined)
-      .finally(() => {
-        window.clearTimeout(timeoutId)
-        void finishHydration()
-      })
+    void finishHydration()
 
     return () => {
       cancelled = true
-      window.clearTimeout(timeoutId)
     }
   }, [])
 
@@ -1132,6 +1145,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     showCreateGoalPrompt,
     showGoalCreateForm,
     isContentLocked,
+    hydrated,
     setActiveTab,
     setShowAddTransaction,
     openAddTransactionForCategory,

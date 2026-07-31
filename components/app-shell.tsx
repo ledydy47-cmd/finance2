@@ -29,6 +29,7 @@ export function AppShell() {
   const { isTelegram, user } = useTelegram()
   const {
     data,
+    hydrated,
     activeTab,
     showBudgetPlanner,
     showTransactionsList,
@@ -220,8 +221,18 @@ export function AppShell() {
     : "relative flex h-[100dvh] w-full max-w-[420px] flex-col overflow-hidden bg-background sm:h-[860px] sm:rounded-[3rem] sm:shadow-2xl sm:shadow-primary/20 sm:ring-8 sm:ring-card"
 
   const mainClassName = isTelegram
-    ? "min-h-[100dvh] bg-background"
+    ? "flex min-h-[100dvh] bg-background"
     : "flex min-h-screen items-center justify-center bg-muted p-0 sm:p-6"
+
+  if (!hydrated) {
+    return (
+      <main className={mainClassName}>
+        <div className="flex min-h-[100dvh] w-full items-center justify-center bg-background">
+          <p className="text-sm font-medium text-muted-foreground">Загрузка…</p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className={mainClassName}>

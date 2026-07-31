@@ -7,7 +7,8 @@ import {
   processUserFlashSaleReminder,
   processUserFlashSaleReoffers,
 } from "@/lib/server/flash-sale-cron-service"
-import { processUserOnboardingReoffer1h } from "@/lib/server/onboarding-reoffer-service"
+import { processUserOnboardingReoffer1h, scheduleOnboardingReoffer1hIfNeeded } from "@/lib/server/onboarding-reoffer-service"
+import { getUserAnalyticsRecord } from "@/lib/server/user-analytics-store"
 
 export async function POST(request: Request) {
   try {
@@ -36,6 +37,15 @@ export async function POST(request: Request) {
       userName: body.userName,
       age: body.age,
     })
+
+    const user = await getUserAnalyticsRecord(userKey)
+    if (
+      user?.onboardingStartedAt &&
+      !user.onboardingReoffer1hScheduledAt &&
+      !user.onboardingReoffer1hSentAt
+    ) {
+      await scheduleOnboardingReoffer1hIfNeeded(userKey, user.onboardingStartedAt)
+    }
 
     const reminder = await processUserFlashSaleReminder(userKey)
     const reoffers = await processUserFlashSaleReoffers(userKey)
