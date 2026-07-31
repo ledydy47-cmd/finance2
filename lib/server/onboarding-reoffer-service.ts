@@ -13,8 +13,8 @@ import {
   readAnalyticsStore,
   updateUserAnalyticsRecord,
 } from "@/lib/server/user-analytics-store"
+import { sendMessageToUser, formatDateInAnalyticsTimezone } from "@/lib/server/user-analytics-service"
 import type { UserAnalyticsRecord } from "@/lib/server/user-analytics-types"
-import { sendMessageToUser } from "@/lib/server/user-analytics-service"
 
 export const ONBOARDING_REOFFER_1H_MESSAGE =
   "ты нажала «Начать» — значит, мечта уже близко 💗 мы снова открыли для тебя скидку −50%. Загляни в приложение, пока она доступна"
@@ -169,4 +169,102 @@ export async function processPendingOnboardingReoffers1h(now = new Date()) {
   }
 
   return { sent, pending }
+}
+
+export function getYesterdayAndTodayYmdMoscow(now = new Date()) {
+  const today = formatDateInAnalyticsTimezone(now)
+  const [year, month, day] = today.split("-").map(Number)
+  const yesterday = formatDateInAnalyticsTimezone(new Date(year, month - 1, day - 1))
+  return { yesterday, today, dates: [yesterday, today] as const }
+}
+
+function isNewUserOnDates(user: UserAnalyticsRecord, dates: Set<string>) {
+  if (user.appOpenedAt && dates.has(formatDateInAnalyticsTimezone(new Date(user.appOpenedAt)))) {
+    return true
+  }
+  if (
+    user.onboardingStartedAt &&
+    dates.has(formatDateInAnalyticsTimezone(new Date(user.onboardingStartedAt)))
+  ) {
+    return true
+  }
+  return false
+}
+
+export async function broadcastOnboardingReofferToNewUsers(input?: {
+  datesYmd?: string[]
+  message?: string
+  offset?: number
+  limit?: number
+  skipAlreadySent?: boolean
+}) {
+  const message = input?.message?.trim() || ONBOARDING_REOFFER_1H_MESSAGE
+  const skipAlreadySent = input?.skipAlreadySent ?? true
+  const offset = Math.max(0, input?.offset ?? 0)
+  const limit = input?.limit && input.limit > 0 ? Math.floor(input.limit) : null
+  const defaultDates = getYesterdayAndTodayYmdMoscow()
+  const dates = new Set(input?.datesYmd?.length ? input.datesYmd : defaultDates.dates)
+
+  const allCandidates = Object.values((await readAnalyticsStore()).users).filter((user) => {
+    if (!user.telegramUserId && !user.userKey.startsWith("tg-")) return false
+    if (!isNewUserOnDates(user, dates)) return false
+    if (skipAlreadySent && user.onboardingReoffer1hSentAt) return false
+    return true
+  })
+
+  const candidates = limit
+    ? allCandidates.slice(offset, offset + limit)
+    : allCandidates.slice(offset)
+
+  const results: Array<{ userKey: string; sent: boolean; reason?: string }> = []
+  const nowIso = new Date().toISOString()
+
+  for (const user of candidates) {
+    const subscription = await getServerSubscriptionStatus(user.userKey)
+    if (subscription?.active) {
+      results.push({ userKey: user.userKey, sent: false, reason: "SUBSCRIBED" })
+      continue
+    }
+
+    const sendResult = await sendMessageToUser({
+      userKey: user.userKey,
+      message,
+    })
+
+    if (!sendResult.ok) {
+      results.push({
+        userKey: user.userKey,
+        sent: false,
+        reason: sendResult.error ?? "SEND_FAILED",
+      })
+      continue
+    }
+
+    const anchorStartedAt =
+      user.onboardingStartedAt ?? user.onboardingReoffer1hScheduledAt ?? user.appOpenedAt ?? nowIso
+
+    await updateUserAnalyticsRecord(user.userKey, (existing) => {
+      if (!existing) return existing
+      existing.onboardingReoffer1hScheduledAt ??= anchorStartedAt
+      existing.onboardingReoffer1hSentAt = nowIso
+      return existing
+    })
+
+    const lifecycle = await ensureLifecycleForPendingOffer(user.userKey, anchorStartedAt)
+    lifecycle.pendingOffer = "1h" satisfies FlashSalePendingOffer
+    await saveFlashSaleLifecycle(lifecycle)
+
+    results.push({ userKey: user.userKey, sent: true })
+  }
+
+  return {
+    dates: [...dates],
+    total: allCandidates.length,
+    batchOffset: offset,
+    batchLimit: limit,
+    batchSize: candidates.length,
+    sent: results.filter((item) => item.sent).length,
+    failed: results.filter((item) => !item.sent).length,
+    results,
+  }
 }
