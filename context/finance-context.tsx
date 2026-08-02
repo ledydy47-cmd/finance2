@@ -408,17 +408,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     [telegramUserId, update],
   )
 
-  const markPaywallShown = useCallback(() => {
-    if (isUserSubscribed(data.settings)) {
-      setShowPaywall(false)
-      return
-    }
-
-    if (!canActivatePaywall(data.settings)) {
-      return
-    }
-
-    setShowPaywall(true)
+  const commitPaywallOfferSideEffects = useCallback(() => {
+    if (isUserSubscribed(data.settings)) return
 
     const alreadyShown = data.settings.paywallShown
     const subscribed =
@@ -471,16 +462,27 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         age: data.settings.age,
       })
     }
-  }, [
-    data.settings,
-    telegramUserId,
-    update,
-  ])
+  }, [data.settings, telegramUserId, update])
+
+  const markPaywallShown = useCallback(() => {
+    if (isUserSubscribed(data.settings)) {
+      setShowPaywall(false)
+      return
+    }
+
+    if (!canActivatePaywall(data.settings)) {
+      return
+    }
+
+    setShowPaywall(true)
+    commitPaywallOfferSideEffects()
+  }, [commitPaywallOfferSideEffects, data.settings])
 
   const openPaywall = useCallback(() => {
     if (isUserSubscribed(data.settings)) return
-    markPaywallShown()
-  }, [data.settings, markPaywallShown])
+    setShowPaywall(true)
+    commitPaywallOfferSideEffects()
+  }, [commitPaywallOfferSideEffects, data.settings])
   const closePaywall = useCallback(() => setShowPaywall(false), [])
 
   const homeSetupStep = useMemo((): 1 | 2 | 3 => {
