@@ -10,6 +10,9 @@ import type { SupportTicket } from "@/lib/server/support-types"
 
 const SESSION_KEY = "kopilka-admin-support-key"
 
+const FEEDBACK_BROADCAST_TEMPLATE =
+  "спасибо, что вы с нами! мы стремимся улучшать приложение и будем благодарны, если вы поделитесь отзывом — просто ответьте на это сообщение в боте. что бы вы хотели улучшить или добавить? 💗"
+
 const EVENT_LABELS: Record<AnalyticsEventType, string> = {
   app_opened: "Запустил бота",
   onboarding_started: "Нажал «Начать»",
@@ -172,6 +175,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [supportReply, setSupportReply] = useState("")
   const [replying, setReplying] = useState(false)
+  const [webhookLoading, setWebhookLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -377,6 +381,28 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
       setError("Не удалось запланировать сообщение")
     } finally {
       setSendingToUser(false)
+    }
+  }
+
+  async function setupTelegramWebhook() {
+    setWebhookLoading(true)
+    setError(null)
+    try {
+      const response = await fetch("/api/admin/setup-telegram-webhook", {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ dropPendingUpdates: false }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.ok) {
+        setError(data.detail || data.error || "Не удалось подключить webhook бота")
+        return
+      }
+      alert(`Webhook бота подключён:\n${data.url}`)
+    } catch {
+      setError("Не удалось подключить webhook бота")
+    } finally {
+      setWebhookLoading(false)
     }
   }
 
@@ -751,6 +777,13 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
               <p className="mt-1 text-xs text-muted-foreground">
                 В начале сообщения автоматически подставится имя пользователя
               </p>
+              <button
+                type="button"
+                onClick={() => setMessageText(FEEDBACK_BROADCAST_TEMPLATE)}
+                className="mt-3 rounded-block-sm border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary"
+              >
+                Шаблон: запрос отзывов
+              </button>
               <select
                 value={messageFilter}
                 onChange={(e) => setMessageFilter(e.target.value as MessageCampaign["filter"])}
@@ -876,19 +909,30 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
         {tab === "support" && (
           <div className="flex flex-col gap-4 lg:flex-row">
             <div className="lg:w-[22rem] lg:shrink-0">
-              <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">
                   {tickets.filter((t) => t.status === "open").length} открытых ·{" "}
-                  {tickets.filter((t) => t.status === "answered").length} с ответом
+                  {tickets.filter((t) => t.status === "answered").length} с ответом ·{" "}
+                  {tickets.filter((t) => t.source === "bot").length} из бота
                 </p>
-                <button
-                  type="button"
-                  onClick={() => void loadTickets()}
-                  disabled={loading}
-                  className="rounded-block-sm border border-border px-3 py-2 text-xs font-semibold"
-                >
-                  Обновить
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void setupTelegramWebhook()}
+                    disabled={webhookLoading}
+                    className="rounded-block-sm border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  >
+                    {webhookLoading ? "…" : "Webhook бота"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void loadTickets()}
+                    disabled={loading}
+                    className="rounded-block-sm border border-border px-3 py-2 text-xs font-semibold"
+                  >
+                    Обновить
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 {tickets.map((ticket) => (
@@ -919,6 +963,9 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                         {ticket.status === "open" ? "новое" : "ответ"}
                       </span>
                     </div>
+                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {ticket.source === "bot" ? "из бота" : "из приложения"}
+                    </p>
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{ticket.message}</p>
                     <p className="mt-1 text-[10px] text-muted-foreground/80">
                       {formatDateTime(ticket.createdAt)}
@@ -947,7 +994,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
 
                   <div className="mb-4 rounded-block-sm bg-secondary/50 p-4">
                     <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                      Вопрос
+                      {selectedTicket.source === "bot" ? "Отзыв из бота" : "Вопрос из приложения"}
                     </p>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                       {selectedTicket.message}

@@ -61,6 +61,7 @@ export const supportTickets = sqliteTable(
     telegramUsername: text("telegram_username"),
     userName: text("user_name"),
     message: text("message").notNull(),
+    source: text("source").notNull().default("app"),
     status: text("status").notNull(),
     reply: text("reply"),
     createdAt: text("created_at").notNull(),

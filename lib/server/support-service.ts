@@ -16,6 +16,7 @@ export async function createSupportTicket(input: {
   telegramUserId?: number | null
   telegramUsername?: string | null
   userName?: string | null
+  source?: SupportTicket["source"]
 }) {
   const message = input.message.trim()
   if (message.length < 3) {
@@ -35,6 +36,7 @@ export async function createSupportTicket(input: {
     telegramUsername: input.telegramUsername?.replace(/^@/, "") ?? null,
     userName: input.userName?.trim() || null,
     message,
+    source: input.source ?? "app",
     status: "open",
     reply: null,
     createdAt: nowIso(),

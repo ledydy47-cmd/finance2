@@ -58,8 +58,12 @@ function formatSupportUser(ticket: SupportTicket) {
 
 export async function notifyAdminNewSupportTicket(ticket: SupportTicket) {
   const adminUrl = `${getAppBaseUrl()}/admin/support?tab=support`
+  const title =
+    ticket.source === "bot"
+      ? "💬 Новый отзыв из бота «Мани.точка»"
+      : "💬 Новое обращение в поддержку «Мани.точка»"
   const text = [
-    "💬 Новое обращение в поддержку «Мани.точка»",
+    title,
     "",
     `Пользователь: ${formatSupportUser(ticket)}`,
     `Время: ${formatDateTime(ticket.createdAt)}`,

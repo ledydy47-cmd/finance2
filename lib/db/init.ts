@@ -49,6 +49,7 @@ const INIT_STATEMENTS = [
     telegram_username TEXT,
     user_name TEXT,
     message TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'app',
     status TEXT NOT NULL,
     reply TEXT,
     created_at TEXT NOT NULL,
@@ -117,6 +118,7 @@ const INIT_STATEMENTS = [
 const MIGRATION_STATEMENTS = [
   `ALTER TABLE user_analytics ADD COLUMN onboarding_reoffer_1h_scheduled_at TEXT`,
   `ALTER TABLE user_analytics ADD COLUMN onboarding_reoffer_1h_sent_at TEXT`,
+  `ALTER TABLE support_tickets ADD COLUMN source TEXT NOT NULL DEFAULT 'app'`,
 ]
 
 export async function initTursoSchema() {

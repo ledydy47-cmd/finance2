@@ -1,4 +1,5 @@
 export type SupportTicketStatus = "open" | "answered"
+export type SupportTicketSource = "app" | "bot"
 
 export interface SupportTicket {
   id: string
@@ -7,6 +8,7 @@ export interface SupportTicket {
   telegramUsername: string | null
   userName: string | null
   message: string
+  source: SupportTicketSource
   status: SupportTicketStatus
   reply: string | null
   createdAt: string
