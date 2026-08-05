@@ -1,4 +1,25 @@
 import type { Settings } from "@/lib/types"
+import { isSubscriptionActive } from "@/lib/subscription"
+
+export function clearPaywallOfferSettings(settings: Settings): Settings {
+  return {
+    ...settings,
+    paywallFlashSaleStartedAt: null,
+    flashSaleDurationMs: null,
+  }
+}
+
+export function mergeActiveSubscriptionSettings(
+  settings: Settings,
+  patch: Partial<Settings>,
+): Settings {
+  const merged = { ...settings, ...patch }
+  const subscribed =
+    Boolean(patch.isSubscribed) || isSubscriptionActive(patch.subscriptionExpiresAt ?? merged.subscriptionExpiresAt)
+
+  if (!subscribed) return merged
+  return clearPaywallOfferSettings(merged)
+}
 
 export async function fetchServerSubscriptionSettings(
   userKey: string,

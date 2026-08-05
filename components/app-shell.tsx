@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { BottomNav } from "@/components/finance/bottom-nav"
 import { HomeWalkthrough } from "@/components/home-walkthrough/home-walkthrough"
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow"
@@ -51,8 +51,7 @@ export function AppShell() {
     setShowTransactionsList,
     setShowAddTransaction,
     closeAddToGoal,
-    confirmPendingPayment,
-    syncSubscriptionFromServer,
+    refreshSubscriptionAfterExternalPayment,
     syncFlashSaleFromServer,
     activatePendingFlashSaleOffer,
   } = useFinance()
@@ -73,10 +72,12 @@ export function AppShell() {
   }, [isTelegram])
 
   const appOpenHandledForUserId = useRef<number | null>(null)
+  const [isBlocked, setIsBlocked] = useState(false)
 
   useEffect(() => {
     if (!user?.id) {
       appOpenHandledForUserId.current = null
+      setIsBlocked(false)
       return
     }
     if (appOpenHandledForUserId.current === user.id) return
@@ -93,10 +94,11 @@ export function AppShell() {
         userName: user.first_name,
       })
 
-      await syncSubscriptionFromServer(userKey)
-      await syncFlashSaleFromServer(userKey)
-      await activatePendingFlashSaleOffer(userKey)
-      void confirmPendingPayment()
+      const active = await refreshSubscriptionAfterExternalPayment(userKey)
+      if (!active) {
+        await syncFlashSaleFromServer(userKey)
+        await activatePendingFlashSaleOffer(userKey)
+      }
 
       void fetch("/api/user/register-telegram", {
         method: "POST",
@@ -106,6 +108,13 @@ export function AppShell() {
           username: user.username,
           firstName: user.first_name,
         }),
+      }).then(async (response) => {
+        if (response.status === 403) {
+          const payload = (await response.json()) as { blocked?: boolean }
+          if (payload.blocked) {
+            setIsBlocked(true)
+          }
+        }
       })
 
       void fetch("/api/subscription/flash-sale-reminder-check", {
@@ -115,7 +124,21 @@ export function AppShell() {
       })
     })()
     // Run once per Telegram user per app session — callback identity changes after sync.
-  }, [user?.id, user?.username, user?.first_name, confirmPendingPayment, syncSubscriptionFromServer, syncFlashSaleFromServer, activatePendingFlashSaleOffer])
+  }, [user?.id, user?.username, user?.first_name, refreshSubscriptionAfterExternalPayment, syncFlashSaleFromServer, activatePendingFlashSaleOffer])
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    const userKey = getClientUserKey(user.id)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return
+      void refreshSubscriptionAfterExternalPayment(userKey)
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [refreshSubscriptionAfterExternalPayment, user?.id])
 
   useEffect(() => {
     if (!user?.id) return
@@ -229,6 +252,21 @@ export function AppShell() {
       <main className={mainClassName}>
         <div className="flex min-h-[100dvh] w-full items-center justify-center bg-background">
           <p className="text-sm font-medium text-muted-foreground">Загрузка…</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (isBlocked) {
+    return (
+      <main className={mainClassName}>
+        <div className="flex min-h-[100dvh] w-full items-center justify-center bg-background px-6 text-center">
+          <div className="max-w-sm">
+            <p className="text-lg font-bold text-foreground">Доступ ограничен</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Использование приложения для этого аккаунта недоступно.
+            </p>
+          </div>
         </div>
       </main>
     )

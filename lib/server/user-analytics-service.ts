@@ -365,6 +365,11 @@ export async function sendMessageToUser(input: {
   userKey: string
   message: string
 }) {
+  const { isUserKeyBlocked } = await import("@/lib/server/blocked-users-service")
+  if (await isUserKeyBlocked(input.userKey)) {
+    return { ok: false as const, error: "USER_BLOCKED" as const }
+  }
+
   const store = await readAnalyticsStore()
   const user = store.users[input.userKey]
   const telegramUserId = user?.telegramUserId ?? parseTelegramUserId(input.userKey)

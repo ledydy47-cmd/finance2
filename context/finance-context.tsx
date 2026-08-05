@@ -33,7 +33,10 @@ import {
 } from "@/lib/app-reset-client"
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
-import { scheduleFlashSaleReminderChecks } from "@/lib/client/flash-sale-reminder-client"
+import {
+  clearFlashSaleReminderWatch,
+  scheduleFlashSaleReminderChecks,
+} from "@/lib/client/flash-sale-reminder-client"
 import {
   canActivatePaywall,
   hasFreemiumTrialCompleted,
@@ -43,9 +46,13 @@ import {
 } from "@/lib/paywall-experiment"
 import { ensureTelegramSdk, getWebApp, waitForTelegramWebApp } from "@/lib/telegram"
 import type { SubscriptionPlan } from "@/lib/subscription"
-import { isSubscriptionActive, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
-import { verifyPaymentWithRetry } from "@/lib/pending-payment-verify"
-import { fetchServerFlashSaleStatus, fetchServerSubscriptionSettings } from "@/lib/subscription-sync-client"
+import { isSubscriptionActive, PENDING_ORDER_ID_KEY, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
+import { verifyPaymentByOrderWithRetry, verifyPaymentWithRetry } from "@/lib/pending-payment-verify"
+import {
+  fetchServerFlashSaleStatus,
+  fetchServerSubscriptionSettings,
+  mergeActiveSubscriptionSettings,
+} from "@/lib/subscription-sync-client"
 import type { ThemeId } from "@/lib/themes"
 import { applyTheme, DEFAULT_THEME_ID } from "@/lib/themes"
 import type {
@@ -92,6 +99,7 @@ interface FinanceContextValue {
   }) => void
   restoreSubscription: () => Promise<{ ok: boolean; message: string }>
   confirmPendingPayment: () => Promise<boolean>
+  refreshSubscriptionAfterExternalPayment: (userKey: string) => Promise<boolean>
   syncSubscriptionFromServer: (userKey: string) => Promise<boolean>
   syncFlashSaleFromServer: (userKey: string) => Promise<boolean>
   activatePendingFlashSaleOffer: (userKey: string) => Promise<boolean>
@@ -177,7 +185,7 @@ async function syncHydrationFromServer(input: {
   if (subscriptionPatch) {
     loaded = {
       ...loaded,
-      settings: { ...loaded.settings, ...subscriptionPatch },
+      settings: mergeActiveSubscriptionSettings(loaded.settings, subscriptionPatch),
     }
   }
 
@@ -504,19 +512,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }) => {
       update((prev) => ({
         ...prev,
-        settings: {
-          ...prev.settings,
+        settings: mergeActiveSubscriptionSettings(prev.settings, {
           isSubscribed: true,
           subscriptionPlan: input.plan,
           subscriptionExpiresAt: input.expiresAt,
           lastPaymentId: input.paymentId,
           autoRenew: input.autoRenew ?? true,
           subscriptionStatus: input.subscriptionStatus ?? "active",
-        },
+        }),
       }))
+      clearFlashSaleReminderWatch(getClientUserKey(telegramUserId))
       setShowPaywall(false)
     },
-    [update],
+    [telegramUserId, update],
   )
 
   const syncSubscriptionFromServer = useCallback(
@@ -524,6 +532,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch(
           `/api/subscription/status?userKey=${encodeURIComponent(userKey)}`,
+          { cache: "no-store" },
         )
         const payload = await response.json()
         const subscription = payload.subscription
@@ -531,8 +540,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
         update((prev) => ({
           ...prev,
-          settings: {
-            ...prev.settings,
+          settings: mergeActiveSubscriptionSettings(prev.settings, {
             isSubscribed: subscription.active,
             subscriptionPlan: subscription.subscriptionType,
             subscriptionExpiresAt: subscription.currentPeriodEnd,
@@ -541,7 +549,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
             ...(subscription.lastPaymentId
               ? { lastPaymentId: subscription.lastPaymentId }
               : {}),
-          },
+          }),
         }))
 
         if (subscription.active) {
@@ -554,6 +562,65 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       }
     },
     [update],
+  )
+
+  const confirmPendingPayment = useCallback(async (): Promise<boolean> => {
+    const orderId = localStorage.getItem(PENDING_ORDER_ID_KEY)?.trim()
+    if (orderId) {
+      const verifiedByOrder = await verifyPaymentByOrderWithRetry(orderId, {
+        maxAttempts: 8,
+        intervalMs: 1500,
+      })
+      if (verifiedByOrder) {
+        activateSubscription({
+          plan: verifiedByOrder.plan,
+          paymentId: verifiedByOrder.paymentId,
+          expiresAt: verifiedByOrder.expiresAt,
+          autoRenew: verifiedByOrder.autoRenew,
+          subscriptionStatus: verifiedByOrder.status as Settings["subscriptionStatus"],
+        })
+        localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
+        localStorage.removeItem(PENDING_ORDER_ID_KEY)
+        return true
+      }
+    }
+
+    const paymentId = localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)
+    if (!paymentId) return false
+
+    const verified = await verifyPaymentWithRetry(paymentId, {
+      maxAttempts: 8,
+      intervalMs: 1500,
+    })
+    if (!verified) return false
+
+    activateSubscription({
+      plan: verified.plan,
+      paymentId: verified.paymentId,
+      expiresAt: verified.expiresAt,
+      autoRenew: verified.autoRenew,
+      subscriptionStatus: verified.status as Settings["subscriptionStatus"],
+    })
+    localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
+    localStorage.removeItem(PENDING_ORDER_ID_KEY)
+    return true
+  }, [activateSubscription])
+
+  const refreshSubscriptionAfterExternalPayment = useCallback(
+    async (userKey: string) => {
+      if (await syncSubscriptionFromServer(userKey)) {
+        localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
+        localStorage.removeItem(PENDING_ORDER_ID_KEY)
+        return true
+      }
+
+      if (await confirmPendingPayment()) {
+        return true
+      }
+
+      return syncSubscriptionFromServer(userKey)
+    },
+    [confirmPendingPayment, syncSubscriptionFromServer],
   )
 
   const syncFlashSaleFromServer = useCallback(
@@ -658,24 +725,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     persistFlashSaleStart,
     telegramUserId,
   ])
-
-  const confirmPendingPayment = useCallback(async (): Promise<boolean> => {
-    const paymentId = localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY)
-    if (!paymentId) return false
-
-    const verified = await verifyPaymentWithRetry(paymentId)
-    if (!verified) return false
-
-    activateSubscription({
-      plan: verified.plan,
-      paymentId: verified.paymentId,
-      expiresAt: verified.expiresAt,
-      autoRenew: verified.autoRenew,
-      subscriptionStatus: verified.status as Settings["subscriptionStatus"],
-    })
-    localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
-    return true
-  }, [activateSubscription])
 
   const restoreSubscription = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
     const userKey = getClientUserKey(getWebApp()?.initDataUnsafe?.user?.id)
@@ -1181,6 +1230,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     activateSubscription,
     restoreSubscription,
     confirmPendingPayment,
+    refreshSubscriptionAfterExternalPayment,
     syncSubscriptionFromServer,
     syncFlashSaleFromServer,
     activatePendingFlashSaleOffer,

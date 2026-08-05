@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isTelegramUserBlocked } from "@/lib/server/blocked-users-service"
 import { grantManualSubscription } from "@/lib/server/subscription-service"
 import { getSubscriptionByUserKey } from "@/lib/server/subscription-store"
 import { registerTelegramUser } from "@/lib/server/telegram-users"
@@ -24,6 +25,10 @@ export async function POST(request: Request) {
 
     if (!body.telegramUserId || !Number.isFinite(body.telegramUserId)) {
       return NextResponse.json({ error: "MISSING_TELEGRAM_USER_ID" }, { status: 400 })
+    }
+
+    if (await isTelegramUserBlocked(body.telegramUserId)) {
+      return NextResponse.json({ error: "USER_BLOCKED", blocked: true }, { status: 403 })
     }
 
     const record = await registerTelegramUser({

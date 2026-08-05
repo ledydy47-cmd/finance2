@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
-import { PLAN_CONFIG, type SubscriptionPlan } from "@/lib/subscription"
+import { isUserKeyBlocked } from "@/lib/server/blocked-users-service"
 import { savePendingPayment } from "@/lib/server/pending-payment-store"
 import { resolveServerPaywallPricing } from "@/lib/server/paywall-pricing-service"
+import { PLAN_CONFIG, type SubscriptionPlan } from "@/lib/subscription"
 import {
   createYooKassaPayment,
   getAppBaseUrl,
@@ -34,8 +35,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 })
     }
 
-    const planConfig = PLAN_CONFIG[body.plan]
     const userKey = body.userKey.trim()
+    if (await isUserKeyBlocked(userKey)) {
+      return NextResponse.json({ error: "USER_BLOCKED" }, { status: 403 })
+    }
+
+    const planConfig = PLAN_CONFIG[body.plan]
     const orderId = body.orderId.trim()
 
     if (!userKey.startsWith("tg-")) {

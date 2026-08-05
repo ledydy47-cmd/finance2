@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUserKeyBlocked } from "@/lib/server/blocked-users-service"
 import { createSupportTicket } from "@/lib/server/support-service"
 
 export async function POST(request: Request) {
@@ -13,6 +14,10 @@ export async function POST(request: Request) {
 
     if (!body.userKey?.trim()) {
       return NextResponse.json({ error: "MISSING_USER_KEY" }, { status: 400 })
+    }
+
+    if (await isUserKeyBlocked(body.userKey.trim())) {
+      return NextResponse.json({ error: "USER_BLOCKED" }, { status: 403 })
     }
 
     const result = await createSupportTicket({

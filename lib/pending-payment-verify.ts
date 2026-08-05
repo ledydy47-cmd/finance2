@@ -51,3 +51,45 @@ export async function verifyPaymentWithRetry(
 
   return null
 }
+
+export async function verifyPaymentByOrderWithRetry(
+  orderId: string,
+  options?: { maxAttempts?: number; intervalMs?: number },
+): Promise<VerifiedSubscriptionPayload | null> {
+  const maxAttempts = options?.maxAttempts ?? 15
+  const intervalMs = options?.intervalMs ?? 2000
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(
+        `/api/payments/verify-by-order?orderId=${encodeURIComponent(orderId)}`,
+      )
+      const data = (await response.json()) as {
+        active?: boolean
+        paymentId?: string
+        plan?: "yearly" | "monthly"
+        expiresAt?: string
+        autoRenew?: boolean
+        status?: string
+      }
+
+      if (response.ok && data.active && data.paymentId && data.plan && data.expiresAt) {
+        return {
+          paymentId: data.paymentId,
+          plan: data.plan,
+          expiresAt: data.expiresAt,
+          autoRenew: data.autoRenew ?? true,
+          status: data.status ?? "active",
+        }
+      }
+    } catch {
+      // retry
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await sleep(intervalMs)
+    }
+  }
+
+  return null
+}

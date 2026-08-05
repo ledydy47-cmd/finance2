@@ -45,3 +45,4 @@ export function isSubscriptionActive(expiresAt: string | null | undefined) {
 }
 
 export const PENDING_PAYMENT_STORAGE_KEY = "kopilka-pending-payment-id"
+export const PENDING_ORDER_ID_KEY = "kopilka-pending-order-id"

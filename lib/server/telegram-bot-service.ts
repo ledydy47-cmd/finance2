@@ -1,3 +1,4 @@
+import { isTelegramUserBlocked } from "@/lib/server/blocked-users-service"
 import { createSupportTicket } from "@/lib/server/support-service"
 import { sendTelegramNotification } from "@/lib/server/telegram-notify"
 import { ensureAnalyticsUser } from "@/lib/server/user-analytics-service"
@@ -47,6 +48,10 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
   }
 
   const telegramUserId = message.from.id
+  if (await isTelegramUserBlocked(telegramUserId)) {
+    return { handled: true as const, action: "BLOCKED" as const }
+  }
+
   const text = getMessageText(message)
 
   if (!text) {

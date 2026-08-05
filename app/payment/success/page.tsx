@@ -5,42 +5,19 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ThemeApplier } from "@/components/theme/theme-applier"
 import { TelegramProvider, useTelegram } from "@/components/telegram/telegram-provider"
 import { FinanceProvider, useFinance } from "@/context/finance-context"
-import { PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
+import { verifyPaymentByOrderWithRetry } from "@/lib/pending-payment-verify"
+import { PENDING_ORDER_ID_KEY, PENDING_PAYMENT_STORAGE_KEY } from "@/lib/subscription"
 import { getClientUserKey } from "@/lib/client-id"
-
-async function verifyPaymentWithRetryByOrder(orderId: string) {
-  for (let attempt = 0; attempt < 15; attempt += 1) {
-    try {
-      const response = await fetch(
-        `/api/payments/verify-by-order?orderId=${encodeURIComponent(orderId)}`,
-      )
-      const data = (await response.json()) as {
-        active?: boolean
-        paymentId?: string
-        plan?: "yearly" | "monthly"
-        expiresAt?: string
-        autoRenew?: boolean
-        status?: string
-      }
-      if (response.ok && data.active && data.paymentId && data.plan && data.expiresAt) {
-        return data
-      }
-    } catch {
-      // retry
-    }
-
-    if (attempt < 14) {
-      await new Promise((resolve) => window.setTimeout(resolve, 2000))
-    }
-  }
-
-  return null
-}
 
 function PaymentSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { confirmPendingPayment, syncSubscriptionFromServer, activateSubscription } = useFinance()
+  const {
+    confirmPendingPayment,
+    syncSubscriptionFromServer,
+    activateSubscription,
+    refreshSubscriptionAfterExternalPayment,
+  } = useFinance()
   const { user } = useTelegram()
   const [message, setMessage] = useState("Проверяем оплату…")
 
@@ -49,10 +26,13 @@ function PaymentSuccessContent() {
 
     async function verify() {
       const userKey = getClientUserKey(user?.id)
-      const orderId = searchParams.get("orderId")?.trim()
+      const orderId =
+        searchParams.get("orderId")?.trim() ||
+        localStorage.getItem(PENDING_ORDER_ID_KEY)?.trim()
 
       if (orderId) {
-        const verified = await verifyPaymentWithRetryByOrder(orderId)
+        localStorage.setItem(PENDING_ORDER_ID_KEY, orderId)
+        const verified = await verifyPaymentByOrderWithRetry(orderId)
         if (cancelled) return
 
         if (verified) {
@@ -65,9 +45,16 @@ function PaymentSuccessContent() {
               (verified.status as "active" | "canceled" | "past_due" | "expired") ?? "active",
           })
           localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY)
+          localStorage.removeItem(PENDING_ORDER_ID_KEY)
           setMessage("Подписка активирована! Вернитесь в Telegram и откройте приложение.")
           return
         }
+      }
+
+      if (await refreshSubscriptionAfterExternalPayment(userKey)) {
+        if (cancelled) return
+        setMessage("Подписка активирована! Вернитесь в Telegram и откройте приложение.")
+        return
       }
 
       const synced = await syncSubscriptionFromServer(userKey)
@@ -102,7 +89,14 @@ function PaymentSuccessContent() {
     return () => {
       cancelled = true
     }
-  }, [activateSubscription, confirmPendingPayment, searchParams, syncSubscriptionFromServer, user?.id])
+  }, [
+    activateSubscription,
+    confirmPendingPayment,
+    refreshSubscriptionAfterExternalPayment,
+    searchParams,
+    syncSubscriptionFromServer,
+    user?.id,
+  ])
 
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-6">

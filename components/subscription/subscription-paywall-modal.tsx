@@ -15,6 +15,7 @@ import {
 } from "@/lib/paywall-pricing"
 import {
   PAYWALL_TESTIMONIALS,
+  PENDING_ORDER_ID_KEY,
   PENDING_PAYMENT_STORAGE_KEY,
   type SubscriptionPlan,
 } from "@/lib/subscription"
@@ -119,7 +120,7 @@ interface SubscriptionPaywallModalProps {
 
 export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalProps) {
   const { openLink, user } = useTelegram()
-  const { data, restoreSubscription } = useFinance()
+  const { data, restoreSubscription, refreshSubscriptionAfterExternalPayment } = useFinance()
   const [plan, setPlan] = useState<SubscriptionPlan>("yearly")
   const [paying, setPaying] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -168,6 +169,22 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
     return () => window.clearInterval(intervalId)
   }, [flashSale.active, data.settings.paywallFlashSaleStartedAt, user?.id])
 
+  useEffect(() => {
+    if (!user?.id) return
+
+    const userKey = getClientUserKey(user.id)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return
+      void refreshSubscriptionAfterExternalPayment(userKey).then((active) => {
+        if (active) onClose()
+      })
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [onClose, refreshSubscriptionAfterExternalPayment, user?.id])
+
   async function handlePay() {
     if (!agreedToTerms) return
     if (!user?.id) {
@@ -207,7 +224,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
 
       localStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, payload.paymentId)
       if (payload.orderId) {
-        localStorage.setItem("kopilka-pending-order-id", payload.orderId)
+        localStorage.setItem(PENDING_ORDER_ID_KEY, payload.orderId)
       }
       openLink(payload.confirmationUrl)
     } catch {
