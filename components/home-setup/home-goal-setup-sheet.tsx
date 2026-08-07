@@ -9,22 +9,45 @@ import { parseAmount } from "@/lib/budget-planner"
 import { DEFAULT_GOAL_IMAGE } from "@/lib/setup-tour"
 
 export function HomeGoalSetupSheet() {
-  const { addGoal, setShowHomeGoalSetup } = useFinance()
+  const { addGoal, setShowHomeGoalSetup, persistError, clearPersistError } = useFinance()
   const [name, setName] = useState("")
   const [target, setTarget] = useState("")
   const [image, setImage] = useState(DEFAULT_GOAL_IMAGE)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [photoLoading, setPhotoLoading] = useState(false)
 
   const targetAmount = parseAmount(target)
-  const canSave = name.trim().length > 0 && targetAmount > 0
+  const canSave = name.trim().length > 0 && targetAmount > 0 && !photoLoading
   const hasCustomPhoto = image.startsWith("data:")
+  const visibleError = saveError ?? persistError
 
   function handleImageUpload(file: File) {
-    void readFileAsDataUrl(file).then(setImage)
+    setPhotoError(null)
+    setSaveError(null)
+    clearPersistError()
+    setPhotoLoading(true)
+    void readFileAsDataUrl(file)
+      .then((dataUrl) => setImage(dataUrl))
+      .catch(() => {
+        setPhotoError("Не удалось загрузить фото. Попробуйте другое или сохраните цель без фото.")
+      })
+      .finally(() => setPhotoLoading(false))
   }
 
   function handleSave() {
     if (!canSave) return
-    addGoal({ name: name.trim(), targetAmount, image })
+    setSaveError(null)
+    clearPersistError()
+
+    const saved = addGoal({ name: name.trim(), targetAmount, image })
+    if (!saved) {
+      setSaveError(
+        "Не удалось сохранить цель. Попробуйте без своего фото или перезапустите приложение.",
+      )
+      return
+    }
+
     setShowHomeGoalSetup(false)
   }
 
@@ -63,10 +86,16 @@ export function HomeGoalSetupSheet() {
               <Camera className="size-5" strokeWidth={2.4} />
             </span>
             <span className="pointer-events-none rounded-full bg-white px-4 py-1.5 text-sm font-bold text-foreground shadow-md">
-              {hasCustomPhoto ? "Изменить фото" : "Добавить фото"}
+              {photoLoading ? "Загрузка…" : hasCustomPhoto ? "Изменить фото" : "Добавить фото"}
             </span>
           </ImagePickerTrigger>
         </div>
+
+        {photoError && (
+          <p className="mb-3 rounded-block-sm bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+            {photoError}
+          </p>
+        )}
 
         <input
           value={name}
@@ -82,6 +111,12 @@ export function HomeGoalSetupSheet() {
           inputMode="numeric"
           className="mb-4 w-full rounded-block-sm border border-border bg-card px-4 py-3.5 text-sm font-semibold outline-none ring-primary focus:ring-2"
         />
+
+        {visibleError && (
+          <p className="mb-3 rounded-block-sm bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+            {visibleError}
+          </p>
+        )}
 
         <button
           type="button"

@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -21,7 +22,7 @@ import {
   isNewPeriodPending,
   resetCurrentMonthSpending,
 } from "@/lib/period-reset"
-import { loadAppData, saveAppData } from "@/lib/storage"
+import { loadAppData, saveAppData, getSaveErrorMessage } from "@/lib/storage"
 import {
   fetchUserProgress,
   mergeServerProgressIntoAppData,
@@ -115,7 +116,7 @@ interface FinanceContextValue {
     date?: string
   }) => void
   deleteTransaction: (id: string) => void
-  addGoal: (input: Omit<Goal, "id" | "savedAmount">) => void
+  addGoal: (input: Omit<Goal, "id" | "savedAmount">) => boolean
   updateGoal: (id: string, patch: Partial<Omit<Goal, "id">>) => void
   deleteGoal: (id: string) => void
   addToGoal: (id: string, amount: number) => void
@@ -147,6 +148,8 @@ interface FinanceContextValue {
   dismissCreateGoalPrompt: () => void
   setShowGoalCreateForm: (open: boolean) => void
   getCategoryById: (id: string | null) => Category | undefined
+  persistError: string | null
+  clearPersistError: () => void
 }
 
 const FinanceContext = createContext<FinanceContextValue | null>(null)
@@ -263,6 +266,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [celebratingGoal, setCelebratingGoal] = useState<Goal | null>(null)
   const [showCreateGoalPrompt, setShowCreateGoalPrompt] = useState(false)
   const [showGoalCreateForm, setShowGoalCreateFormState] = useState(false)
+  const [persistError, setPersistError] = useState<string | null>(null)
+  const dataRef = useRef(data)
+
+  useEffect(() => {
+    dataRef.current = data
+  }, [data])
 
   useEffect(() => {
     let cancelled = false
@@ -347,8 +356,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return
-    saveAppData(data)
+    const result = saveAppData(data)
+    if (!result.ok) {
+      setPersistError(getSaveErrorMessage(result))
+    }
   }, [data, hydrated])
+
+  const clearPersistError = useCallback(() => setPersistError(null), [])
 
   useEffect(() => {
     if (!hydrated) return
@@ -378,9 +392,28 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const isHomeSetupActive =
     data.settings.onboardingCompleted && !data.settings.homeWalkthroughCompleted
 
-  const update = useCallback((updater: (prev: AppData) => AppData) => {
-    setData((prev) => updater(prev))
-  }, [])
+  const update = useCallback(
+    (updater: (prev: AppData) => AppData): boolean => {
+      const next = updater(dataRef.current)
+      if (!hydrated) {
+        setData(next)
+        dataRef.current = next
+        return true
+      }
+
+      const result = saveAppData(next)
+      if (!result.ok) {
+        setPersistError(getSaveErrorMessage(result))
+        return false
+      }
+
+      setPersistError(null)
+      setData(next)
+      dataRef.current = next
+      return true
+    },
+    [hydrated],
+  )
 
   const telegramUserId = getWebApp()?.initDataUnsafe?.user?.id
   const paywallAccess = useMemo(
@@ -894,11 +927,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   )
 
   const addGoal = useCallback(
-    (input: Omit<Goal, "id" | "savedAmount">) => {
-      if (guardPremiumGoalCreation()) return
-      if (guardLocked()) return
+    (input: Omit<Goal, "id" | "savedAmount">): boolean => {
+      if (guardPremiumGoalCreation()) return false
+      if (guardLocked()) return false
       const goal: Goal = { ...input, id: crypto.randomUUID(), savedAmount: 0 }
-      update((prev) => ({
+      return update((prev) => ({
         ...prev,
         goals: [...prev.goals, goal],
         settings: {
@@ -1264,6 +1297,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     dismissCreateGoalPrompt,
     setShowGoalCreateForm,
     getCategoryById,
+    persistError,
+    clearPersistError,
   }
 
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>

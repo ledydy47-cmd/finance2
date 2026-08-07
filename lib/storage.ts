@@ -100,7 +100,31 @@ function migrateData(data: AppData, defaults: AppData): AppData {
   }
 }
 
-export function saveAppData(data: AppData) {
-  if (typeof window === "undefined") return
-  localStorage.setItem(getStorageKey(), JSON.stringify(data))
+export type SaveAppDataResult =
+  | { ok: true }
+  | { ok: false; reason: "quota" | "unknown" }
+
+export function getSaveErrorMessage(result: Extract<SaveAppDataResult, { ok: false }>) {
+  if (result.reason === "quota") {
+    return "Не хватило места для сохранения. Попробуйте без своего фото или удалите старые цели с большими обложками."
+  }
+  return "Не удалось сохранить данные. Попробуйте ещё раз."
+}
+
+export function saveAppData(data: AppData): SaveAppDataResult {
+  if (typeof window === "undefined") return { ok: true }
+
+  try {
+    localStorage.setItem(getStorageKey(), JSON.stringify(data))
+    return { ok: true }
+  } catch (error) {
+    if (
+      error instanceof DOMException &&
+      (error.name === "QuotaExceededError" || error.code === 22)
+    ) {
+      return { ok: false, reason: "quota" }
+    }
+    console.error("[storage] save failed", error)
+    return { ok: false, reason: "unknown" }
+  }
 }

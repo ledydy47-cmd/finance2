@@ -46,14 +46,4 @@ export function ImagePickerTrigger({
   )
 }
 
-export function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === "string") resolve(reader.result)
-      else reject(new Error("Не удалось прочитать файл"))
-    }
-    reader.onerror = () => reject(reader.error ?? new Error("Не удалось прочитать файл"))
-    reader.readAsDataURL(file)
-  })
-}
+export { readImageFileForStorage as readFileAsDataUrl } from "@/lib/image-storage"

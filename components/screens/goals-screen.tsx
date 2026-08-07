@@ -17,19 +17,35 @@ export function GoalsScreen() {
     setPrimaryGoal,
     showGoalCreateForm,
     setShowGoalCreateForm,
+    persistError,
+    clearPersistError,
   } = useFinance()
   const [name, setName] = useState("")
   const [target, setTarget] = useState("")
   const [image, setImage] = useState("/images/goal-sochi.png")
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [photoLoading, setPhotoLoading] = useState(false)
 
   const activeGoals = getActiveGoals(data.goals)
   const completedGoals = getCompletedGoals(data.goals)
   const showForm = showGoalCreateForm
+  const visibleError = saveError ?? persistError
 
   function handleCreate() {
     const targetAmount = Number(target.replace(/\s/g, ""))
-    if (!name.trim() || targetAmount <= 0) return
-    addGoal({ name: name.trim(), targetAmount, image })
+    if (!name.trim() || targetAmount <= 0 || photoLoading) return
+    setSaveError(null)
+    clearPersistError()
+
+    const saved = addGoal({ name: name.trim(), targetAmount, image })
+    if (!saved) {
+      setSaveError(
+        "Не удалось сохранить цель. Попробуйте без своего фото или перезапустите приложение.",
+      )
+      return
+    }
+
     setName("")
     setTarget("")
     setImage("/images/goal-sochi.png")
@@ -37,7 +53,16 @@ export function GoalsScreen() {
   }
 
   function handleImageUpload(file: File) {
-    void readFileAsDataUrl(file).then(setImage)
+    setPhotoError(null)
+    setSaveError(null)
+    clearPersistError()
+    setPhotoLoading(true)
+    void readFileAsDataUrl(file)
+      .then((dataUrl) => setImage(dataUrl))
+      .catch(() => {
+        setPhotoError("Не удалось загрузить фото. Попробуйте другое или сохраните цель без фото.")
+      })
+      .finally(() => setPhotoLoading(false))
   }
 
   return (
@@ -69,13 +94,24 @@ export function GoalsScreen() {
               className="mb-3 flex w-full cursor-pointer items-center justify-center rounded-block-sm border border-dashed border-border py-6 text-xs font-semibold text-muted-foreground"
               onPick={handleImageUpload}
             >
-              Загрузить фото обложки
+              {photoLoading ? "Загрузка фото…" : "Загрузить фото обложки"}
             </ImagePickerTrigger>
+            {photoError && (
+              <p className="mb-3 rounded-block-sm bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                {photoError}
+              </p>
+            )}
+            {visibleError && (
+              <p className="mb-3 rounded-block-sm bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                {visibleError}
+              </p>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={handleCreate}
-                className="flex-1 rounded-block-sm bg-primary py-3 text-sm font-bold text-primary-foreground"
+                disabled={photoLoading}
+                className="flex-1 rounded-block-sm bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-40"
               >
                 Создать
               </button>
@@ -103,9 +139,13 @@ export function GoalsScreen() {
                   isPrimary={isPrimary}
                   onAdd={() => openAddToGoal(goal.id)}
                   onImageChange={(file) => {
-                    void readFileAsDataUrl(file).then((dataUrl) => {
-                      updateGoal(goal.id, { image: dataUrl })
-                    })
+                    void readFileAsDataUrl(file)
+                      .then((dataUrl) => updateGoal(goal.id, { image: dataUrl }))
+                      .catch(() => {
+                        window.alert(
+                          "Не удалось загрузить фото. Попробуйте другое изображение или оставьте текущую обложку.",
+                        )
+                      })
                   }}
                 />
                 <div className="absolute right-3 top-3 flex gap-2">
