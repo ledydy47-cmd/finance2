@@ -10,8 +10,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const date = new URL(request.url).searchParams.get("date")
-    const summary = await getAnalyticsSummary(date)
+    const url = new URL(request.url)
+    const month = url.searchParams.get("month")?.trim()
+    const date = url.searchParams.get("date")
+    const summary = await getAnalyticsSummary(
+      month ? { monthYmd: month } : { dateYmd: date },
+    )
     return NextResponse.json({ summary })
   } catch (error) {
     console.error("[admin/analytics/summary]", error)

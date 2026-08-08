@@ -198,10 +198,38 @@ export function formatDateInAnalyticsTimezone(date: Date) {
   }).format(date)
 }
 
+function isDateInRange(dateYmd: string, startYmd: string, endYmd: string) {
+  return dateYmd >= startYmd && dateYmd <= endYmd
+}
+
+export function getMonthRange(monthYmd: string) {
+  const [yearRaw, monthRaw] = monthYmd.split("-")
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  if (!year || !month || month < 1 || month > 12) {
+    throw new Error("INVALID_MONTH")
+  }
+
+  const start = `${yearRaw}-${monthRaw}-01`
+  const lastDay = new Date(year, month, 0).getDate()
+  const end = `${yearRaw}-${monthRaw}-${String(lastDay).padStart(2, "0")}`
+  return { start, end }
+}
+
 export function countNewUsersOnDate(users: UserAnalyticsRecord[], dateYmd: string) {
-  return users.filter(
-    (user) => user.appOpenedAt && formatDateInAnalyticsTimezone(new Date(user.appOpenedAt)) === dateYmd,
-  ).length
+  return countNewUsersInRange(users, dateYmd, dateYmd)
+}
+
+export function countNewUsersInRange(
+  users: UserAnalyticsRecord[],
+  startYmd: string,
+  endYmd: string,
+) {
+  return users.filter((user) => {
+    if (!user.appOpenedAt) return false
+    const date = formatDateInAnalyticsTimezone(new Date(user.appOpenedAt))
+    return isDateInRange(date, startYmd, endYmd)
+  }).length
 }
 
 function countUsersWithEventOnDate(
@@ -209,25 +237,96 @@ function countUsersWithEventOnDate(
   eventType: AnalyticsEventType,
   dateYmd: string,
 ) {
+  return countUsersWithEventInRange(users, eventType, dateYmd, dateYmd)
+}
+
+function countUsersWithEventInRange(
+  users: UserAnalyticsRecord[],
+  eventType: AnalyticsEventType,
+  startYmd: string,
+  endYmd: string,
+) {
   return users.filter((user) =>
-    user.events.some(
-      (event) =>
-        event.type === eventType &&
-        formatDateInAnalyticsTimezone(new Date(event.at)) === dateYmd,
-    ),
+    user.events.some((event) => {
+      if (event.type !== eventType) return false
+      const date = formatDateInAnalyticsTimezone(new Date(event.at))
+      return isDateInRange(date, startYmd, endYmd)
+    }),
   ).length
 }
 
 function countUsersWithFirstExpenseOnDate(users: UserAnalyticsRecord[], dateYmd: string) {
-  const fromEvent = countUsersWithEventOnDate(users, "first_expense_added", dateYmd)
-  if (fromEvent > 0) return fromEvent
+  return countUsersWithFirstExpenseInRange(users, dateYmd, dateYmd)
+}
+
+function countUsersWithFirstExpenseInRange(
+  users: UserAnalyticsRecord[],
+  startYmd: string,
+  endYmd: string,
+) {
+  const fromEvent = countUsersWithEventInRange(
+    users,
+    "first_expense_added",
+    startYmd,
+    endYmd,
+  )
+  if (fromEvent > 0 || startYmd !== endYmd) return fromEvent
 
   return users.filter(
     (user) =>
       hasAddedFirstExpense(user) &&
       user.paywallShownAt &&
-      formatDateInAnalyticsTimezone(new Date(user.paywallShownAt)) === dateYmd,
+      formatDateInAnalyticsTimezone(new Date(user.paywallShownAt)) === startYmd,
   ).length
+}
+
+function buildPeriodAnalyticsBucket(
+  users: UserAnalyticsRecord[],
+  startYmd: string,
+  endYmd: string,
+) {
+  return {
+    newUsers: countNewUsersInRange(users, startYmd, endYmd),
+    appOpened: countUsersWithEventInRange(users, "app_opened", startYmd, endYmd),
+    onboardingStarted: countUsersWithEventInRange(
+      users,
+      "onboarding_started",
+      startYmd,
+      endYmd,
+    ),
+    onboardingCompleted: countUsersWithEventInRange(
+      users,
+      "onboarding_completed",
+      startYmd,
+      endYmd,
+    ),
+    walkthroughCompleted: countUsersWithEventInRange(
+      users,
+      "walkthrough_completed",
+      startYmd,
+      endYmd,
+    ),
+    firstExpenseAdded: countUsersWithFirstExpenseInRange(users, startYmd, endYmd),
+    paywallShown: countUsersWithEventInRange(users, "paywall_shown", startYmd, endYmd),
+    subscribedMonthly: countUsersWithEventInRange(
+      users,
+      "subscription_paid_monthly",
+      startYmd,
+      endYmd,
+    ),
+    subscribedYearly: countUsersWithEventInRange(
+      users,
+      "subscription_paid_yearly",
+      startYmd,
+      endYmd,
+    ),
+    autoRenewCanceled: countUsersWithEventInRange(
+      users,
+      "auto_renew_canceled",
+      startYmd,
+      endYmd,
+    ),
+  }
 }
 
 export async function syncUserAppState(input: {
@@ -276,9 +375,11 @@ export async function syncUserAppState(input: {
   })
 }
 
-export async function getAnalyticsSummary(dateYmd?: string | null) {
+export async function getAnalyticsSummary(input?: {
+  dateYmd?: string | null
+  monthYmd?: string | null
+}) {
   const users = Object.values((await readAnalyticsStore()).users)
-  const selectedDate = dateYmd ?? formatDateInAnalyticsTimezone(new Date())
   const allTime = {
     totalUsers: users.length,
     appOpened: users.filter((u) => u.appOpenedAt).length,
@@ -292,20 +393,36 @@ export async function getAnalyticsSummary(dateYmd?: string | null) {
     autoRenewCanceled: users.filter((u) => u.autoRenewCanceledAt).length,
   }
 
-  const daily = {
-    newUsers: countNewUsersOnDate(users, selectedDate),
-    appOpened: countUsersWithEventOnDate(users, "app_opened", selectedDate),
-    onboardingStarted: countUsersWithEventOnDate(users, "onboarding_started", selectedDate),
-    onboardingCompleted: countUsersWithEventOnDate(users, "onboarding_completed", selectedDate),
-    walkthroughCompleted: countUsersWithEventOnDate(users, "walkthrough_completed", selectedDate),
-    firstExpenseAdded: countUsersWithFirstExpenseOnDate(users, selectedDate),
-    paywallShown: countUsersWithEventOnDate(users, "paywall_shown", selectedDate),
-    subscribedMonthly: countUsersWithEventOnDate(users, "subscription_paid_monthly", selectedDate),
-    subscribedYearly: countUsersWithEventOnDate(users, "subscription_paid_yearly", selectedDate),
-    autoRenewCanceled: countUsersWithEventOnDate(users, "auto_renew_canceled", selectedDate),
+  if (input?.monthYmd) {
+    const { start, end } = getMonthRange(input.monthYmd)
+    const monthly = buildPeriodAnalyticsBucket(users, start, end)
+
+    return {
+      period: "month" as const,
+      selectedMonth: input.monthYmd,
+      monthStart: start,
+      monthEnd: end,
+      analyticsTimezone: ANALYTICS_TIMEZONE,
+      monthly,
+      allTime,
+      totalUsers: allTime.totalUsers,
+      totalAppOpened: allTime.appOpened,
+      totalOnboardingStarted: allTime.onboardingStarted,
+      totalOnboardingCompleted: allTime.onboardingCompleted,
+      totalWalkthroughCompleted: allTime.walkthroughCompleted,
+      totalFirstExpenseAdded: allTime.firstExpenseAdded,
+      totalPaywallShown: allTime.paywallShown,
+      totalSubscribedMonthly: allTime.subscribedMonthly,
+      totalSubscribedYearly: allTime.subscribedYearly,
+      totalAutoRenewCanceled: allTime.autoRenewCanceled,
+    }
   }
 
+  const selectedDate = input?.dateYmd ?? formatDateInAnalyticsTimezone(new Date())
+  const daily = buildPeriodAnalyticsBucket(users, selectedDate, selectedDate)
+
   return {
+    period: "day" as const,
     selectedDate,
     analyticsTimezone: ANALYTICS_TIMEZONE,
     daily,

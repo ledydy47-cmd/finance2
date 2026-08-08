@@ -55,12 +55,19 @@ type AnalyticsBucket = {
 }
 
 type SummaryState = {
+  period?: "day" | "month"
   selectedDate?: string
+  selectedMonth?: string
+  monthStart?: string
+  monthEnd?: string
   analyticsTimezone?: string
   daily?: AnalyticsBucket
+  monthly?: AnalyticsBucket
   allTime?: AnalyticsBucket
   newUsersOnDate?: number
 } | null
+
+type StatsPeriod = "day" | "month"
 
 type TabId = "stats" | "users" | "messages" | "support"
 type UserFilter = "all" | "none" | "monthly" | "yearly"
@@ -90,6 +97,30 @@ function todayYmdMoscow() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date())
+}
+
+function currentMonthYmdMoscow() {
+  return todayYmdMoscow().slice(0, 7)
+}
+
+function shiftMonthYmd(monthYmd: string, deltaMonths: number) {
+  const [yearRaw, monthRaw] = monthYmd.split("-")
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  if (!year || !month) return monthYmd
+  const date = new Date(year, month - 1 + deltaMonths, 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+}
+
+function formatMonthLabel(monthYmd: string) {
+  const [yearRaw, monthRaw] = monthYmd.split("-")
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  if (!year || !month) return monthYmd
+  return new Date(year, month - 1, 1).toLocaleDateString("ru-RU", {
+    month: "long",
+    year: "numeric",
+  })
 }
 
 function hasCompletedWalkthrough(user: UserAnalyticsRecord) {
@@ -167,7 +198,9 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const [inputKey, setInputKey] = useState("")
   const [tab, setTab] = useState<TabId>(defaultTab)
   const [summary, setSummary] = useState<SummaryState>(null)
+  const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>("month")
   const [statsDate, setStatsDate] = useState(todayYmdMoscow)
+  const [statsMonth, setStatsMonth] = useState(currentMonthYmdMoscow)
   const [users, setUsers] = useState<UserAnalyticsRecord[]>([])
   const [userFilter, setUserFilter] = useState<UserFilter>("all")
   const [campaigns, setCampaigns] = useState<MessageCampaign[]>([])
@@ -212,14 +245,19 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   )
 
   const loadSummary = useCallback(async () => {
-    const query = statsDate ? `?date=${encodeURIComponent(statsDate)}` : ""
+    const query =
+      statsPeriod === "month"
+        ? `?month=${encodeURIComponent(statsMonth)}`
+        : statsDate
+          ? `?date=${encodeURIComponent(statsDate)}`
+          : ""
     const response = await fetch(`/api/admin/analytics/summary${query}`, { headers: authHeaders() })
     const data = await response.json()
     if (!response.ok) {
       throw new Error(data.error ?? "SUMMARY_FAILED")
     }
     setSummary(data.summary)
-  }, [authHeaders, statsDate])
+  }, [authHeaders, statsDate, statsMonth, statsPeriod])
 
   const loadUsers = useCallback(async () => {
     const query = userFilter === "all" ? "" : `?filter=${userFilter}`
@@ -273,7 +311,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   useEffect(() => {
     if (!adminKey) return
     void refresh()
-  }, [adminKey, userFilter, statsDate, refresh])
+  }, [adminKey, userFilter, statsDate, statsMonth, statsPeriod, refresh])
 
   function handleLogin(event: React.FormEvent) {
     event.preventDefault()
@@ -455,22 +493,66 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
     )
   }
 
+  const periodBucket =
+    summary?.period === "month" ? summary.monthly : summary?.daily
+
+  const periodCards = periodBucket
+    ? [
+        {
+          label: "Новых пользователей",
+          hint: "первый запуск приложения за период",
+          value: periodBucket.newUsers ?? 0,
+          highlight: true,
+        },
+        {
+          label: "Запустили бота",
+          hint: "уникальные пользователи с событием за период",
+          value: periodBucket.appOpened ?? 0,
+        },
+        {
+          label: "Нажали «Начать»",
+          hint: "уникальные пользователи с событием за период",
+          value: periodBucket.onboardingStarted ?? 0,
+        },
+        {
+          label: "Прошли онбординг",
+          hint: "в т.ч. те, кто вернулся позже первого запуска",
+          value: periodBucket.onboardingCompleted ?? 0,
+        },
+        {
+          label: "Прошли обучение (+)",
+          hint: "уникальные пользователи с событием за период",
+          value: periodBucket.walkthroughCompleted ?? 0,
+        },
+        {
+          label: "Добавили расход",
+          hint: "уникальные пользователи с событием за период",
+          value: periodBucket.firstExpenseAdded ?? 0,
+        },
+        {
+          label: "Увидели paywall",
+          hint: "уникальные пользователи с событием за период",
+          value: periodBucket.paywallShown ?? 0,
+        },
+        { label: "Оплатили месяц", value: periodBucket.subscribedMonthly ?? 0 },
+        { label: "Оплатили год", value: periodBucket.subscribedYearly ?? 0 },
+        {
+          label: "Отключили автопродление",
+          value: periodBucket.autoRenewCanceled ?? 0,
+        },
+      ]
+    : []
+
+  const periodTitle =
+    summary?.period === "month"
+      ? `За ${formatMonthLabel(String(summary.selectedMonth ?? statsMonth))} (МСК)`
+      : `За ${formatSelectedDate(String(summary?.selectedDate ?? statsDate))} (МСК)`
+
   const statSections = summary
     ? [
         {
-          title: `За ${formatSelectedDate(String(summary.selectedDate ?? statsDate))} (МСК)`,
-          cards: [
-            { label: "Новых пользователей", value: summary.daily?.newUsers ?? 0, highlight: true },
-            { label: "Запустили бота", value: summary.daily?.appOpened ?? 0 },
-            { label: "Нажали «Начать»", value: summary.daily?.onboardingStarted ?? 0 },
-            { label: "Прошли онбординг", value: summary.daily?.onboardingCompleted ?? 0 },
-            { label: "Прошли обучение (+)", value: summary.daily?.walkthroughCompleted ?? 0 },
-            { label: "Добавили расход", value: summary.daily?.firstExpenseAdded ?? 0 },
-            { label: "Увидели paywall", value: summary.daily?.paywallShown ?? 0 },
-            { label: "Оплатили месяц", value: summary.daily?.subscribedMonthly ?? 0 },
-            { label: "Оплатили год", value: summary.daily?.subscribedYearly ?? 0 },
-            { label: "Отключили автопродление", value: summary.daily?.autoRenewCanceled ?? 0 },
-          ],
+          title: periodTitle,
+          cards: periodCards,
         },
         {
           title: "За всё время",
@@ -534,22 +616,88 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
 
         {tab === "stats" && (
           <div className="space-y-6">
-            <div className="flex flex-wrap items-end gap-3 rounded-block border border-border bg-card p-4">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground">
-                  Дата аналитики (МСК)
-                </span>
-                <input
-                  type="date"
-                  value={statsDate}
-                  onChange={(e) => setStatsDate(e.target.value || todayYmdMoscow())}
-                  className="rounded-block-sm border border-border bg-background px-3 py-2 text-sm"
-                />
-              </label>
-              <p className="text-sm text-muted-foreground">
-                Сверху — уникальные пользователи с событием в выбранный день. Снизу — накопительно
-                по всей базе.
-              </p>
+            <div className="space-y-4 rounded-block border border-border bg-card p-4">
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["month", "Месяц"],
+                    ["day", "День"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setStatsPeriod(id)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                      statsPeriod === id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {statsPeriod === "month" ? (
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStatsMonth(currentMonthYmdMoscow())}
+                      className={`rounded-block-sm px-3 py-2 text-sm font-semibold ${
+                        statsMonth === currentMonthYmdMoscow()
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-border bg-background"
+                      }`}
+                    >
+                      Текущий месяц
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatsMonth(shiftMonthYmd(currentMonthYmdMoscow(), -1))}
+                      className={`rounded-block-sm px-3 py-2 text-sm font-semibold ${
+                        statsMonth === shiftMonthYmd(currentMonthYmdMoscow(), -1)
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-border bg-background"
+                      }`}
+                    >
+                      Прошлый месяц
+                    </button>
+                  </div>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-muted-foreground">Месяц (МСК)</span>
+                    <input
+                      type="month"
+                      value={statsMonth}
+                      onChange={(e) => setStatsMonth(e.target.value || currentMonthYmdMoscow())}
+                      className="rounded-block-sm border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">Дата (МСК)</span>
+                  <input
+                    type="date"
+                    value={statsDate}
+                    onChange={(e) => setStatsDate(e.target.value || todayYmdMoscow())}
+                    className="rounded-block-sm border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+              )}
+
+              <div className="rounded-block-sm bg-secondary/50 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
+                <p>
+                  <strong className="font-semibold text-foreground">Новых пользователей</strong> — только
+                  те, кто впервые открыл приложение за выбранный период.
+                </p>
+                <p className="mt-1">
+                  Остальные шаги воронки считают уникальных пользователей с событием за период — в том
+                  числе вернувшихся позже. Поэтому «Прошли онбординг» может быть больше, чем «Новых
+                  пользователей».
+                </p>
+              </div>
             </div>
 
             {statSections.map((section) => (
@@ -566,6 +714,11 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                       }`}
                     >
                       <p className="text-xs text-muted-foreground">{card.label}</p>
+                      {"hint" in card && card.hint ? (
+                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/80">
+                          {card.hint}
+                        </p>
+                      ) : null}
                       <p className="mt-1 font-serif text-3xl font-bold">{card.value ?? 0}</p>
                     </div>
                   ))}
