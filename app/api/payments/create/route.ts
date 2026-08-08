@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       returnUrl,
       amount: pricing.amount,
       description: planConfig.description,
+      savePaymentMethod: body.plan === "monthly",
     })
 
     await savePendingPayment({

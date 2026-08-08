@@ -82,11 +82,15 @@ export async function activateSubscriptionFromPayment(payment: YooKassaPayment) 
       : nowIso()
 
   const currentPeriodEnd = extendPeriodEnd(plan, baseDate)
-  const paymentMethodId =
-    payment.payment_method?.id ?? existing?.paymentMethodId ?? null
-  const autoRenew = Boolean(payment.payment_method?.saved && paymentMethodId)
+  const isYearlyOneTime = plan === "yearly"
+  const paymentMethodId = isYearlyOneTime
+    ? null
+    : payment.payment_method?.id ?? existing?.paymentMethodId ?? null
+  const autoRenew = isYearlyOneTime
+    ? false
+    : Boolean(payment.payment_method?.saved && paymentMethodId)
 
-  if (!paymentMethodId) {
+  if (!isYearlyOneTime && !paymentMethodId) {
     console.warn(
       "[subscription] payment succeeded without saved payment_method — auto-renew disabled",
       payment.id,

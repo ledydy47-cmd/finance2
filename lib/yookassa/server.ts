@@ -97,7 +97,10 @@ export async function createYooKassaPayment(input: {
   returnUrl: string
   amount: string
   description: string
+  savePaymentMethod?: boolean
 }): Promise<YooKassaPayment> {
+  const savePaymentMethod = input.savePaymentMethod ?? true
+
   const response = await fetch("https://api.yookassa.ru/v3/payments", {
     method: "POST",
     headers: {
@@ -123,7 +126,7 @@ export async function createYooKassaPayment(input: {
         userKey: input.userKey,
         orderId: input.orderId,
       },
-      save_payment_method: true,
+      ...(savePaymentMethod ? { save_payment_method: true } : {}),
     }),
   })
 

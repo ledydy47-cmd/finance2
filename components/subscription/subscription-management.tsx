@@ -26,6 +26,7 @@ export function SubscriptionManagement() {
   const planLabel = settings.subscriptionPlan
     ? PLAN_CONFIG[settings.subscriptionPlan].label
     : "Подписка"
+  const isYearlyPlan = settings.subscriptionPlan === "yearly"
 
   async function handleCancelRenewal() {
     setLoading(true)
@@ -100,11 +101,16 @@ export function SubscriptionManagement() {
         </p>
         <p className="mt-1">
           <span className="font-semibold text-foreground">Автопродление:</span>{" "}
-          {settings.autoRenew === false ? "выключено" : "включено"}
+          {isYearlyPlan
+            ? "не подключается (разовый платёж на год)"
+            : settings.autoRenew === false
+              ? "выключено"
+              : "включено"}
         </p>
       </div>
 
-      {settings.autoRenew === false ? (
+      {!isYearlyPlan &&
+        (settings.autoRenew === false ? (
         <button
           type="button"
           disabled={loading}
@@ -122,9 +128,9 @@ export function SubscriptionManagement() {
         >
           Отменить автопродление
         </button>
-      )}
+      ))}
 
-      {confirmCancel && (
+      {!isYearlyPlan && confirmCancel && (
         <div className="rounded-block-sm border border-border bg-background p-3">
           <p className="text-sm leading-relaxed text-foreground">
             Автопродление будет отключено. Доступ сохранится до{" "}
