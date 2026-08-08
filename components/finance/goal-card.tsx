@@ -2,19 +2,18 @@ import Image from "next/image"
 import { Camera, Plus } from "lucide-react"
 import { ImagePickerTrigger } from "@/components/ui/image-picker-trigger"
 
+import { formatMoney, type AppCurrency } from "@/lib/currency"
+
 interface GoalCardProps {
   name: string
   saved: number
   target: number
   image: string
+  currency: AppCurrency
   isPrimary?: boolean
   completed?: boolean
   onAdd?: () => void
   onImageChange?: (file: File) => void
-}
-
-function formatRub(value: number) {
-  return `${value.toLocaleString("ru-RU")} ₽`
 }
 
 export function GoalCard({
@@ -22,6 +21,7 @@ export function GoalCard({
   saved,
   target,
   image,
+  currency,
   isPrimary,
   completed,
   onAdd,
@@ -80,9 +80,9 @@ export function GoalCard({
         </div>
 
         <p className="mt-1 text-sm font-medium text-muted-foreground">
-          <span className="text-card-foreground">{formatRub(saved)}</span>
+          <span className="text-card-foreground">{formatMoney(saved, currency)}</span>
           {" из "}
-          {formatRub(target)}
+          {formatMoney(target, currency)}
         </p>
 
         <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-secondary">

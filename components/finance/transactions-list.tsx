@@ -16,7 +16,8 @@ export function TransactionsList({
   emptyMessage = "Нет операций за этот период",
   deletable = true,
 }: TransactionsListProps) {
-  const { getCategoryById, deleteTransaction } = useFinance()
+  const { getCategoryById, deleteTransaction, data } = useFinance()
+  const currency = data.settings.currency
 
   const sorted = [...transactions].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
@@ -55,6 +56,7 @@ export function TransactionsList({
             type={tx.type}
             tint={category?.tint ?? "var(--accent)"}
             bar={category?.bar ?? "var(--primary)"}
+            currency={currency}
             onDelete={deletable ? () => handleDelete(tx) : undefined}
           />
         )

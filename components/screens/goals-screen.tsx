@@ -136,6 +136,7 @@ export function GoalsScreen() {
                   saved={goal.savedAmount}
                   target={goal.targetAmount}
                   image={goal.image}
+                  currency={data.settings.currency}
                   isPrimary={isPrimary}
                   onAdd={() => openAddToGoal(goal.id)}
                   onImageChange={(file) => {
@@ -186,6 +187,7 @@ export function GoalsScreen() {
                   saved={goal.savedAmount}
                   target={goal.targetAmount}
                   image={goal.image}
+                  currency={data.settings.currency}
                   completed
                 />
               ))}

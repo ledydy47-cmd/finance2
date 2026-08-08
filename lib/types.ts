@@ -1,3 +1,4 @@
+import type { AppCurrency } from "@/lib/currency"
 import type { ThemeId } from "@/lib/themes"
 import type { SubscriptionPlan } from "@/lib/subscription"
 
@@ -54,7 +55,7 @@ export interface BudgetPlanState {
 
 export interface Settings {
   userName: string
-  currency: "RUB"
+  currency: AppCurrency
   monthStartDay: number
   primaryGoalId: string | null
   themeId: ThemeId

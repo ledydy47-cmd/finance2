@@ -10,12 +10,11 @@ import {
   FINANCE_FEELING_OPTIONS,
   MONEY_PROBLEM_OPTIONS,
   ONBOARDING_TOTAL_STEPS,
-  SAVINGS_PRESETS,
   SAVING_MOTIVATION_OPTIONS,
   createOnboardingDraft,
   type OnboardingDraft,
 } from "@/lib/onboarding"
-import { formatRub } from "@/lib/format"
+import { formatMoney, getSavingsPresets, isAppCurrency } from "@/lib/currency"
 import { parseAmount } from "@/lib/budget-planner"
 import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
@@ -212,6 +211,11 @@ export function OnboardingFlow() {
         return false
     }
   }, [step, draft, customSavingsMode])
+
+  const savingsPresets = useMemo(
+    () => getSavingsPresets(draft.currency),
+    [draft.currency],
+  )
 
   function finishOnboarding() {
     const monthlySavings = customSavingsMode
@@ -414,10 +418,20 @@ export function OnboardingFlow() {
       {step === 10 && (
         <OnboardingStepShell {...shellProps}>
           <h2 className="font-serif text-2xl font-bold text-foreground">Выбери валюту</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Сейчас доступен российский рубль</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Все суммы в приложении будут в выбранной валюте. Подписка оплачивается в рублях.
+          </p>
           <select
             value={draft.currency}
-            onChange={(e) => patch({ currency: e.target.value as "RUB" })}
+            onChange={(e) => {
+              const nextCurrency = isAppCurrency(e.target.value) ? e.target.value : draft.currency
+              patch({
+                currency: nextCurrency,
+                monthlySavings: null,
+                customSavings: "",
+              })
+              setCustomSavingsMode(false)
+            }}
             className="mt-6 w-full rounded-block-sm border border-border bg-card px-4 py-4 text-base font-semibold outline-none ring-primary focus:ring-2"
           >
             {CURRENCY_OPTIONS.map((c) => (
@@ -435,7 +449,7 @@ export function OnboardingFlow() {
             Сколько хочешь откладывать в месяц?
           </h2>
           <div className="mt-4 grid w-full grid-cols-3 gap-2">
-            {SAVINGS_PRESETS.map((amount) => (
+            {savingsPresets.map((amount) => (
               <button
                 key={amount}
                 type="button"
@@ -449,7 +463,7 @@ export function OnboardingFlow() {
                     : "bg-card text-foreground shadow-sm shadow-primary/5"
                 }`}
               >
-                {formatRub(amount)}
+                {formatMoney(amount, draft.currency)}
               </button>
             ))}
             <button

@@ -116,6 +116,7 @@ export function DashboardScreen() {
                   saved={featuredGoal.savedAmount}
                   target={featuredGoal.targetAmount}
                   image={featuredGoal.image}
+                  currency={data.settings.currency}
                   isPrimary
                   onAdd={() => openAddToGoal(featuredGoal.id)}
                 />
@@ -125,7 +126,12 @@ export function DashboardScreen() {
         )}
 
         <div className="mt-6">
-          <BalanceCard left={summary.left} income={summary.income} spent={summary.spent} />
+          <BalanceCard
+            left={summary.left}
+            income={summary.income}
+            spent={summary.spent}
+            currency={data.settings.currency}
+          />
         </div>
 
         <button
@@ -195,6 +201,7 @@ export function DashboardScreen() {
                   daysLeft={daysLeftInPeriod}
                   tint={category.tint}
                   bar={category.bar}
+                  currency={data.settings.currency}
                   onQuickAdd={isHomeSetupActive ? undefined : openAddTransactionForCategory}
                 />
               ))}

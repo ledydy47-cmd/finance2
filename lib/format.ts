@@ -13,8 +13,12 @@ const MONTHS = [
   "Декабрь",
 ]
 
-export function formatRub(value: number) {
-  return `${Math.round(value).toLocaleString("ru-RU")} ₽`
+import { DEFAULT_CURRENCY, formatMoney, type AppCurrency } from "@/lib/currency"
+
+export { formatMoney, type AppCurrency }
+
+export function formatRub(value: number, currency: AppCurrency = DEFAULT_CURRENCY) {
+  return formatMoney(value, currency)
 }
 
 export function formatMonthYear(date: Date) {

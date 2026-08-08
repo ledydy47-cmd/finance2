@@ -7,6 +7,7 @@ import { SupportSection } from "@/components/support/support-section"
 import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
 import { getClientUserKey } from "@/lib/client-id"
+import { CURRENCY_OPTIONS, normalizeAppCurrency } from "@/lib/currency"
 import { useEffect } from "react"
 
 export function SettingsScreen() {
@@ -122,7 +123,23 @@ export function SettingsScreen() {
             Месяц в приложении начинается с этого дня. Если зарплата приходит 29–31 числа,
             выберите 28 — так период будет считаться стабильно во всех месяцах.
           </p>
-          <p className="text-xs text-muted-foreground">Валюта: ₽ (рубль)</p>
+          <label className="mb-1 block text-xs font-semibold text-muted-foreground">Валюта</label>
+          <select
+            value={data.settings.currency}
+            onChange={(e) =>
+              updateSettings({ currency: normalizeAppCurrency(e.target.value) })
+            }
+            className="mb-2 w-full rounded-block-sm border border-border bg-background px-4 py-3 text-sm outline-none ring-primary focus:ring-2"
+          >
+            {CURRENCY_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Суммы в приложении — в выбранной валюте. Подписка оплачивается в рублях.
+          </p>
         </section>
 
         <section className="mt-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">

@@ -2,11 +2,12 @@
 
 import { useFinance } from "@/context/finance-context"
 import { getCategorySpent } from "@/lib/calculations"
-import { formatPercent, formatRub } from "@/lib/format"
+import { formatPercent, formatMoney } from "@/lib/format"
 import { CategoryCard } from "@/components/finance/category-card"
 
 export function StatsScreen() {
   const { data, periodKey, periodLabel, summary } = useFinance()
+  const currency = data.settings.currency
 
   const totalBudget = data.categories.reduce((sum, c) => sum + c.monthlyLimit, 0)
   const budgetUsed = formatPercent(summary.spent, totalBudget)
@@ -23,10 +24,10 @@ export function StatsScreen() {
         <div className="rounded-block bg-card p-5 shadow-sm shadow-primary/5">
           <p className="text-sm font-medium text-muted-foreground">Бюджет месяца</p>
           <p className="mt-1 font-serif text-3xl font-bold">
-            {formatRub(summary.spent)}
+            {formatMoney(summary.spent, currency)}
             <span className="text-lg font-medium text-muted-foreground">
               {" "}
-              / {formatRub(totalBudget)}
+              / {formatMoney(totalBudget, currency)}
             </span>
           </p>
           <div className="mt-4 h-3 overflow-hidden rounded-full bg-secondary">
@@ -37,8 +38,8 @@ export function StatsScreen() {
           </div>
           <p className={`mt-2 text-sm font-semibold ${onTrack ? "text-[color:var(--success)]" : "text-destructive"}`}>
             {onTrack
-              ? `В рамках бюджета · осталось ${formatRub(totalBudget - summary.spent)}`
-              : `Перерасход ${formatRub(summary.spent - totalBudget)}`}
+              ? `В рамках бюджета · осталось ${formatMoney(totalBudget - summary.spent, currency)}`
+              : `Перерасход ${formatMoney(summary.spent - totalBudget, currency)}`}
           </p>
         </div>
 
@@ -61,6 +62,7 @@ export function StatsScreen() {
                   budget={category.monthlyLimit}
                   tint={category.tint}
                   bar={category.bar}
+                  currency={currency}
                 />
               )
             })}
@@ -70,11 +72,13 @@ export function StatsScreen() {
         <div className="mt-6 grid grid-cols-2 gap-3">
           <div className="rounded-block bg-primary/10 p-4">
             <p className="text-xs font-semibold text-muted-foreground">Доход</p>
-            <p className="mt-1 font-serif text-xl font-bold text-primary">{formatRub(summary.income)}</p>
+            <p className="mt-1 font-serif text-xl font-bold text-primary">
+              {formatMoney(summary.income, currency)}
+            </p>
           </div>
           <div className="rounded-block bg-accent p-4">
             <p className="text-xs font-semibold text-muted-foreground">Свободно</p>
-            <p className="mt-1 font-serif text-xl font-bold">{formatRub(summary.left)}</p>
+            <p className="mt-1 font-serif text-xl font-bold">{formatMoney(summary.left, currency)}</p>
           </div>
         </div>
       </div>

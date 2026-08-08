@@ -102,9 +102,16 @@ export const FINANCE_FEELING_OPTIONS = [
   { id: "confusion", label: "Растерянность", emoji: "🌀" },
 ] as const
 
-export const SAVINGS_PRESETS = [3000, 5000, 10000, 15000, 20000] as const
+import {
+  CURRENCY_OPTIONS,
+  DEFAULT_CURRENCY,
+  getSavingsPresets,
+  type AppCurrency,
+} from "@/lib/currency"
 
-export const CURRENCY_OPTIONS = [{ id: "RUB" as const, label: "₽ Рубль" }]
+export { CURRENCY_OPTIONS, getSavingsPresets as getOnboardingSavingsPresets }
+
+export const SAVINGS_PRESETS = getSavingsPresets(DEFAULT_CURRENCY)
 
 export interface OnboardingDraft {
   name: string
@@ -112,7 +119,7 @@ export interface OnboardingDraft {
   savingMotivation: string
   moneyProblem: string
   financeFeeling: string
-  currency: "RUB"
+  currency: AppCurrency
   monthlySavings: number | null
   customSavings: string
 }
@@ -124,7 +131,7 @@ export function createOnboardingDraft(userName = ""): OnboardingDraft {
     savingMotivation: "",
     moneyProblem: "",
     financeFeeling: "",
-    currency: "RUB",
+    currency: DEFAULT_CURRENCY,
     monthlySavings: null,
     customSavings: "",
   }

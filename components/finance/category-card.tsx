@@ -1,4 +1,5 @@
 import { CategoryIconBadge } from "@/components/finance/category-icon"
+import { formatMoney, type AppCurrency } from "@/lib/currency"
 
 interface CategoryCardProps {
   icon: string
@@ -7,13 +8,18 @@ interface CategoryCardProps {
   budget: number
   tint: string
   bar: string
+  currency: AppCurrency
 }
 
-function formatRub(value: number) {
-  return `${value.toLocaleString("ru-RU")} ₽`
-}
-
-export function CategoryCard({ icon, name, spent, budget, tint, bar }: CategoryCardProps) {
+export function CategoryCard({
+  icon,
+  name,
+  spent,
+  budget,
+  tint,
+  bar,
+  currency,
+}: CategoryCardProps) {
   const percent = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : spent > 0 ? 100 : 0
   const remaining = Math.max(0, budget - spent)
   const overBudget = spent > budget
@@ -27,9 +33,9 @@ export function CategoryCard({ icon, name, spent, budget, tint, bar }: CategoryC
           <div className="flex items-baseline justify-between gap-2">
             <p className="truncate font-serif text-[15px] font-semibold text-card-foreground">{name}</p>
             <p className="shrink-0 text-xs font-medium text-muted-foreground">
-              <span className="text-card-foreground">{formatRub(spent)}</span>
+              <span className="text-card-foreground">{formatMoney(spent, currency)}</span>
               {" / "}
-              {formatRub(budget)}
+              {formatMoney(budget, currency)}
             </p>
           </div>
 
@@ -45,9 +51,13 @@ export function CategoryCard({ icon, name, spent, budget, tint, bar }: CategoryC
 
           <p className="mt-1.5 text-xs font-medium">
             {overBudget ? (
-              <span className="text-destructive">Превышение на {formatRub(spent - budget)}</span>
+              <span className="text-destructive">
+                Превышение на {formatMoney(spent - budget, currency)}
+              </span>
             ) : (
-              <span className="text-[color:var(--success)]">Осталось {formatRub(remaining)}</span>
+              <span className="text-[color:var(--success)]">
+                Осталось {formatMoney(remaining, currency)}
+              </span>
             )}
           </p>
         </div>

@@ -2,6 +2,7 @@ import type { AppData } from "./types"
 import { createDefaultData } from "./default-data"
 import { emojiForCategoryId } from "./category-icons"
 import { DEFAULT_THEME_ID, isThemeId } from "./themes"
+import { normalizeAppCurrency } from "./currency"
 import {
   buildCategoriesFromPlan,
   migrateLegacyBudgetPlan,
@@ -86,6 +87,7 @@ function migrateData(data: AppData, defaults: AppData): AppData {
       themeId: isThemeId(data.settings.themeId ?? "")
         ? data.settings.themeId
         : DEFAULT_THEME_ID,
+      currency: normalizeAppCurrency(data.settings.currency),
       firstExpenseAdded: data.transactions.some((tx) => tx.type === "expense"),
       paywallShown: data.settings.paywallShown ?? false,
       paywallFlashSaleStartedAt: data.settings.paywallFlashSaleStartedAt ?? null,

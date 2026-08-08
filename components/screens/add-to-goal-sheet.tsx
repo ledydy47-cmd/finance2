@@ -3,10 +3,11 @@
 import { useState } from "react"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { useFinance } from "@/context/finance-context"
-import { formatRub, formatPercent } from "@/lib/format"
+import { formatMoney, formatPercent } from "@/lib/format"
 
 export function AddToGoalSheet() {
   const { data, addToGoalTargetId, closeAddToGoal, addToGoal } = useFinance()
+  const currency = data.settings.currency
   const [amount, setAmount] = useState("")
 
   const goal = data.goals.find((g) => g.id === addToGoalTargetId)
@@ -50,7 +51,7 @@ export function AddToGoalSheet() {
       <div className="mb-5 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
         <p className="font-serif text-base font-bold text-foreground">{goal.name}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {formatRub(goal.savedAmount)} из {formatRub(goal.targetAmount)} · {percent}%
+          {formatMoney(goal.savedAmount, currency)} из {formatMoney(goal.targetAmount, currency)} · {percent}%
         </p>
         <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-secondary">
           <div
@@ -59,7 +60,7 @@ export function AddToGoalSheet() {
           />
         </div>
         <p className="mt-2 text-xs font-medium text-[color:var(--success)]">
-          Осталось {formatRub(remaining)}
+          Осталось {formatMoney(remaining, currency)}
         </p>
       </div>
 

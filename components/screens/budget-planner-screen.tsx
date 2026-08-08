@@ -18,7 +18,8 @@ import {
   iconOptionForCategoryId,
   type CategoryIconOption,
 } from "@/lib/category-icons"
-import { formatRub } from "@/lib/format"
+import { formatMoney } from "@/lib/format"
+import type { AppCurrency } from "@/lib/currency"
 import { SETUP_TOUR_CATEGORIES } from "@/lib/setup-tour"
 import type { Category } from "@/lib/types"
 
@@ -86,6 +87,7 @@ function EntryListSection({
   onUpdate,
   onRemove,
   addLabel,
+  currency,
 }: {
   title: string
   subtotalLabel: string
@@ -95,13 +97,14 @@ function EntryListSection({
   onUpdate: (id: string, patch: Partial<EntryDraft>) => void
   onRemove: (id: string) => void
   addLabel: string
+  currency: AppCurrency
 }) {
   return (
     <section className="rounded-block bg-card p-4 shadow-sm shadow-primary/5">
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <h2 className="font-serif text-base font-bold text-foreground">{title}</h2>
         <p className="text-xs font-semibold text-muted-foreground">
-          {subtotalLabel}: {formatRub(subtotal)}
+          {subtotalLabel}: {formatMoney(subtotal, currency)}
         </p>
       </div>
 
@@ -208,6 +211,7 @@ export function BudgetPlannerScreen() {
     getPrimaryGoal,
     isHomeSetupActive,
   } = useFinance()
+  const currency = data.settings.currency
 
   const [incomeSources, setIncomeSources] = useState<EntryDraft[]>([])
   const [mandatoryExpenses, setMandatoryExpenses] = useState<CategoryEntryDraft[]>([])
@@ -413,6 +417,7 @@ export function BudgetPlannerScreen() {
           }
           onRemove={(id) => setIncomeSources((prev) => prev.filter((e) => e.id !== id))}
           addLabel="Добавить доход"
+          currency={currency}
         />
 
         <div className="mt-4">
@@ -420,7 +425,7 @@ export function BudgetPlannerScreen() {
             <div className="mb-3 flex items-baseline justify-between gap-2">
               <h2 className="font-serif text-base font-bold text-foreground">Обязательные расходы</h2>
               <p className="text-xs font-semibold text-muted-foreground">
-                Обязательные: {formatRub(mandatoryTotal)}
+                Обязательные: {formatMoney(mandatoryTotal, currency)}
               </p>
             </div>
 
@@ -508,7 +513,7 @@ export function BudgetPlannerScreen() {
               overspent ? "text-destructive" : "text-primary"
             }`}
           >
-            {formatRub(remaining)}
+            {formatMoney(remaining, currency)}
           </p>
           {overspent && (
             <p className="mt-2 text-sm font-semibold text-destructive">
@@ -596,7 +601,7 @@ export function BudgetPlannerScreen() {
                 overspent ? "text-muted-foreground" : "text-primary"
               }`}
             >
-              {formatRub(overspent ? 0 : dreamAmount)}
+              {formatMoney(overspent ? 0 : dreamAmount, currency)}
             </p>
           </section>
         )}

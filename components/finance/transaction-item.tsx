@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react"
 import { CategoryIconBadge } from "@/components/finance/category-icon"
+import { formatMoney, type AppCurrency } from "@/lib/currency"
 import type { TransactionType } from "@/lib/types"
 
 interface TransactionItemProps {
@@ -10,11 +11,8 @@ interface TransactionItemProps {
   type?: TransactionType
   tint: string
   bar: string
+  currency: AppCurrency
   onDelete?: () => void
-}
-
-function formatRub(value: number) {
-  return `${value.toLocaleString("ru-RU")} ₽`
 }
 
 export function TransactionItem({
@@ -25,6 +23,7 @@ export function TransactionItem({
   type = "expense",
   tint,
   bar,
+  currency,
   onDelete,
 }: TransactionItemProps) {
   const prefix = type === "income" ? "+" : "-"
@@ -42,7 +41,7 @@ export function TransactionItem({
         }`}
       >
         {prefix}
-        {formatRub(amount)}
+        {formatMoney(amount, currency)}
       </p>
       {onDelete && (
         <button

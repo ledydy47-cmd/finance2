@@ -14,7 +14,7 @@ import {
 } from "recharts"
 import { useFinance } from "@/context/finance-context"
 import { getCategorySpent, getDailySpendingMap } from "@/lib/calculations"
-import { formatRub } from "@/lib/format"
+import { formatMoney } from "@/lib/format"
 import { getPeriodBounds } from "@/lib/period"
 
 const FALLBACK_COLORS = {
@@ -46,6 +46,7 @@ const CHART_COLORS = [
 
 export function AnalyticsScreen() {
   const { data, periodKey, periodLabel, summary } = useFinance()
+  const currency = data.settings.currency
   const comparisonColors = useComparisonChartColors()
 
   const pieData = data.categories
@@ -120,7 +121,7 @@ export function AnalyticsScreen() {
                         <Cell key={entry.name} fill={entry.color ?? CHART_COLORS[index % CHART_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => formatRub(Number(value))} />
+                    <Tooltip formatter={(value) => formatMoney(Number(value), currency)} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -128,7 +129,7 @@ export function AnalyticsScreen() {
                 {pieData.map((item) => (
                   <div key={item.name} className="flex items-center justify-between text-xs">
                     <span className="font-medium">{item.name}</span>
-                    <span className="font-bold">{formatRub(item.value)}</span>
+                    <span className="font-bold">{formatMoney(item.value, currency)}</span>
                   </div>
                 ))}
               </div>
@@ -161,7 +162,7 @@ export function AnalyticsScreen() {
                 <YAxis tick={{ fontSize: 11, fill: "currentColor" }} width={42} />
                 <Tooltip
                   formatter={(value, name) => [
-                    formatRub(Number(value)),
+                    formatMoney(Number(value), currency),
                     name === "spent" ? "Расходы" : "Доход",
                   ]}
                   labelFormatter={(label) => `Период: ${label}`}
@@ -194,7 +195,7 @@ export function AnalyticsScreen() {
             {heatmapDays.map((item) => (
               <div
                 key={item.day}
-                title={item.amount > 0 ? `${item.day}: ${formatRub(item.amount)}` : `${item.day}`}
+                title={item.amount > 0 ? `${item.day}: ${formatMoney(item.amount, currency)}` : `${item.day}`}
                 className="flex aspect-square items-center justify-center rounded-lg text-[10px] font-semibold"
                 style={{
                   backgroundColor: `color-mix(in oklch, var(--primary) ${Math.round(12 + item.intensity * 75)}%, transparent)`,
@@ -211,15 +212,15 @@ export function AnalyticsScreen() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Доход</span>
-              <span className="font-bold text-[color:var(--success)]">{formatRub(summary.income)}</span>
+              <span className="font-bold text-[color:var(--success)]">{formatMoney(summary.income, currency)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Расходы</span>
-              <span className="font-bold text-destructive">{formatRub(summary.spent)}</span>
+              <span className="font-bold text-destructive">{formatMoney(summary.spent, currency)}</span>
             </div>
             <div className="flex justify-between border-t border-border pt-2">
               <span className="font-semibold">Остаток</span>
-              <span className="font-serif text-lg font-bold">{formatRub(summary.left)}</span>
+              <span className="font-serif text-lg font-bold">{formatMoney(summary.left, currency)}</span>
             </div>
           </div>
         </section>

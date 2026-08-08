@@ -2,7 +2,8 @@
 
 import { Pencil } from "lucide-react"
 import { CategoryIconBadge } from "@/components/finance/category-icon"
-import { formatDaysLeftLabel, formatOperationsCount, formatRub } from "@/lib/format"
+import { formatDaysLeftLabel, formatOperationsCount, formatMoney } from "@/lib/format"
+import type { AppCurrency } from "@/lib/currency"
 
 interface HomeCategoryCardProps {
   categoryId: string
@@ -14,6 +15,7 @@ interface HomeCategoryCardProps {
   daysLeft: number
   tint: string
   bar: string
+  currency: AppCurrency
   onQuickAdd?: (categoryId: string) => void
 }
 
@@ -27,6 +29,7 @@ export function HomeCategoryCard({
   daysLeft,
   tint,
   bar,
+  currency,
   onQuickAdd,
 }: HomeCategoryCardProps) {
   const overBudget = spent > budget
@@ -58,17 +61,17 @@ export function HomeCategoryCard({
       </div>
 
       <p className="mt-3 text-base leading-snug">
-        <span className="font-serif text-xl font-bold text-card-foreground">{formatRub(spent)}</span>
-        <span className="font-medium text-muted-foreground"> / {formatRub(budget)}</span>
+        <span className="font-serif text-xl font-bold text-card-foreground">{formatMoney(spent, currency)}</span>
+        <span className="font-medium text-muted-foreground"> / {formatMoney(budget, currency)}</span>
         {overBudget ? (
           <span className="font-semibold text-destructive">
             {" "}
-            · превышение на {formatRub(spent - budget)}
+            · превышение на {formatMoney(spent - budget, currency)}
           </span>
         ) : (
           <span className="font-semibold text-[color:var(--success)]">
             {" "}
-            · осталось {formatRub(Math.max(0, remaining))}
+            · осталось {formatMoney(Math.max(0, remaining), currency)}
           </span>
         )}
       </p>

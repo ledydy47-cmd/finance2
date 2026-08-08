@@ -20,6 +20,8 @@ import {
   type SubscriptionPlan,
 } from "@/lib/subscription"
 
+import { getPaywallPaymentNote } from "@/lib/currency"
+
 const TESTIMONIAL_LAYOUT = [
   { className: "-rotate-1 mr-5" },
   { className: "rotate-1 ml-5 -mt-1" },
@@ -380,6 +382,10 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
               </div>
             </button>
           </div>
+
+          <p className="rounded-block-sm bg-secondary/60 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+            {getPaywallPaymentNote(data.settings.currency)}
+          </p>
 
           <label className="flex items-start justify-between gap-3 rounded-block-sm border border-border/70 bg-card px-3 py-3">
             <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted-foreground">

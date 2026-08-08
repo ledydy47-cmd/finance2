@@ -6,10 +6,11 @@ import { useState } from "react"
 import { ImagePickerTrigger, readFileAsDataUrl } from "@/components/ui/image-picker-trigger"
 import { useFinance } from "@/context/finance-context"
 import { parseAmount } from "@/lib/budget-planner"
+import { getCurrencyAmountPlaceholder } from "@/lib/currency"
 import { DEFAULT_GOAL_IMAGE } from "@/lib/setup-tour"
 
 export function HomeGoalSetupSheet() {
-  const { addGoal, setShowHomeGoalSetup, persistError, clearPersistError } = useFinance()
+  const { addGoal, setShowHomeGoalSetup, persistError, clearPersistError, data } = useFinance()
   const [name, setName] = useState("")
   const [target, setTarget] = useState("")
   const [image, setImage] = useState(DEFAULT_GOAL_IMAGE)
@@ -107,7 +108,7 @@ export function HomeGoalSetupSheet() {
         <input
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          placeholder="Целевая сумма, ₽"
+          placeholder={getCurrencyAmountPlaceholder(data.settings.currency)}
           inputMode="numeric"
           className="mb-4 w-full rounded-block-sm border border-border bg-card px-4 py-3.5 text-sm font-semibold outline-none ring-primary focus:ring-2"
         />
