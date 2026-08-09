@@ -82,6 +82,7 @@ export async function replyToSupportTicket(input: { ticketId: string; reply: str
   const notifyResult = await sendTelegramNotification({
     telegramUserId: updated.telegramUserId,
     text: notificationText,
+    allowWhenMuted: true,
   })
 
   return {
