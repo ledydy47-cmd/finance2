@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
 import { getFlashSaleStartedAt } from "@/lib/server/flash-sale-store"
 import { getFlashSaleTiming } from "@/lib/server/flash-sale-timing"
 import { getServerSubscriptionStatus } from "@/lib/server/subscription-service"
@@ -11,13 +12,16 @@ export async function GET(request: Request) {
     }
 
     const subscription = await getServerSubscriptionStatus(userKey)
+    const lifecycle = await getFlashSaleLifecycle(userKey)
+    const pendingOffer = lifecycle?.pendingOffer ?? null
+
     if (subscription?.active) {
-      return NextResponse.json({ active: false, subscribed: true })
+      return NextResponse.json({ active: false, subscribed: true, pendingOffer: null })
     }
 
     const startedAt = await getFlashSaleStartedAt(userKey)
     if (!startedAt) {
-      return NextResponse.json({ active: false })
+      return NextResponse.json({ active: false, pendingOffer })
     }
 
     const timing = await getFlashSaleTiming(userKey, startedAt)
@@ -30,6 +34,7 @@ export async function GET(request: Request) {
         expired: true,
         startedAt,
         saleDurationMs: timing.saleDurationMs,
+        pendingOffer,
       })
     }
 
@@ -38,6 +43,7 @@ export async function GET(request: Request) {
       startedAt,
       saleDurationMs: timing.saleDurationMs,
       remainingMs,
+      pendingOffer: null,
     })
   } catch (error) {
     console.error("[subscription/flash-sale-status]", error)

@@ -52,8 +52,7 @@ export function AppShell() {
     setShowAddTransaction,
     closeAddToGoal,
     refreshSubscriptionAfterExternalPayment,
-    syncFlashSaleFromServer,
-    activatePendingFlashSaleOffer,
+    prepareFlashSaleOnAppOpen,
   } = useFinance()
 
   const showOnboarding = !data.settings.onboardingCompleted
@@ -96,8 +95,7 @@ export function AppShell() {
 
       const active = await refreshSubscriptionAfterExternalPayment(userKey)
       if (!active) {
-        await syncFlashSaleFromServer(userKey)
-        await activatePendingFlashSaleOffer(userKey)
+        await prepareFlashSaleOnAppOpen(userKey)
       }
 
       void fetch("/api/user/register-telegram", {
@@ -124,7 +122,7 @@ export function AppShell() {
       })
     })()
     // Run once per Telegram user per app session — callback identity changes after sync.
-  }, [user?.id, user?.username, user?.first_name, refreshSubscriptionAfterExternalPayment, syncFlashSaleFromServer, activatePendingFlashSaleOffer])
+  }, [user?.id, user?.username, user?.first_name, refreshSubscriptionAfterExternalPayment, prepareFlashSaleOnAppOpen])
 
   useEffect(() => {
     if (!user?.id) return

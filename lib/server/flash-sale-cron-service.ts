@@ -346,7 +346,6 @@ export async function activatePendingFlashSaleOffer(userKey: string, now = new D
   await setFlashSaleStartedAt(userKey, startedAt)
   await scheduleFlashSaleReminder(userKey, startedAt)
   await scheduleFlashSaleReminderDelivery(userKey, startedAt)
-  await registerFlashSaleLifecycle(userKey, startedAt)
   await scheduleFlashSaleReofferDeliveries(userKey, startedAt)
 
   lifecycle.startedAt = startedAt

@@ -104,6 +104,7 @@ interface FinanceContextValue {
   syncSubscriptionFromServer: (userKey: string) => Promise<boolean>
   syncFlashSaleFromServer: (userKey: string) => Promise<boolean>
   activatePendingFlashSaleOffer: (userKey: string) => Promise<boolean>
+  prepareFlashSaleOnAppOpen: (userKey: string) => Promise<void>
   openAddToGoal: (goalId: string) => void
   closeAddToGoal: () => void
   setPrimaryGoal: (goalId: string) => void
@@ -202,7 +203,9 @@ async function syncHydrationFromServer(input: {
 
   const flashSalePatch = await withTimeout(fetchServerFlashSaleStatus(input.userKey), 4000, null)
   if (
-    flashSalePatch &&
+    flashSalePatch?.active &&
+    flashSalePatch.startedAt &&
+    flashSalePatch.saleDurationMs &&
     !isUserSubscribed(loaded.settings) &&
     hasFreemiumTrialCompleted(loaded.settings)
   ) {
@@ -523,25 +526,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
   }, [data.settings, telegramUserId, update])
 
-  const markPaywallShown = useCallback(() => {
-    if (isUserSubscribed(data.settings)) {
-      setShowPaywall(false)
-      return
-    }
-
-    if (!canActivatePaywall(data.settings)) {
-      return
-    }
-
-    setShowPaywall(true)
-    commitPaywallOfferSideEffects()
-  }, [commitPaywallOfferSideEffects, data.settings])
-
-  const openPaywall = useCallback(() => {
-    if (isUserSubscribed(data.settings)) return
-    setShowPaywall(true)
-    commitPaywallOfferSideEffects()
-  }, [commitPaywallOfferSideEffects, data.settings])
   const closePaywall = useCallback(() => setShowPaywall(false), [])
 
   const homeSetupStep = useMemo((): 1 | 2 | 3 => {
@@ -681,13 +665,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
       try {
         const flashSale = await fetchServerFlashSaleStatus(userKey)
-        if (!flashSale) return false
+        if (!flashSale?.active || !flashSale.startedAt || !flashSale.saleDurationMs) {
+          return false
+        }
 
         update((prev) => ({
           ...prev,
           settings: {
             ...prev.settings,
-            paywallFlashSaleStartedAt: flashSale.startedAt,
+            paywallFlashSaleStartedAt: flashSale.startedAt!,
             flashSaleDurationMs: flashSale.saleDurationMs,
           },
         }))
@@ -780,6 +766,74 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     persistFlashSaleStart,
     telegramUserId,
   ])
+
+  const prepareFlashSaleOnAppOpen = useCallback(
+    async (userKey: string) => {
+      if (isUserSubscribed(data.settings)) return
+
+      const activated = await activatePendingFlashSaleOffer(userKey)
+      if (activated) return
+
+      await syncFlashSaleFromServer(userKey)
+    },
+    [activatePendingFlashSaleOffer, data.settings, syncFlashSaleFromServer],
+  )
+
+  const markPaywallShown = useCallback(() => {
+    if (isUserSubscribed(data.settings)) {
+      setShowPaywall(false)
+      return
+    }
+
+    if (!canActivatePaywall(data.settings)) {
+      return
+    }
+
+    void (async () => {
+      const userKey = getClientUserKey(telegramUserId)
+      const activated = await activatePendingFlashSaleOffer(userKey)
+      if (!activated) {
+        commitPaywallOfferSideEffects()
+      } else {
+        update((prev) => ({
+          ...prev,
+          settings: {
+            ...prev.settings,
+            paywallShown: true,
+          },
+        }))
+        if (!data.settings.paywallShown) {
+          void trackClientAnalytics({
+            event: "paywall_shown",
+            userKey,
+            telegramUserId,
+            telegramUsername: getWebApp()?.initDataUnsafe?.user?.username,
+            userName: data.settings.userName || getWebApp()?.initDataUnsafe?.user?.first_name,
+            age: data.settings.age,
+          })
+        }
+      }
+      setShowPaywall(true)
+    })()
+  }, [
+    activatePendingFlashSaleOffer,
+    commitPaywallOfferSideEffects,
+    data.settings,
+    telegramUserId,
+    update,
+  ])
+
+  const openPaywall = useCallback(() => {
+    if (isUserSubscribed(data.settings)) return
+    void (async () => {
+      const userKey = getClientUserKey(telegramUserId)
+      const activated = await activatePendingFlashSaleOffer(userKey)
+      if (!activated) {
+        commitPaywallOfferSideEffects()
+      }
+      setShowPaywall(true)
+    })()
+  }, [activatePendingFlashSaleOffer, commitPaywallOfferSideEffects, data.settings, telegramUserId])
 
   const restoreSubscription = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
     const userKey = getClientUserKey(getWebApp()?.initDataUnsafe?.user?.id)
@@ -1289,6 +1343,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     syncSubscriptionFromServer,
     syncFlashSaleFromServer,
     activatePendingFlashSaleOffer,
+    prepareFlashSaleOnAppOpen,
     openAddToGoal,
     closeAddToGoal,
     setPrimaryGoal,

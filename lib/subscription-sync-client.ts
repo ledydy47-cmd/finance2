@@ -64,21 +64,15 @@ export async function fetchServerFlashSaleStatus(userKey: string) {
     )
     const payload = (await response.json()) as {
       active?: boolean
+      expired?: boolean
       startedAt?: string
       saleDurationMs?: number
       remainingMs?: number
       subscribed?: boolean
+      pendingOffer?: "1h" | "4h" | "24h" | null
     }
 
-    if (!response.ok || !payload.active || !payload.startedAt || !payload.saleDurationMs) {
-      return null
-    }
-
-    return {
-      startedAt: payload.startedAt,
-      saleDurationMs: payload.saleDurationMs,
-      remainingMs: payload.remainingMs ?? 0,
-    }
+    return payload
   } catch {
     return null
   }
