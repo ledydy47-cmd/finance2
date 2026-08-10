@@ -1,5 +1,6 @@
 import {
   clearFlashSaleLifecycle,
+  getFlashSaleLifecycle,
   registerFlashSaleLifecycle,
   saveFlashSaleLifecycle,
 } from "@/lib/server/flash-sale-lifecycle-store"
@@ -10,6 +11,7 @@ import { FLASH_SALE_OFFER_4H_MESSAGE } from "@/lib/server/flash-sale-cron-servic
 import {
   clearFlashSaleReminder,
   clearFlashSaleStartedAt,
+  getFlashSaleStartedAt,
   scheduleFlashSaleReminder,
   setFlashSaleStartedAt,
 } from "@/lib/server/flash-sale-store"
@@ -86,6 +88,56 @@ export async function grantCustomFlashSale(input: {
     saleDurationMs,
     reminderDelayMs,
     reminderDelivery,
+    messageSent: sendResult.ok,
+    messageError: sendResult.ok ? undefined : sendResult.error,
+  }
+}
+
+/** Send discount message now; 15-min timer starts only on next app open. */
+export async function grantPendingFlashSaleOffer(input: {
+  telegramUserId: number
+  telegramUsername?: string | null
+  firstName?: string | null
+  offerType?: "1h" | "4h" | "24h"
+  message?: string
+}) {
+  const userKey = `tg-${input.telegramUserId}`
+  const subscription = await getServerSubscriptionStatus(userKey)
+  if (subscription?.active) {
+    return { ok: false as const, error: "SUBSCRIBED" as const }
+  }
+
+  const offerType = input.offerType ?? "4h"
+  const message = input.message?.trim() || DEFAULT_CUSTOM_FLASH_SALE_MESSAGE
+
+  await ensureAnalyticsUser({
+    userKey,
+    telegramUserId: input.telegramUserId,
+    telegramUsername: input.telegramUsername,
+    userName: input.firstName,
+  })
+
+  const startedAt =
+    (await getFlashSaleStartedAt(userKey)) ??
+    (await getFlashSaleLifecycle(userKey))?.startedAt ??
+    new Date(Date.now() - 20 * 60 * 1000).toISOString()
+
+  const lifecycle = await registerFlashSaleLifecycle(userKey, startedAt)
+  if (!lifecycle.expiredAt) {
+    lifecycle.expiredAt = new Date().toISOString()
+  }
+  lifecycle.pendingOffer = offerType
+  if (offerType === "4h") lifecycle.offer4hSentAt = new Date().toISOString()
+  if (offerType === "24h") lifecycle.offer24hSentAt = new Date().toISOString()
+  await saveFlashSaleLifecycle(lifecycle)
+
+  const sendResult = await sendMessageToUser({ userKey, message })
+
+  return {
+    ok: true as const,
+    userKey,
+    offerType,
+    pendingOffer: offerType,
     messageSent: sendResult.ok,
     messageError: sendResult.ok ? undefined : sendResult.error,
   }

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
-import { grantCustomFlashSale } from "@/lib/server/grant-custom-flash-sale"
+import {
+  grantCustomFlashSale,
+  grantPendingFlashSaleOffer,
+} from "@/lib/server/grant-custom-flash-sale"
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -25,10 +28,26 @@ export async function POST(request: Request) {
       saleDurationMs?: number
       saleDurationHours?: number
       message?: string
+      mode?: "active" | "pending"
+      offerType?: "1h" | "4h" | "24h"
     }
 
     if (!body.telegramUserId || !Number.isFinite(body.telegramUserId)) {
       return NextResponse.json({ error: "MISSING_TELEGRAM_USER_ID" }, { status: 400 })
+    }
+
+    if (body.mode === "pending") {
+      const result = await grantPendingFlashSaleOffer({
+        telegramUserId: body.telegramUserId,
+        telegramUsername: body.telegramUsername,
+        firstName: body.firstName,
+        offerType: body.offerType ?? "4h",
+        message: body.message,
+      })
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 400 })
+      }
+      return NextResponse.json({ ok: true, ...result })
     }
 
     const saleDurationMs =
