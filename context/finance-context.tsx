@@ -160,6 +160,10 @@ function hydrationTimeout(ms: number) {
   })
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([promise, hydrationTimeout(ms).then(() => fallback)])
+}
+
 async function syncHydrationFromServer(input: {
   userKey: string
   loaded: AppData
@@ -167,7 +171,7 @@ async function syncHydrationFromServer(input: {
 }) {
   let loaded = input.loaded
 
-  const pendingReset = await fetchPendingAppReset(input.userKey)
+  const pendingReset = await withTimeout(fetchPendingAppReset(input.userKey), 4000, null)
   if (pendingReset) {
     loaded = applyRemoteAppReset(loaded, pendingReset)
     markResetApplied(pendingReset.resetId)
@@ -178,13 +182,17 @@ async function syncHydrationFromServer(input: {
   }
 
   if (!input.appliedOnboardingReset) {
-    const progress = await fetchUserProgress(input.userKey)
+    const progress = await withTimeout(fetchUserProgress(input.userKey), 4000, null)
     if (progress) {
       loaded = mergeServerProgressIntoAppData(loaded, progress)
     }
   }
 
-  const subscriptionPatch = await fetchServerSubscriptionSettings(input.userKey)
+  const subscriptionPatch = await withTimeout(
+    fetchServerSubscriptionSettings(input.userKey),
+    4000,
+    null,
+  )
   if (subscriptionPatch) {
     loaded = {
       ...loaded,
@@ -192,7 +200,7 @@ async function syncHydrationFromServer(input: {
     }
   }
 
-  const flashSalePatch = await fetchServerFlashSaleStatus(input.userKey)
+  const flashSalePatch = await withTimeout(fetchServerFlashSaleStatus(input.userKey), 4000, null)
   if (
     flashSalePatch &&
     !isUserSubscribed(loaded.settings) &&
@@ -277,42 +285,54 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     const safetyTimer = window.setTimeout(() => {
       if (!cancelled) setHydrated(true)
-    }, 8000)
+    }, 3000)
+
+    const revealLoadedData = (loaded: AppData) => {
+      setData(loaded)
+      applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
+      if (isNewPeriodPending(loaded)) {
+        setShowNewMonthModal(true)
+      }
+      const goalToCelebrate = findGoalToCelebrate(loaded)
+      if (goalToCelebrate) {
+        setCelebratingGoal(goalToCelebrate)
+      }
+      setHydrated(true)
+      window.clearTimeout(safetyTimer)
+    }
 
     const finishHydration = async () => {
       let loaded = createDefaultData()
 
       try {
-        await waitForTelegramWebApp(5000)
+        await withTimeout(waitForTelegramWebApp(1500), 1500, undefined)
         if (cancelled) return
 
-        await ensureTelegramSdk().catch(() => undefined)
+        await withTimeout(ensureTelegramSdk().catch(() => undefined), 2000, undefined)
         if (cancelled) return
 
         loaded = loadAppData()
+        if (cancelled) return
+
+        revealLoadedData(loaded)
+
         const webAppUser = getWebApp()?.initDataUnsafe?.user
         const userKey = getClientUserKey(webAppUser?.id)
 
         if (userKey.startsWith("tg-")) {
-          try {
-            const synced = await Promise.race([
-              syncHydrationFromServer({
-                userKey,
-                loaded,
-                appliedOnboardingReset: false,
-              }),
-              hydrationTimeout(5000).then(() => ({
-                loaded,
-                appliedOnboardingReset: false,
-              })),
-            ])
-            loaded = synced.loaded
-          } catch {
-            // keep local data if remote sync fails
-          }
+          const synced = await withTimeout(
+            syncHydrationFromServer({
+              userKey,
+              loaded,
+              appliedOnboardingReset: false,
+            }),
+            8000,
+            { loaded, appliedOnboardingReset: false },
+          )
+          loaded = synced.loaded
         } else {
           try {
-            const pendingReset = await fetchPendingAppReset(userKey)
+            const pendingReset = await withTimeout(fetchPendingAppReset(userKey), 4000, null)
             if (pendingReset) {
               loaded = applyRemoteAppReset(loaded, pendingReset)
               markResetApplied(pendingReset.resetId)
@@ -342,8 +362,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       if (goalToCelebrate) {
         setCelebratingGoal(goalToCelebrate)
       }
-      setHydrated(true)
-      window.clearTimeout(safetyTimer)
     }
 
     void finishHydration()
