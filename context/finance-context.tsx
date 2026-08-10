@@ -712,9 +712,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
       const showPaywall = options?.showPaywall ?? false
       if (showPaywall && !canActivatePaywall(settings)) return false
-      if (!showPaywall && !shouldStartFlashSaleTimer(settings, transactions)) {
-        return false
-      }
 
       try {
         const response = await fetch("/api/subscription/activate-flash-offer", {
@@ -727,27 +724,33 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           startedAt?: string
         }
 
-        if (!response.ok || !payload.activated || !payload.startedAt) {
-          return false
+        if (response.ok && payload.activated && payload.startedAt) {
+          persistFlashSaleStart(payload.startedAt)
+
+          if (showPaywall) {
+            update((prev) => ({
+              ...prev,
+              settings: {
+                ...prev.settings,
+                paywallShown: true,
+              },
+            }))
+            setShowPaywall(true)
+          }
+
+          return true
         }
-
-        persistFlashSaleStart(payload.startedAt)
-
-        if (showPaywall) {
-          update((prev) => ({
-            ...prev,
-            settings: {
-              ...prev.settings,
-              paywallShown: true,
-            },
-          }))
-          setShowPaywall(true)
-        }
-
-        return true
       } catch {
+        // fall through — no pending server-side offer
+      }
+
+      if (!showPaywall && !shouldStartFlashSaleTimer(settings, transactions)) {
         return false
       }
+      if (showPaywall) return false
+
+      persistFlashSaleStart(new Date().toISOString())
+      return true
     },
     [data.settings, data.transactions, persistFlashSaleStart, update],
   )
@@ -758,7 +761,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }) => {
     const settings = overrides?.settings ?? data.settings
     const transactions = overrides?.transactions ?? data.transactions
-    if (!shouldStartFlashSaleTimer(settings, transactions)) return
 
     const userKey = getClientUserKey(telegramUserId)
     const activated = await activatePendingFlashSaleOffer(userKey, {
@@ -767,6 +769,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       transactions,
     })
     if (activated) return
+
+    if (!shouldStartFlashSaleTimer(settings, transactions)) return
 
     persistFlashSaleStart(new Date().toISOString())
   }, [
