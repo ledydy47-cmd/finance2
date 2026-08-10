@@ -6,6 +6,7 @@ import {
 import { registerFlashSaleLifecycle } from "@/lib/server/flash-sale-lifecycle-store"
 import {
   scheduleFlashSaleReminderDelivery,
+  scheduleFlashSaleReofferDeliveries,
 } from "@/lib/server/flash-sale-reminder-scheduler"
 import { getFlashSaleTiming } from "@/lib/server/flash-sale-timing"
 
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
       timing.reminderDelayMs,
     )
     const delivery = await scheduleFlashSaleReminderDelivery(userKey, activeStartedAt, timing)
+    const reofferDeliveries = await scheduleFlashSaleReofferDeliveries(userKey, activeStartedAt, timing)
     await registerFlashSaleLifecycle(userKey, activeStartedAt)
 
     return NextResponse.json({
@@ -38,6 +40,7 @@ export async function POST(request: Request) {
       saleDurationMs: timing.saleDurationMs,
       reminderScheduled,
       delivery,
+      reofferDeliveries,
     })
   } catch (error) {
     console.error("[subscription/flash-sale-sync]", error)
