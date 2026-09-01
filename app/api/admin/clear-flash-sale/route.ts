@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       settingsPatch: {
         paywallFlashSaleStartedAt: null,
         flashSaleDurationMs: null,
+        paywallPromotionId: null,
       },
     })
 

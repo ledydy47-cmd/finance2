@@ -65,6 +65,8 @@ export interface Settings {
   paywallShown: boolean
   paywallFlashSaleStartedAt?: string | null
   flashSaleDurationMs?: number | null
+  paywallPromotionId?: string | null
+  paywallPromotionId?: string | null
   isSubscribed: boolean
   subscriptionPlan?: SubscriptionPlan | null
   subscriptionExpiresAt?: string | null

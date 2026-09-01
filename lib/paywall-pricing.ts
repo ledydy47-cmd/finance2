@@ -6,6 +6,12 @@ import {
   FLASH_SALE_SALE_PRICES,
   isUserSubscribed,
 } from "@/lib/paywall-experiment"
+import {
+  getPaywallPromotion,
+  getPromotionPlanAmount,
+  getPromotionYearlyPerMonth,
+  isPromotionActive,
+} from "@/lib/paywall-promotions"
 
 export type PaywallPricingPhase = "standard" | "flash_sale" | "full_price"
 
@@ -17,10 +23,21 @@ export const FULL_PRICE_AMOUNTS: Record<SubscriptionPlan, string> = {
 export function resolvePaywallPricingPhase(input: {
   paywallFlashSaleStartedAt?: string | null
   flashSaleDurationMs?: number | null
+  paywallPromotionId?: string | null
   isSubscribed?: boolean
   now?: number
 }): PaywallPricingPhase {
-  if (input.isSubscribed || !input.paywallFlashSaleStartedAt) {
+  if (input.isSubscribed) {
+    return "standard"
+  }
+
+  const now = input.now ?? Date.now()
+  const promotion = getPaywallPromotion(input.paywallPromotionId)
+  if (promotion && isPromotionActive(promotion, now)) {
+    return "flash_sale"
+  }
+
+  if (!input.paywallFlashSaleStartedAt) {
     return "standard"
   }
 
@@ -30,7 +47,6 @@ export function resolvePaywallPricingPhase(input: {
   }
 
   const durationMs = input.flashSaleDurationMs ?? FLASH_SALE_DURATION_MS
-  const now = input.now ?? Date.now()
   const remainingMs = durationMs - (now - startedAt)
   if (remainingMs > 0) {
     return "flash_sale"
@@ -46,12 +62,46 @@ export function getPaymentAmountForPhase(plan: SubscriptionPlan, phase: PaywallP
   return PLAN_CONFIG[plan].amount
 }
 
+export function getPaymentAmountForPlan(input: {
+  plan: SubscriptionPlan
+  phase: PaywallPricingPhase
+  promotionId?: string | null
+  now?: number
+}) {
+  const promotion = getPaywallPromotion(input.promotionId)
+  if (
+    promotion &&
+    isPromotionActive(promotion, input.now) &&
+    input.phase === "flash_sale"
+  ) {
+    return getPromotionPlanAmount(input.plan, promotion)
+  }
+  return getPaymentAmountForPhase(input.plan, input.phase)
+}
+
 export interface PaywallPlanDisplayPrices {
   total?: number
   perMonth: number
   listTotal?: number
   listPerMonth?: number
   showDiscount: boolean
+}
+
+function getPromotionDisplayPrices(promotion: NonNullable<ReturnType<typeof getPaywallPromotion>>) {
+  return {
+    phase: "flash_sale" as const,
+    yearly: {
+      total: Number(promotion.yearlyAmount),
+      perMonth: getPromotionYearlyPerMonth(promotion),
+      listTotal: promotion.yearlyListTotal,
+      listPerMonth: FLASH_SALE_LIST_PRICES.yearly.perMonth,
+      showDiscount: true,
+    },
+    monthly: {
+      perMonth: Number(promotion.monthlyAmount),
+      showDiscount: false,
+    },
+  }
 }
 
 export function getPaywallDisplayPrices(input: {
@@ -61,13 +111,25 @@ export function getPaywallDisplayPrices(input: {
   phase: PaywallPricingPhase
   yearly: PaywallPlanDisplayPrices
   monthly: PaywallPlanDisplayPrices
+  promotionId?: string | null
 } {
   const isSubscribed = isUserSubscribed(input.settings)
+  const now = input.now ?? Date.now()
+  const promotion = getPaywallPromotion(input.settings.paywallPromotionId)
+
+  if (promotion && isPromotionActive(promotion, now) && !isSubscribed) {
+    return {
+      ...getPromotionDisplayPrices(promotion),
+      promotionId: promotion.id,
+    }
+  }
+
   const phase = resolvePaywallPricingPhase({
     paywallFlashSaleStartedAt: input.settings.paywallFlashSaleStartedAt,
     flashSaleDurationMs: input.settings.flashSaleDurationMs,
+    paywallPromotionId: input.settings.paywallPromotionId,
     isSubscribed,
-    now: input.now,
+    now,
   })
 
   if (phase === "flash_sale") {

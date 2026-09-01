@@ -14,6 +14,8 @@ export async function POST(request: Request) {
       message?: string
       offerType?: "4h" | "24h"
       audience?: "paywall_non_subscribers" | "all_non_subscribers"
+      paywallDateYmd?: string
+      promotionId?: string
       offset?: number
       limit?: number
     }
@@ -22,6 +24,8 @@ export async function POST(request: Request) {
       message: body.message,
       offerType: body.offerType,
       audience: body.audience,
+      paywallDateYmd: body.paywallDateYmd,
+      promotionId: body.promotionId,
       offset: body.offset,
       limit: body.limit,
     })

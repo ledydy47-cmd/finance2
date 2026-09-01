@@ -9,6 +9,7 @@ import {
   isYooKassaConfigured,
   parseYooKassaErrorMessage,
 } from "@/lib/yookassa/server"
+import { isTursoWriteBlockedError } from "@/lib/db/turso-errors"
 
 export async function POST(request: Request) {
   if (!isYooKassaConfigured()) {
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
       orderId?: string
       paywallFlashSaleStartedAt?: string | null
       flashSaleDurationMs?: number | null
+      paywallPromotionId?: string | null
     }
 
     if (body.plan !== "yearly" && body.plan !== "monthly") {
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
       plan: body.plan,
       paywallFlashSaleStartedAt: body.paywallFlashSaleStartedAt,
       flashSaleDurationMs: body.flashSaleDurationMs,
+      paywallPromotionId: body.paywallPromotionId,
     })
     const returnUrl = `${getAppBaseUrl()}/payment/success?orderId=${encodeURIComponent(orderId)}`
 
@@ -71,13 +74,21 @@ export async function POST(request: Request) {
       savePaymentMethod: body.plan === "monthly",
     })
 
-    await savePendingPayment({
-      paymentId: payment.id,
-      userKey,
-      plan: body.plan,
-      orderId,
-      createdAt: new Date().toISOString(),
-    })
+    try {
+      await savePendingPayment({
+        paymentId: payment.id,
+        userKey,
+        plan: body.plan,
+        orderId,
+        createdAt: new Date().toISOString(),
+      })
+    } catch (saveError) {
+      // YooKassa payment is already created; orderId is in payment metadata for verify-by-order.
+      console.warn("[payments/create] pending payment save failed", saveError)
+      if (isTursoWriteBlockedError(saveError)) {
+        console.error("[payments/create] Turso writes blocked — subscription activation may fail until DB plan is upgraded")
+      }
+    }
 
     const confirmationUrl = payment.confirmation?.confirmation_url
     if (!confirmationUrl) {
@@ -91,6 +102,16 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error("[payments/create]", error)
+    if (isTursoWriteBlockedError(error)) {
+      return NextResponse.json(
+        {
+          error: "STORAGE_WRITE_BLOCKED",
+          message:
+            "Сервис временно перегружен. Попробуйте через несколько минут или напишите в поддержку.",
+        },
+        { status: 503 },
+      )
+    }
     const yookassaMessage = parseYooKassaErrorMessage(error)
     return NextResponse.json(
       {

@@ -3,6 +3,10 @@ import {
   getReofferDelayMs as getTimingReofferDelayMs,
 } from "@/lib/server/flash-sale-timing"
 import {
+  getPaywallPromotion,
+  getPromotionRemainingMs,
+} from "@/lib/paywall-promotions"
+import {
   getFlashSaleStartedAt,
   readFlashSaleReminders,
   scheduleFlashSaleReminder,
@@ -29,12 +33,12 @@ export const FLASH_SALE_OFFER_24H_MESSAGE =
 
 export type FlashSaleReofferType = "4h" | "24h"
 
-const REOFFER_RETRY_REASONS = new Set([
-  "NOT_DUE",
-  "NO_LIFECYCLE",
-  "SALE_ACTIVE",
-  "STALE",
-])
+/**
+ * Only transient timing races should return 503 to QStash.
+ * Permanent skips (STALE, NO_LIFECYCLE, ALREADY_SENT, NO_PENDING, …) must be 200
+ * so QStash stops retrying and does not spike error alerts.
+ */
+const REOFFER_RETRY_REASONS = new Set(["NOT_DUE", "SALE_ACTIVE"])
 
 export function shouldRetryFlashSaleReoffer(
   result: { sent: boolean; reason?: string },
@@ -45,7 +49,7 @@ export function shouldRetryFlashSaleReoffer(
 export function shouldRetryFlashSaleReminder(
   result: { sent: boolean; reason?: string },
 ) {
-  return !result.sent && (result.reason === "NOT_DUE" || result.reason === "NO_PENDING")
+  return !result.sent && result.reason === "NOT_DUE"
 }
 
 function getReofferMessage(offer: FlashSaleReofferType, isTest: boolean) {
@@ -333,29 +337,45 @@ export async function activatePendingFlashSaleOffer(userKey: string, now = new D
   }
 
   const lifecycle = await getFlashSaleLifecycle(userKey)
-  if (!lifecycle?.pendingOffer) {
+  if (!lifecycle?.pendingOffer && !lifecycle?.pendingPromotionId) {
     return { activated: false as const, reason: "NO_PENDING_OFFER" as const }
   }
 
   const startedAt = now.toISOString()
   const offerType = lifecycle.pendingOffer
+  const promotionId = lifecycle.pendingPromotionId
+  const promotion = getPaywallPromotion(promotionId)
+  const saleDurationMs =
+    promotion?.fixedEndsAt && promotion
+      ? getPromotionRemainingMs(promotion, now.getTime())
+      : undefined
 
   const { setFlashSaleStartedAt } = await import("@/lib/server/flash-sale-store")
-  const { scheduleFlashSaleReminderDelivery, scheduleFlashSaleReofferDeliveries } =
-    await import("@/lib/server/flash-sale-reminder-scheduler")
   await setFlashSaleStartedAt(userKey, startedAt)
-  await scheduleFlashSaleReminder(userKey, startedAt)
-  await scheduleFlashSaleReminderDelivery(userKey, startedAt)
-  await scheduleFlashSaleReofferDeliveries(userKey, startedAt)
+
+  if (!promotion?.fixedEndsAt) {
+    const { scheduleFlashSaleReminderDelivery, scheduleFlashSaleReofferDeliveries } =
+      await import("@/lib/server/flash-sale-reminder-scheduler")
+    await scheduleFlashSaleReminder(userKey, startedAt)
+    await scheduleFlashSaleReminderDelivery(userKey, startedAt)
+    await scheduleFlashSaleReofferDeliveries(userKey, startedAt)
+  }
 
   lifecycle.startedAt = startedAt
   lifecycle.expiredAt = null
   lifecycle.pendingOffer = null
+  lifecycle.pendingPromotionId = null
+  if (promotionId) {
+    lifecycle.promotionId = promotionId
+  }
   await saveFlashSaleLifecycle(lifecycle)
 
   return {
     activated: true as const,
     startedAt,
     offerType,
+    promotionId: lifecycle.promotionId,
+    saleDurationMs,
+    promotionEndsAt: promotion?.endsAt ?? null,
   }
 }

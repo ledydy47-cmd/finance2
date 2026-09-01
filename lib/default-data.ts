@@ -145,6 +145,7 @@ export function createDefaultData(): AppData {
       firstExpenseAdded: false,
   paywallShown: false,
   paywallFlashSaleStartedAt: null,
+  paywallPromotionId: null,
   isSubscribed: false,
       autoRenew: true,
       subscriptionStatus: undefined,

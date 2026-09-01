@@ -1,4 +1,9 @@
 import type { Settings, Transaction } from "@/lib/types"
+import {
+  getPaywallPromotion,
+  getPromotionRemainingMs,
+  isPromotionActive,
+} from "@/lib/paywall-promotions"
 
 export function countExpenseTransactions(transactions: Transaction[]) {
   return transactions.filter((tx) => tx.type === "expense").length
@@ -52,12 +57,42 @@ function formatCountdown(remainingMs: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
 }
 
+function formatPromotionCountdown(remainingMs: number) {
+  const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60_000))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours > 0) {
+    return `${hours} ч ${String(minutes).padStart(2, "0")} мин`
+  }
+  return formatCountdown(remainingMs)
+}
+
 export function getFlashSaleState(
   settings: Settings,
   now = Date.now(),
   durationMs = settings.flashSaleDurationMs ?? FLASH_SALE_DURATION_MS,
 ) {
-  if (isUserSubscribed(settings) || !settings.paywallFlashSaleStartedAt) {
+  if (isUserSubscribed(settings)) {
+    return { active: false as const }
+  }
+
+  const promotion = getPaywallPromotion(settings.paywallPromotionId)
+  if (promotion && isPromotionActive(promotion, now)) {
+    const remainingMs = getPromotionRemainingMs(promotion, now)
+    if (remainingMs > 0) {
+      return {
+        active: true as const,
+        remainingMs,
+        countdownLabel: formatPromotionCountdown(remainingMs),
+        promotionId: promotion.id,
+        promotionTitle: promotion.bannerTitle,
+        promotionBadgeLabel: promotion.badgeLabel,
+      }
+    }
+    return { active: false as const, expired: true as const }
+  }
+
+  if (!settings.paywallFlashSaleStartedAt) {
     return { active: false as const }
   }
 

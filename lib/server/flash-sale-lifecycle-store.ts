@@ -17,6 +17,8 @@ export interface FlashSaleLifecycle {
   startedAt: string
   expiredAt: string | null
   pendingOffer: FlashSalePendingOffer | null
+  promotionId: string | null
+  pendingPromotionId: string | null
   offer4hSentAt: string | null
   offer24hSentAt: string | null
 }
@@ -42,6 +44,8 @@ function emptyLifecycle(userKey: string, startedAt: string): FlashSaleLifecycle 
     startedAt,
     expiredAt: null,
     pendingOffer: null,
+    promotionId: null,
+    pendingPromotionId: null,
     offer4hSentAt: null,
     offer24hSentAt: null,
   }
@@ -130,7 +134,8 @@ export async function registerFlashSaleLifecycle(userKey: string, startedAt: str
       existing.offer4hSentAt = null
       existing.offer24hSentAt = null
       existing.pendingOffer = null
-    } else if (!existing.pendingOffer) {
+      existing.pendingPromotionId = null
+    } else if (!existing.pendingOffer && !existing.pendingPromotionId) {
       existing.expiredAt = null
     }
     await saveFlashSaleLifecycle(existing)

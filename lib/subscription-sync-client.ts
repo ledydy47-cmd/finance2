@@ -6,6 +6,7 @@ export function clearPaywallOfferSettings(settings: Settings): Settings {
     ...settings,
     paywallFlashSaleStartedAt: null,
     flashSaleDurationMs: null,
+    paywallPromotionId: null,
   }
 }
 
@@ -70,6 +71,9 @@ export async function fetchServerFlashSaleStatus(userKey: string) {
       remainingMs?: number
       subscribed?: boolean
       pendingOffer?: "1h" | "4h" | "24h" | null
+      pendingPromotionId?: string | null
+      promotionId?: string | null
+      promotionEndsAt?: string | null
     }
 
     return payload

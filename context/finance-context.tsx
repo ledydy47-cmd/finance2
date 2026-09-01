@@ -215,6 +215,9 @@ async function syncHydrationFromServer(input: {
         ...loaded.settings,
         paywallFlashSaleStartedAt: flashSalePatch.startedAt,
         flashSaleDurationMs: flashSalePatch.saleDurationMs,
+        ...(flashSalePatch.promotionId
+          ? { paywallPromotionId: flashSalePatch.promotionId }
+          : {}),
       },
     }
   }
@@ -445,18 +448,24 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const requiresPremiumAfterWalkthrough = paywallAccess.requiresPremiumAfterWalkthrough
 
   const persistFlashSaleStart = useCallback(
-    (startedAt: string, durationMs?: number | null) => {
+    (
+      startedAt: string,
+      options?: { durationMs?: number | null; promotionId?: string | null },
+    ) => {
       update((prev) => ({
         ...prev,
         settings: {
           ...prev.settings,
           paywallFlashSaleStartedAt: startedAt,
-          ...(durationMs ? { flashSaleDurationMs: durationMs } : {}),
+          ...(options?.durationMs ? { flashSaleDurationMs: options.durationMs } : {}),
+          ...(options?.promotionId ? { paywallPromotionId: options.promotionId } : {}),
         },
       }))
 
       const userKey = getClientUserKey(telegramUserId)
-      scheduleFlashSaleReminderChecks(userKey, startedAt)
+      if (!options?.promotionId) {
+        scheduleFlashSaleReminderChecks(userKey, startedAt)
+      }
 
       void fetch("/api/subscription/flash-sale-sync", {
         method: "POST",
@@ -675,9 +684,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
             ...prev.settings,
             paywallFlashSaleStartedAt: flashSale.startedAt!,
             flashSaleDurationMs: flashSale.saleDurationMs,
+            ...(flashSale.promotionId
+              ? { paywallPromotionId: flashSale.promotionId }
+              : {}),
           },
         }))
-        scheduleFlashSaleReminderChecks(userKey, flashSale.startedAt)
+        if (!flashSale.promotionId) {
+          scheduleFlashSaleReminderChecks(userKey, flashSale.startedAt)
+        }
         return true
       } catch {
         return false
@@ -708,10 +722,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         const payload = (await response.json()) as {
           activated?: boolean
           startedAt?: string
+          promotionId?: string | null
+          saleDurationMs?: number | null
         }
 
         if (response.ok && payload.activated && payload.startedAt) {
-          persistFlashSaleStart(payload.startedAt)
+          persistFlashSaleStart(payload.startedAt, {
+            durationMs: payload.saleDurationMs,
+            promotionId: payload.promotionId,
+          })
 
           if (showPaywall) {
             update((prev) => ({

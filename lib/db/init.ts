@@ -1,4 +1,5 @@
 import { getTursoClient, hasTursoConfig } from "@/lib/db/client"
+import { isTursoWriteBlockedError } from "@/lib/db/turso-errors"
 
 const INIT_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS user_analytics (
@@ -119,6 +120,8 @@ const MIGRATION_STATEMENTS = [
   `ALTER TABLE user_analytics ADD COLUMN onboarding_reoffer_1h_scheduled_at TEXT`,
   `ALTER TABLE user_analytics ADD COLUMN onboarding_reoffer_1h_sent_at TEXT`,
   `ALTER TABLE support_tickets ADD COLUMN source TEXT NOT NULL DEFAULT 'app'`,
+  `ALTER TABLE flash_sale_lifecycle ADD COLUMN promotion_id TEXT`,
+  `ALTER TABLE flash_sale_lifecycle ADD COLUMN pending_promotion_id TEXT`,
 ]
 
 export async function initTursoSchema() {
@@ -127,15 +130,25 @@ export async function initTursoSchema() {
   }
 
   const client = getTursoClient()
-  for (const statement of INIT_STATEMENTS) {
-    await client.execute(statement)
-  }
-
-  for (const statement of MIGRATION_STATEMENTS) {
-    try {
+  try {
+    for (const statement of INIT_STATEMENTS) {
       await client.execute(statement)
-    } catch {
-      // Column may already exist on older databases.
     }
+
+    for (const statement of MIGRATION_STATEMENTS) {
+      try {
+        await client.execute(statement)
+      } catch {
+        // Column may already exist on older databases.
+      }
+    }
+  } catch (error) {
+    if (isTursoWriteBlockedError(error)) {
+      console.warn(
+        "[turso] schema init skipped — writes blocked on plan, assuming schema already exists",
+      )
+      return
+    }
+    throw error
   }
 }

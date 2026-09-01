@@ -107,6 +107,8 @@ export const flashSaleLifecycle = sqliteTable("flash_sale_lifecycle", {
   startedAt: text("started_at").notNull(),
   expiredAt: text("expired_at"),
   pendingOffer: text("pending_offer"),
+  promotionId: text("promotion_id"),
+  pendingPromotionId: text("pending_promotion_id"),
   offer4hSentAt: text("offer_4h_sent_at"),
   offer24hSentAt: text("offer_24h_sent_at"),
 })

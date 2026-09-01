@@ -43,46 +43,76 @@ function PlanRadio({ selected }: { selected: boolean }) {
   return <span className="size-6 shrink-0 rounded-full border-2 border-muted-foreground/30 bg-card" />
 }
 
-function PlanDiscountBadge({ className = "" }: { className?: string }) {
+function PlanDiscountBadge({
+  label = "−50%",
+  className = "",
+}: {
+  label?: string
+  className?: string
+}) {
   return (
     <span
       className={`inline-flex items-center rounded-md bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm ${className}`}
     >
-      −50%
+      {label}
     </span>
   )
 }
 
-function FlashSaleBadge({ className = "" }: { className?: string }) {
+function FlashSaleBadge({
+  label = "−50%",
+  className = "",
+}: {
+  label?: string
+  className?: string
+}) {
   return (
     <span
       className={`inline-flex items-center rounded-full bg-destructive px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-white shadow-lg shadow-destructive/35 ${className}`}
     >
-      −50%
+      {label}
     </span>
   )
 }
 
-function FlashSaleBanner({ countdownLabel }: { countdownLabel: string }) {
+function FlashSaleBanner({
+  countdownLabel,
+  title,
+  badgeLabel,
+  showForeverBadge = true,
+  subtitle,
+}: {
+  countdownLabel: string
+  title?: string
+  badgeLabel?: string
+  showForeverBadge?: boolean
+  subtitle?: string
+}) {
   return (
     <div className="relative mb-3 shrink-0 overflow-hidden rounded-2xl border-2 border-destructive/35 bg-gradient-to-br from-destructive/20 via-destructive/10 to-background px-4 py-4 text-center shadow-lg shadow-destructive/15">
       <div className="pointer-events-none absolute -right-6 -top-6 size-24 rounded-full bg-destructive/15 blur-2xl" />
       <div className="pointer-events-none absolute -bottom-8 -left-4 size-20 rounded-full bg-destructive/10 blur-2xl" />
 
       <div className="relative flex items-center justify-center gap-2">
-        <FlashSaleBadge className="px-3 py-1.5 text-xs" />
-        <span className="rounded-full bg-destructive/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-destructive">
-          навсегда
-        </span>
+        <FlashSaleBadge label={badgeLabel} className="px-3 py-1.5 text-xs" />
+        {showForeverBadge ? (
+          <span className="rounded-full bg-destructive/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-destructive">
+            навсегда
+          </span>
+        ) : null}
       </div>
 
       <p className="relative mt-3 font-serif text-[1.05rem] font-bold leading-snug text-foreground">
-        Зафиксируй скидку на всё время подписки
+        {title ?? "Зафиксируй скидку на всё время подписки"}
       </p>
       <p className="relative mt-1.5 text-sm leading-relaxed text-muted-foreground">
-        Оформи сейчас — и цена{" "}
-        <span className="font-bold text-destructive">останется такой навсегда</span>, даже при
-        продлении
+        {subtitle ?? (
+          <>
+            Оформи сейчас — и цена{" "}
+            <span className="font-bold text-destructive">останется такой навсегда</span>, даже при
+            продлении
+          </>
+        )}
       </p>
 
       <div className="relative mt-3 inline-flex min-w-[9.5rem] items-center justify-center rounded-full border border-destructive/30 bg-background/90 px-4 py-2">
@@ -141,18 +171,23 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
 
   const flashSaleActive = pricing.phase === "flash_sale"
   const flashSale = getFlashSaleState(data.settings, now)
+  const isSept1Promo = pricing.promotionId === "sept1_2026"
+  const discountBadgeLabel =
+    flashSale.promotionBadgeLabel ??
+    (isSept1Promo ? "−67%" : "−50%")
 
   useEffect(() => {
-    if (!data.settings.paywallFlashSaleStartedAt) return
+    if (!flashSaleActive && !flashSale.active) return
 
     const timerId = window.setInterval(() => {
       setNow(Date.now())
     }, 1000)
 
     return () => window.clearInterval(timerId)
-  }, [data.settings.paywallFlashSaleStartedAt])
+  }, [flashSaleActive, flashSale.active, data.settings.paywallPromotionId])
 
   useEffect(() => {
+    if (isSept1Promo) return
     if (!flashSale.active || !data.settings.paywallFlashSaleStartedAt || !user?.id) return
 
     const userKey = getClientUserKey(user.id)
@@ -210,6 +245,7 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           orderId,
           paywallFlashSaleStartedAt: data.settings.paywallFlashSaleStartedAt,
           flashSaleDurationMs: data.settings.flashSaleDurationMs,
+          paywallPromotionId: data.settings.paywallPromotionId,
         }),
       })
 
@@ -275,11 +311,25 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
         </div>
 
         {flashSaleActive && flashSale.active ? (
-          <FlashSaleBanner countdownLabel={flashSale.countdownLabel} />
+          <FlashSaleBanner
+            countdownLabel={flashSale.countdownLabel}
+            title={flashSale.promotionTitle}
+            badgeLabel={discountBadgeLabel}
+            showForeverBadge={!isSept1Promo}
+            subtitle={
+              isSept1Promo
+                ? "Годовая подписка всего 999 ₽ вместо 2980 ₽ — только сегодня"
+                : undefined
+            }
+          />
         ) : null}
 
         <h2 className="shrink-0 text-center font-serif text-[1.35rem] font-bold leading-tight text-foreground">
-          {flashSaleActive ? "Твоя цена со скидкой" : "Выбери свой план"}
+          {flashSaleActive
+            ? isSept1Promo
+              ? "Суперскидка на год"
+              : "Твоя цена со скидкой"
+            : "Выбери свой план"}
         </h2>
 
         <div className="mt-2 flex shrink-0 justify-center gap-0.5" aria-label="5 из 5 звёзд">
@@ -305,8 +355,11 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
         <div className="mt-6 flex flex-col gap-2.5">
           <div className="relative shrink-0 pt-3">
             <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
-              {flashSaleActive ? (
-                <PlanDiscountBadge className="rounded-full px-3.5 py-1 text-xs shadow-xl ring-2 ring-background" />
+              {flashSaleActive && yearly.showDiscount ? (
+                <PlanDiscountBadge
+                  label={discountBadgeLabel}
+                  className="rounded-full px-3.5 py-1 text-xs shadow-xl ring-2 ring-background"
+                />
               ) : (
                 <span className="rounded-md bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground shadow-sm">
                   Самый выгодный
@@ -352,9 +405,12 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
           </div>
 
           <div className="relative shrink-0">
-            {flashSaleActive ? (
+            {flashSaleActive && monthly.showDiscount ? (
               <div className="absolute right-4 top-0 z-10 -translate-y-1/2">
-                <PlanDiscountBadge className="rounded-full px-2.5 py-1 text-[10px] shadow-lg ring-2 ring-background" />
+                <PlanDiscountBadge
+                  label={discountBadgeLabel}
+                  className="rounded-full px-2.5 py-1 text-[10px] shadow-lg ring-2 ring-background"
+                />
               </div>
             ) : null}
             <button

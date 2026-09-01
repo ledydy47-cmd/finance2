@@ -189,6 +189,8 @@ export function flashSaleLifecycleToRecord(row: FlashSaleLifecycleRow): FlashSal
     pendingOffer: row.pendingOffer as FlashSaleLifecycle["pendingOffer"],
     offer4hSentAt: row.offer4hSentAt,
     offer24hSentAt: row.offer24hSentAt,
+    promotionId: row.promotionId ?? null,
+    pendingPromotionId: row.pendingPromotionId ?? null,
   }
 }
 
@@ -200,6 +202,8 @@ export function flashSaleLifecycleToRow(lifecycle: FlashSaleLifecycle) {
     pendingOffer: lifecycle.pendingOffer,
     offer4hSentAt: lifecycle.offer4hSentAt,
     offer24hSentAt: lifecycle.offer24hSentAt,
+    promotionId: lifecycle.promotionId,
+    pendingPromotionId: lifecycle.pendingPromotionId,
   }
 }
 

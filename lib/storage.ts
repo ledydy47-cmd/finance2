@@ -91,6 +91,7 @@ function migrateData(data: AppData, defaults: AppData): AppData {
       firstExpenseAdded: data.transactions.some((tx) => tx.type === "expense"),
       paywallShown: data.settings.paywallShown ?? false,
       paywallFlashSaleStartedAt: data.settings.paywallFlashSaleStartedAt ?? null,
+      paywallPromotionId: data.settings.paywallPromotionId ?? null,
       flashSaleDurationMs: data.settings.flashSaleDurationMs ?? null,
       isSubscribed: data.settings.isSubscribed ?? false,
       subscriptionPlan: data.settings.subscriptionPlan ?? null,
