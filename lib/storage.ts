@@ -7,6 +7,7 @@ import {
   buildCategoriesFromPlan,
   migrateLegacyBudgetPlan,
 } from "./budget-planner"
+import { repairMissingPeriodArchives } from "./period-reset"
 import { getStorageKey } from "./telegram"
 
 export function loadAppData(): AppData {
@@ -22,7 +23,12 @@ export function loadAppData(): AppData {
       ...parsed,
       settings: { ...defaults.settings, ...parsed.settings },
     } as AppData
-    return migrateData(merged, defaults)
+    const migrated = migrateData(merged, defaults)
+    const repaired = repairMissingPeriodArchives(migrated)
+    if (repaired.archives.length > migrated.archives.length) {
+      saveAppData(repaired)
+    }
+    return repaired
   } catch {
     return createDefaultData()
   }

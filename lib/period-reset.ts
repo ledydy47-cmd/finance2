@@ -1,5 +1,5 @@
 import { buildArchive, getCurrentPeriodKey } from "./calculations"
-import { getPeriodLabelFromKey, isDateInPeriod } from "./period"
+import { getAvailablePeriodKeys, getPeriodLabelFromKey, isDateInPeriod } from "./period"
 import type { AppData } from "./types"
 
 export function getCalendarPeriodKey(data: AppData) {
@@ -11,35 +11,56 @@ export function isNewPeriodPending(data: AppData) {
   return getCalendarPeriodKey(data) !== data.lastPeriodKey
 }
 
-/** Archive previous period and advance lastPeriodKey (new month «Обнулить»). */
-export function applyNewMonthReset(data: AppData): AppData {
+function ensurePeriodArchived(data: AppData, periodKey: string): AppData {
+  if (data.archives.some((archive) => archive.periodKey === periodKey)) return data
+
+  const { monthStartDay, budgetPlan } = data.settings
+  const label = getPeriodLabelFromKey(periodKey, monthStartDay)
+  const archive = buildArchive(data.transactions, data.categories, periodKey, monthStartDay, label, {
+    includeExcluded: true,
+    budgetPlan,
+  })
+  if (archive.income <= 0 && archive.spent <= 0) return data
+
+  return { ...data, archives: [...data.archives, archive] }
+}
+
+function advanceToCurrentPeriod(data: AppData): AppData {
   const currentKey = getCalendarPeriodKey(data)
   const previousKey = data.lastPeriodKey
   if (previousKey === currentKey) return data
 
-  let next = { ...data }
-
-    if (!next.archives.some((a) => a.periodKey === previousKey)) {
-    const label = getPeriodLabelFromKey(previousKey, next.settings.monthStartDay)
-    const archive = buildArchive(
-      next.transactions,
-      next.categories,
-      previousKey,
-      next.settings.monthStartDay,
-      label,
-      { includeExcluded: true },
-    )
-    if (archive.income > 0 || archive.spent > 0) {
-      next = { ...next, archives: [...next.archives, archive] }
-    }
-  }
-
+  const next = ensurePeriodArchived(data, previousKey)
   return { ...next, lastPeriodKey: currentKey }
 }
 
-/** Acknowledge new month without archiving («Позже»). */
+/** Archive previous period and advance lastPeriodKey (new month «Обнулить»). */
+export function applyNewMonthReset(data: AppData): AppData {
+  return advanceToCurrentPeriod(data)
+}
+
+/** Dismiss new-month modal («Позже») — still archives the previous period for analytics. */
 export function acknowledgeNewMonthLater(data: AppData): AppData {
-  return { ...data, lastPeriodKey: getCalendarPeriodKey(data) }
+  return advanceToCurrentPeriod(data)
+}
+
+/** Backfill analytics archives for past periods that have transactions but were never archived. */
+export function repairMissingPeriodArchives(data: AppData): AppData {
+  const currentKey = getCalendarPeriodKey(data)
+  const { monthStartDay } = data.settings
+  const periodKeys = getAvailablePeriodKeys(
+    data.transactions.map((tx) => tx.date),
+    data.archives.map((archive) => archive.periodKey),
+    currentKey,
+    monthStartDay,
+  )
+
+  let next = data
+  for (const periodKey of periodKeys) {
+    if (periodKey >= currentKey) continue
+    next = ensurePeriodArchived(next, periodKey)
+  }
+  return next
 }
 
 /** Manual reset: exclude current-period expenses from budget totals (transactions kept). */

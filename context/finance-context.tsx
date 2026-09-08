@@ -296,9 +296,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const revealLoadedData = (loaded: AppData) => {
       setData(loaded)
       applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
-      if (isNewPeriodPending(loaded)) {
-        setShowNewMonthModal(true)
-      }
       const goalToCelebrate = findGoalToCelebrate(loaded)
       if (goalToCelebrate) {
         setCelebratingGoal(goalToCelebrate)
@@ -358,6 +355,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       }
 
       if (cancelled) return
+
+      const current = dataRef.current
+      if (!isNewPeriodPending(current) && isNewPeriodPending(loaded)) {
+        loaded = {
+          ...loaded,
+          lastPeriodKey: current.lastPeriodKey,
+          archives: current.archives,
+        }
+      }
 
       setData(loaded)
       applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
