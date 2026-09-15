@@ -8,13 +8,22 @@ import { useTelegram } from "@/components/telegram/telegram-provider"
 import { useFinance } from "@/context/finance-context"
 import { getClientUserKey } from "@/lib/client-id"
 import { CURRENCY_OPTIONS, normalizeAppCurrency } from "@/lib/currency"
-import { useEffect } from "react"
+import { getPeriodsWithExcludedExpenses } from "@/lib/period-reset"
+import { getPeriodLabelFromKey } from "@/lib/period"
+import { useEffect, useMemo } from "react"
 
 export function SettingsScreen() {
-  const { data, updateSettings, openPaywall, resetMonthSpendingManual, syncSubscriptionFromServer } =
-    useFinance()
+  const {
+    data,
+    updateSettings,
+    openPaywall,
+    resetMonthSpendingManual,
+    restoreMonthSpending,
+    syncSubscriptionFromServer,
+  } = useFinance()
   const { isTelegram, user } = useTelegram()
   const isSubscribed = data.settings.isSubscribed
+  const excludedPeriods = useMemo(() => getPeriodsWithExcludedExpenses(data), [data])
 
   useEffect(() => {
     if (!user?.id) return
@@ -89,6 +98,34 @@ export function SettingsScreen() {
           >
             Обнулить траты за месяц
           </button>
+          {excludedPeriods.length > 0 ? (
+            <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
+              <p className="text-xs text-muted-foreground">
+                Вернуть обнулённые траты в счётчики бюджета:
+              </p>
+              {excludedPeriods.map((periodKey) => {
+                const label = getPeriodLabelFromKey(periodKey, data.settings.monthStartDay)
+                return (
+                  <button
+                    key={periodKey}
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Восстановить траты за ${label}? Они снова будут учитываться в бюджете.`,
+                        )
+                      ) {
+                        restoreMonthSpending(periodKey)
+                      }
+                    }}
+                    className="w-full rounded-block-sm border border-border bg-background py-3 text-sm font-bold text-foreground transition-transform active:scale-[0.98]"
+                  >
+                    Восстановить — {label}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
         </section>
 
         <section className="rounded-block bg-card p-4 shadow-sm shadow-primary/5">

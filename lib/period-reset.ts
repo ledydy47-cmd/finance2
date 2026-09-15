@@ -1,5 +1,10 @@
 import { buildArchive, getCurrentPeriodKey } from "./calculations"
-import { getAvailablePeriodKeys, getPeriodLabelFromKey, isDateInPeriod } from "./period"
+import {
+  getAvailablePeriodKeys,
+  getPeriodKey,
+  getPeriodLabelFromKey,
+  isDateInPeriod,
+} from "./period"
 import type { AppData } from "./types"
 
 export function getCalendarPeriodKey(data: AppData) {
@@ -97,4 +102,37 @@ export function resetCurrentMonthSpending(data: AppData): AppData {
   }
 
   return next
+}
+
+export function getPeriodsWithExcludedExpenses(data: AppData) {
+  const { monthStartDay } = data.settings
+  const keys = new Set<string>()
+
+  for (const tx of data.transactions) {
+    if (tx.type === "expense" && tx.excludedFromBudget) {
+      keys.add(getPeriodKey(new Date(tx.date), monthStartDay))
+    }
+  }
+
+  return Array.from(keys).sort().reverse()
+}
+
+/** Restore manually reset expenses back into budget counters for a period. */
+export function restorePeriodSpending(data: AppData, periodKey: string): AppData {
+  const { monthStartDay } = data.settings
+
+  const transactions = data.transactions.map((tx) => {
+    if (
+      tx.type !== "expense" ||
+      !tx.excludedFromBudget ||
+      !isDateInPeriod(tx.date, periodKey, monthStartDay)
+    ) {
+      return tx
+    }
+
+    const { excludedFromBudget: _removed, ...rest } = tx
+    return rest
+  })
+
+  return { ...data, transactions }
 }

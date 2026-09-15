@@ -21,6 +21,7 @@ import {
   applyNewMonthReset,
   isNewPeriodPending,
   resetCurrentMonthSpending,
+  restorePeriodSpending,
 } from "@/lib/period-reset"
 import { loadAppData, saveAppData, getSaveErrorMessage } from "@/lib/storage"
 import {
@@ -144,6 +145,7 @@ interface FinanceContextValue {
   confirmNewMonthReset: () => void
   dismissNewMonthUntilLater: () => void
   resetMonthSpendingManual: () => void
+  restoreMonthSpending: (periodKey: string) => void
   dismissGoalCelebration: () => void
   openCreateGoalFlow: () => void
   dismissCreateGoalPrompt: () => void
@@ -1309,6 +1311,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     update((prev) => resetCurrentMonthSpending(prev))
   }, [update])
 
+  const restoreMonthSpending = useCallback(
+    (targetPeriodKey: string) => {
+      update((prev) => restorePeriodSpending(prev, targetPeriodKey))
+    },
+    [update],
+  )
+
   const dismissGoalCelebration = useCallback(() => {
     if (celebratingGoal) {
       update((prev) => markGoalCelebrated(prev, celebratingGoal.id))
@@ -1394,6 +1403,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     confirmNewMonthReset,
     dismissNewMonthUntilLater,
     resetMonthSpendingManual,
+    restoreMonthSpending,
     dismissGoalCelebration,
     openCreateGoalFlow,
     dismissCreateGoalPrompt,
