@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Bar,
   BarChart,
@@ -13,9 +13,15 @@ import {
   YAxis,
 } from "recharts"
 import { useFinance } from "@/context/finance-context"
-import { getCategorySpent, getDailySpendingMap } from "@/lib/calculations"
+import { getCategorySpent, getDailySpendingMap, getMonthlySummary } from "@/lib/calculations"
 import { formatMoney } from "@/lib/format"
-import { getPeriodBounds } from "@/lib/period"
+import {
+  getAvailablePeriodKeys,
+  getPeriodBounds,
+  getPeriodLabelFromKey,
+  getPeriodStartDate,
+} from "@/lib/period"
+import { getPeriodsWithExcludedExpenses } from "@/lib/period-reset"
 
 const FALLBACK_COLORS = {
   spent: "oklch(0.78 0.115 355)",
@@ -45,9 +51,43 @@ const CHART_COLORS = [
 ]
 
 export function AnalyticsScreen() {
-  const { data, periodKey, periodLabel, summary } = useFinance()
+  const { data, periodKey, periodLabel, summary, setActiveTab } = useFinance()
   const currency = data.settings.currency
   const comparisonColors = useComparisonChartColors()
+  const [selectedPeriodKey, setSelectedPeriodKey] = useState(periodKey)
+  const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSelectedPeriodKey(periodKey)
+    setSelectedDayIso(null)
+  }, [periodKey])
+
+  const periodKeys = useMemo(
+    () =>
+      getAvailablePeriodKeys(
+        data.transactions.map((tx) => tx.date),
+        data.archives.map((archive) => archive.periodKey),
+        periodKey,
+        data.settings.monthStartDay,
+      ),
+    [data.transactions, data.archives, periodKey, data.settings.monthStartDay],
+  )
+
+  const activeKey = periodKeys.includes(selectedPeriodKey) ? selectedPeriodKey : periodKey
+  const activePeriodLabel = getPeriodLabelFromKey(activeKey, data.settings.monthStartDay)
+  const activeSummary = useMemo(
+    () =>
+      getMonthlySummary(
+        data.transactions,
+        data.categories,
+        activeKey,
+        data.settings.monthStartDay,
+        data.budgetPlan,
+      ),
+    [data.transactions, data.categories, activeKey, data.settings.monthStartDay, data.budgetPlan],
+  )
+  const excludedPeriods = useMemo(() => getPeriodsWithExcludedExpenses(data), [data])
+  const activePeriodHasExcluded = excludedPeriods.includes(activeKey)
 
   const pieData = data.categories
     .map((category) => ({
@@ -55,7 +95,7 @@ export function AnalyticsScreen() {
       value: getCategorySpent(
         data.transactions,
         category.id,
-        periodKey,
+        activeKey,
         data.settings.monthStartDay,
       ),
       color: category.bar,
@@ -75,22 +115,33 @@ export function AnalyticsScreen() {
     },
   ]
 
-  const { start, end } = getPeriodBounds(new Date(), data.settings.monthStartDay)
-  const dailyMap = getDailySpendingMap(data.transactions, periodKey, data.settings.monthStartDay)
+  const { start, end } = getPeriodBounds(
+    getPeriodStartDate(activeKey, data.settings.monthStartDay),
+    data.settings.monthStartDay,
+  )
+  const dailyMap = getDailySpendingMap(
+    data.transactions,
+    activeKey,
+    data.settings.monthStartDay,
+  )
   const maxDaily = Math.max(...dailyMap.values(), 1)
+  const dailyTotal = Array.from(dailyMap.values()).reduce((sum, amount) => sum + amount, 0)
 
-  const heatmapDays: { day: number; intensity: number; amount: number }[] = []
+  const heatmapDays: { iso: string; day: number; intensity: number; amount: number }[] = []
   const cursor = new Date(start)
   while (cursor <= end) {
-    const key = cursor.toISOString().slice(0, 10)
-    const amount = dailyMap.get(key) ?? 0
+    const iso = cursor.toISOString().slice(0, 10)
+    const amount = dailyMap.get(iso) ?? 0
     heatmapDays.push({
+      iso,
       day: cursor.getDate(),
       intensity: amount / maxDaily,
       amount,
     })
     cursor.setDate(cursor.getDate() + 1)
   }
+
+  const selectedDay = heatmapDays.find((item) => item.iso === selectedDayIso) ?? null
 
   return (
     <>
@@ -100,10 +151,40 @@ export function AnalyticsScreen() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 pb-28">
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">Период</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {periodKeys.map((key) => {
+              const selected = key === activeKey
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPeriodKey(key)
+                    setSelectedDayIso(null)
+                  }}
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+                    selected
+                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                      : "bg-card text-muted-foreground shadow-sm shadow-primary/5"
+                  }`}
+                >
+                  {getPeriodLabelFromKey(key, data.settings.monthStartDay)}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         <section className="rounded-block bg-card p-4 shadow-sm shadow-primary/5">
           <h2 className="mb-3 font-serif text-base font-bold">Расходы по категориям</h2>
           {pieData.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Нет расходов в этом месяце</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {activePeriodHasExcluded
+                ? "Траты обнулены — восстановите их в Настройках → Месяц"
+                : `Нет расходов за ${activePeriodLabel.toLowerCase()}`}
+            </p>
           ) : (
             <>
               <div className="h-52">
@@ -190,21 +271,61 @@ export function AnalyticsScreen() {
         </section>
 
         <section className="mt-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
-          <h2 className="mb-3 font-serif text-base font-bold">Траты по дням</h2>
-          <div className="grid grid-cols-7 gap-1.5">
-            {heatmapDays.map((item) => (
-              <div
-                key={item.day}
-                title={item.amount > 0 ? `${item.day}: ${formatMoney(item.amount, currency)}` : `${item.day}`}
-                className="flex aspect-square items-center justify-center rounded-lg text-[10px] font-semibold"
-                style={{
-                  backgroundColor: `color-mix(in oklch, var(--primary) ${Math.round(12 + item.intensity * 75)}%, transparent)`,
-                }}
-              >
-                {item.day}
+          <h2 className="mb-1 font-serif text-base font-bold">Траты по дням</h2>
+          <p className="mb-3 text-xs text-muted-foreground">Нажмите на день, чтобы увидеть сумму</p>
+          {dailyTotal === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              {activePeriodHasExcluded ? (
+                <>
+                  <p>Траты за этот период обнулены.</p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("settings")}
+                    className="mt-3 text-sm font-bold text-primary"
+                  >
+                    Восстановить в настройках →
+                  </button>
+                </>
+              ) : (
+                <p>Нет трат за {activePeriodLabel.toLowerCase()}</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-7 gap-1.5">
+                {heatmapDays.map((item) => {
+                  const selected = item.iso === selectedDayIso
+                  return (
+                    <button
+                      key={item.iso}
+                      type="button"
+                      onClick={() =>
+                        setSelectedDayIso((current) => (current === item.iso ? null : item.iso))
+                      }
+                      className={`flex aspect-square items-center justify-center rounded-lg text-[10px] font-semibold transition-transform active:scale-95 ${
+                        selected ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : ""
+                      }`}
+                      style={{
+                        backgroundColor: `color-mix(in oklch, var(--primary) ${Math.round(12 + item.intensity * 75)}%, transparent)`,
+                      }}
+                    >
+                      {item.day}
+                    </button>
+                  )
+                })}
               </div>
-            ))}
-          </div>
+              {selectedDay ? (
+                <p className="mt-3 text-center text-sm font-semibold text-foreground">
+                  {new Date(selectedDay.iso).toLocaleDateString("ru-RU", {
+                    day: "numeric",
+                    month: "long",
+                  })}
+                  {": "}
+                  {formatMoney(selectedDay.amount, currency)}
+                </p>
+              ) : null}
+            </>
+          )}
         </section>
 
         <section className="mt-4 rounded-block bg-card p-4 shadow-sm shadow-primary/5">
@@ -212,15 +333,21 @@ export function AnalyticsScreen() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Доход</span>
-              <span className="font-bold text-[color:var(--success)]">{formatMoney(summary.income, currency)}</span>
+              <span className="font-bold text-[color:var(--success)]">
+                {formatMoney(activeSummary.income, currency)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Расходы</span>
-              <span className="font-bold text-destructive">{formatMoney(summary.spent, currency)}</span>
+              <span className="font-bold text-destructive">
+                {formatMoney(activeSummary.spent, currency)}
+              </span>
             </div>
             <div className="flex justify-between border-t border-border pt-2">
               <span className="font-semibold">Остаток</span>
-              <span className="font-serif text-lg font-bold">{formatMoney(summary.left, currency)}</span>
+              <span className="font-serif text-lg font-bold">
+                {formatMoney(activeSummary.left, currency)}
+              </span>
             </div>
           </div>
         </section>
