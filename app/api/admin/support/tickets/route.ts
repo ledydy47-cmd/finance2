@@ -10,7 +10,20 @@ export async function GET(request: Request) {
   }
 
   try {
-    const tickets = await listSupportTickets()
+    const params = new URL(request.url).searchParams
+    const status = params.get("status")
+    const limitRaw = params.get("limit")
+
+    let tickets = await listSupportTickets()
+    if (status === "open" || status === "answered") {
+      tickets = tickets.filter((ticket) => ticket.status === status)
+    }
+    if (limitRaw) {
+      const limit = Number(limitRaw)
+      if (Number.isFinite(limit) && limit > 0) {
+        tickets = tickets.slice(0, Math.min(limit, 500))
+      }
+    }
     return NextResponse.json({ tickets })
   } catch (error) {
     console.error("[admin/support/tickets]", error)

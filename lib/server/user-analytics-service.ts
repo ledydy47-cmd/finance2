@@ -472,6 +472,68 @@ export async function listAnalyticsUsers(filter?: UserSubscriptionFilter) {
   return mapped.filter((user) => matchesFilter(user, filter))
 }
 
+export async function listAnalyticsUsersPage(input: {
+  filter?: UserSubscriptionFilter
+  limit: number
+  offset: number
+  query?: string
+}) {
+  let users = Object.values((await readAnalyticsStore()).users).sort(
+    (a, b) => new Date(b.lastVisitAt).getTime() - new Date(a.lastVisitAt).getTime(),
+  )
+
+  const query = input.query?.trim().toLowerCase()
+  if (query) {
+    users = users.filter((user) => {
+      const id = user.telegramUserId?.toString() ?? ""
+      const username = user.telegramUsername?.toLowerCase() ?? ""
+      const name = user.userName?.toLowerCase() ?? ""
+      const userKey = user.userKey.toLowerCase()
+      return (
+        id.includes(query) ||
+        username.includes(query.replace(/^@/, "")) ||
+        name.includes(query) ||
+        userKey.includes(query)
+      )
+    })
+  }
+
+  if (input.filter) {
+    users = users.filter((user) => matchesFilter(user, input.filter))
+  }
+
+  const total = users.length
+  const limit = Math.min(Math.max(input.limit, 1), 100)
+  const offset = Math.max(input.offset, 0)
+  const page = users.slice(offset, offset + limit).map(toAdminListUser)
+
+  return { users: page, total, limit, offset }
+}
+
+export async function findAnalyticsUser(search: string) {
+  const trimmed = search.trim()
+  if (!trimmed) return null
+
+  const store = await readAnalyticsStore()
+
+  if (trimmed.startsWith("tg-")) {
+    const user = store.users[trimmed]
+    return user ? toAdminListUser(user) : null
+  }
+
+  const numeric = Number(trimmed.replace(/^@/, ""))
+  if (Number.isFinite(numeric)) {
+    const user = Object.values(store.users).find((entry) => entry.telegramUserId === numeric)
+    return user ? toAdminListUser(user) : null
+  }
+
+  const username = trimmed.replace(/^@/, "").toLowerCase()
+  const user = Object.values(store.users).find(
+    (entry) => entry.telegramUsername?.toLowerCase() === username,
+  )
+  return user ? toAdminListUser(user) : null
+}
+
 export function formatMessageWithName(userName: string | null, message: string) {
   const name = userName?.trim() || "Привет"
   const body = message.trim()
