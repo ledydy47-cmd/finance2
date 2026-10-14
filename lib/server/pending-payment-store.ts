@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm"
 import { getDb, hasTursoConfig } from "@/lib/db/client"
 import { initTursoSchema } from "@/lib/db/init"
+import { isTursoWriteBlockedError } from "@/lib/db/turso-errors"
 import { pendingPaymentToRecord } from "@/lib/db/mappers"
 import { pendingPayments } from "@/lib/db/schema"
 import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
@@ -69,26 +70,31 @@ function removeFromSnapshot(
 
 export async function savePendingPayment(record: PendingPaymentRecord) {
   if (hasTursoConfig()) {
-    await ensureTursoSchema()
-    await getDb()
-      .insert(pendingPayments)
-      .values({
-        userKey: record.userKey,
-        paymentId: record.paymentId,
-        orderId: record.orderId,
-        plan: record.plan,
-        createdAt: record.createdAt,
-      })
-      .onConflictDoUpdate({
-        target: pendingPayments.userKey,
-        set: {
+    try {
+      await ensureTursoSchema()
+      await getDb()
+        .insert(pendingPayments)
+        .values({
+          userKey: record.userKey,
           paymentId: record.paymentId,
           orderId: record.orderId,
           plan: record.plan,
           createdAt: record.createdAt,
-        },
-      })
-    return record
+        })
+        .onConflictDoUpdate({
+          target: pendingPayments.userKey,
+          set: {
+            paymentId: record.paymentId,
+            orderId: record.orderId,
+            plan: record.plan,
+            createdAt: record.createdAt,
+          },
+        })
+      return record
+    } catch (error) {
+      if (!isTursoWriteBlockedError(error)) throw error
+      console.warn("[pending-payment] Turso write blocked, using fallback storage")
+    }
   }
 
   if (hasKvRestConfig()) {

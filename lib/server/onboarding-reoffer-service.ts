@@ -19,7 +19,8 @@ import type { UserAnalyticsRecord } from "@/lib/server/user-analytics-types"
 export const ONBOARDING_REOFFER_1H_MESSAGE =
   "ты нажала «Начать» — значит, мечта уже близко 💗 мы снова открыли для тебя скидку −50%. Загляни в приложение, пока она доступна"
 
-const RETRY_REASONS = new Set(["NOT_DUE", "NOT_SCHEDULED", "STALE"])
+/** Transient timing only — STALE/ALREADY_SENT must ack 200 so QStash does not retry. */
+const RETRY_REASONS = new Set(["NOT_DUE", "NOT_SCHEDULED"])
 
 export function shouldRetryOnboardingReoffer1h(result: { sent: boolean; reason?: string }) {
   return !result.sent && result.reason != null && RETRY_REASONS.has(result.reason)

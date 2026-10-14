@@ -24,6 +24,8 @@ export async function POST(request: Request) {
       offset?: number
       limit?: number
       offers?: Array<"4h" | "24h">
+      paywallDateFrom?: string
+      paywallDateTo?: string
     }
 
     const result = await backfillFlashSaleReoffers(body)

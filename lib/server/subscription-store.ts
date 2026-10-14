@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm"
 import { getDb, hasTursoConfig } from "@/lib/db/client"
 import { initTursoSchema } from "@/lib/db/init"
+import { isTursoWriteBlockedError } from "@/lib/db/turso-errors"
 import { subscriptionToRecord, subscriptionToRow } from "@/lib/db/mappers"
 import { subscriptions } from "@/lib/db/schema"
 import { readJsonDataFile, writeJsonDataFile } from "@/lib/server/file-store"
@@ -41,18 +42,23 @@ export async function readSubscriptionStore(): Promise<SubscriptionStoreSnapshot
 
 export async function writeSubscriptionStore(snapshot: SubscriptionStoreSnapshot) {
   if (hasTursoConfig()) {
-    await ensureTursoSchema()
-    const db = getDb()
-    for (const record of Object.values(snapshot.records)) {
-      await db
-        .insert(subscriptions)
-        .values(subscriptionToRow(record))
-        .onConflictDoUpdate({
-          target: subscriptions.userKey,
-          set: subscriptionToRow(record),
-        })
+    try {
+      await ensureTursoSchema()
+      const db = getDb()
+      for (const record of Object.values(snapshot.records)) {
+        await db
+          .insert(subscriptions)
+          .values(subscriptionToRow(record))
+          .onConflictDoUpdate({
+            target: subscriptions.userKey,
+            set: subscriptionToRow(record),
+          })
+      }
+      return
+    } catch (error) {
+      if (!isTursoWriteBlockedError(error)) throw error
+      console.warn("[subscription-store] Turso bulk write blocked, using fallback storage")
     }
-    return
   }
 
   const payload = JSON.stringify(snapshot)
@@ -82,15 +88,20 @@ export async function getSubscriptionByUserKey(userKey: string) {
 
 export async function upsertSubscription(record: SubscriptionRecord) {
   if (hasTursoConfig()) {
-    await ensureTursoSchema()
-    await getDb()
-      .insert(subscriptions)
-      .values(subscriptionToRow(record))
-      .onConflictDoUpdate({
-        target: subscriptions.userKey,
-        set: subscriptionToRow(record),
-      })
-    return record
+    try {
+      await ensureTursoSchema()
+      await getDb()
+        .insert(subscriptions)
+        .values(subscriptionToRow(record))
+        .onConflictDoUpdate({
+          target: subscriptions.userKey,
+          set: subscriptionToRow(record),
+        })
+      return record
+    } catch (error) {
+      if (!isTursoWriteBlockedError(error)) throw error
+      console.warn("[subscription-store] Turso write blocked, using fallback storage")
+    }
   }
 
   const store = await readSubscriptionStore()

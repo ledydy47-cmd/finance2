@@ -14,6 +14,8 @@ export const userAnalytics = sqliteTable(
     onboardingReoffer1hSentAt: text("onboarding_reoffer_1h_sent_at"),
     onboardingCompletedAt: text("onboarding_completed_at"),
     walkthroughCompletedAt: text("walkthrough_completed_at"),
+    firstExpenseNudgeScheduledAt: text("first_expense_nudge_scheduled_at"),
+    firstExpenseNudgeSentAt: text("first_expense_nudge_sent_at"),
     homeWalkthroughCompleted: integer("home_walkthrough_completed", { mode: "boolean" }),
     firstExpenseAdded: integer("first_expense_added", { mode: "boolean" }),
     paywallShownAt: text("paywall_shown_at"),
@@ -109,6 +111,8 @@ export const flashSaleLifecycle = sqliteTable("flash_sale_lifecycle", {
   pendingOffer: text("pending_offer"),
   promotionId: text("promotion_id"),
   pendingPromotionId: text("pending_promotion_id"),
+  broadcastPromotionId: text("broadcast_promotion_id"),
+  promoOpenedAt: text("promo_opened_at"),
   offer4hSentAt: text("offer_4h_sent_at"),
   offer24hSentAt: text("offer_24h_sent_at"),
 })

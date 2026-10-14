@@ -7,7 +7,12 @@ import {
   processUserFlashSaleReminder,
   processUserFlashSaleReoffers,
 } from "@/lib/server/flash-sale-cron-service"
+import {
+  processUserFirstExpenseNudge,
+  scheduleFirstExpenseNudgeIfNeeded,
+} from "@/lib/server/first-expense-nudge-service"
 import { processUserOnboardingReoffer1h, scheduleOnboardingReoffer1hIfNeeded } from "@/lib/server/onboarding-reoffer-service"
+import { hasAddedFirstExpense } from "@/lib/server/user-analytics-service"
 import { getUserAnalyticsRecord } from "@/lib/server/user-analytics-store"
 
 export async function POST(request: Request) {
@@ -47,11 +52,27 @@ export async function POST(request: Request) {
       await scheduleOnboardingReoffer1hIfNeeded(userKey, user.onboardingStartedAt)
     }
 
+    if (
+      user?.walkthroughCompletedAt &&
+      !user.firstExpenseNudgeScheduledAt &&
+      !user.firstExpenseNudgeSentAt &&
+      !hasAddedFirstExpense(user)
+    ) {
+      await scheduleFirstExpenseNudgeIfNeeded(userKey, user.walkthroughCompletedAt)
+    }
+
     const reminder = await processUserFlashSaleReminder(userKey)
     const reoffers = await processUserFlashSaleReoffers(userKey)
     const onboardingReoffer1h = await processUserOnboardingReoffer1h(userKey)
+    const firstExpenseNudge = await processUserFirstExpenseNudge(userKey)
 
-    return NextResponse.json({ ok: true, reminder, reoffers, onboardingReoffer1h })
+    return NextResponse.json({
+      ok: true,
+      reminder,
+      reoffers,
+      onboardingReoffer1h,
+      firstExpenseNudge,
+    })
   } catch (error) {
     console.error("[analytics/sync]", error)
     return NextResponse.json({ error: "SYNC_FAILED" }, { status: 500 })

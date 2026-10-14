@@ -119,9 +119,13 @@ const INIT_STATEMENTS = [
 const MIGRATION_STATEMENTS = [
   `ALTER TABLE user_analytics ADD COLUMN onboarding_reoffer_1h_scheduled_at TEXT`,
   `ALTER TABLE user_analytics ADD COLUMN onboarding_reoffer_1h_sent_at TEXT`,
+  `ALTER TABLE user_analytics ADD COLUMN first_expense_nudge_scheduled_at TEXT`,
+  `ALTER TABLE user_analytics ADD COLUMN first_expense_nudge_sent_at TEXT`,
   `ALTER TABLE support_tickets ADD COLUMN source TEXT NOT NULL DEFAULT 'app'`,
   `ALTER TABLE flash_sale_lifecycle ADD COLUMN promotion_id TEXT`,
   `ALTER TABLE flash_sale_lifecycle ADD COLUMN pending_promotion_id TEXT`,
+  `ALTER TABLE flash_sale_lifecycle ADD COLUMN broadcast_promotion_id TEXT`,
+  `ALTER TABLE flash_sale_lifecycle ADD COLUMN promo_opened_at TEXT`,
 ]
 
 export async function initTursoSchema() {

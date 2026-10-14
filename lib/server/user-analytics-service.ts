@@ -18,6 +18,11 @@ import type {
   UserSubscriptionFilter,
 } from "@/lib/server/user-analytics-types"
 import { planToFilter } from "@/lib/server/user-analytics-types"
+import {
+  ONBOARDING_DISABLED_AT,
+  ONBOARDING_REENABLED_AT,
+  PAYWALL_BASELINE_DAYS,
+} from "@/lib/onboarding-switch"
 
 function nowIso() {
   return new Date().toISOString()
@@ -43,6 +48,8 @@ function createEmptyUser(input: {
     onboardingReoffer1hSentAt: null,
     onboardingCompletedAt: null,
     walkthroughCompletedAt: null,
+    firstExpenseNudgeScheduledAt: null,
+    firstExpenseNudgeSentAt: null,
     homeWalkthroughCompleted: null,
     firstExpenseAdded: null,
     paywallShownAt: null,
@@ -280,6 +287,56 @@ function countUsersWithFirstExpenseInRange(
   ).length
 }
 
+function parseAnalyticsTime(iso: string | null) {
+  if (!iso) return null
+  const time = new Date(iso).getTime()
+  return Number.isNaN(time) ? null : time
+}
+
+function paywallSharePercent(shown: number, opened: number) {
+  if (opened === 0) return null
+  return Math.round((shown / opened) * 1000) / 10
+}
+
+export function buildPaywallExperiment(users: UserAnalyticsRecord[]) {
+  const cutoff = new Date(ONBOARDING_DISABLED_AT).getTime()
+  const baselineStart = cutoff - PAYWALL_BASELINE_DAYS * 24 * 60 * 60 * 1000
+  let beforeOpened = 0
+  let beforePaywall = 0
+  let afterOpened = 0
+  let afterPaywall = 0
+
+  for (const user of users) {
+    const openedAt = parseAnalyticsTime(user.appOpenedAt)
+    if (openedAt == null) continue
+    const paywallAt = parseAnalyticsTime(user.paywallShownAt)
+
+    if (openedAt >= baselineStart && openedAt < cutoff) {
+      beforeOpened += 1
+      if (paywallAt != null && paywallAt < cutoff) beforePaywall += 1
+    } else if (openedAt >= cutoff && openedAt < new Date(ONBOARDING_REENABLED_AT).getTime()) {
+      afterOpened += 1
+      if (paywallAt != null) afterPaywall += 1
+    }
+  }
+
+  return {
+    disabledAt: ONBOARDING_DISABLED_AT,
+    reenabledAt: ONBOARDING_REENABLED_AT,
+    baselineDays: PAYWALL_BASELINE_DAYS,
+    before: {
+      opened: beforeOpened,
+      paywallShown: beforePaywall,
+      percent: paywallSharePercent(beforePaywall, beforeOpened),
+    },
+    after: {
+      opened: afterOpened,
+      paywallShown: afterPaywall,
+      percent: paywallSharePercent(afterPaywall, afterOpened),
+    },
+  }
+}
+
 function buildPeriodAnalyticsBucket(
   users: UserAnalyticsRecord[],
   startYmd: string,
@@ -393,6 +450,8 @@ export async function getAnalyticsSummary(input?: {
     autoRenewCanceled: users.filter((u) => u.autoRenewCanceledAt).length,
   }
 
+  const paywallExperiment = buildPaywallExperiment(users)
+
   if (input?.monthYmd) {
     const { start, end } = getMonthRange(input.monthYmd)
     const monthly = buildPeriodAnalyticsBucket(users, start, end)
@@ -415,6 +474,7 @@ export async function getAnalyticsSummary(input?: {
       totalSubscribedMonthly: allTime.subscribedMonthly,
       totalSubscribedYearly: allTime.subscribedYearly,
       totalAutoRenewCanceled: allTime.autoRenewCanceled,
+      paywallExperiment,
     }
   }
 
@@ -438,6 +498,7 @@ export async function getAnalyticsSummary(input?: {
     totalSubscribedYearly: allTime.subscribedYearly,
     totalAutoRenewCanceled: allTime.autoRenewCanceled,
     newUsersOnDate: daily.newUsers,
+    paywallExperiment,
   }
 }
 

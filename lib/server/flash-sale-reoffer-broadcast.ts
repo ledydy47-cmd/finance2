@@ -104,6 +104,7 @@ export async function broadcastReofferToPaywallNonSubscribers(input?: {
     lifecycle.pendingOffer = offerType
     if (promotionId) {
       lifecycle.pendingPromotionId = promotionId
+      lifecycle.broadcastPromotionId = promotionId
     }
     if (offerType === "4h") lifecycle.offer4hSentAt = new Date().toISOString()
     if (offerType === "24h") lifecycle.offer24hSentAt = new Date().toISOString()

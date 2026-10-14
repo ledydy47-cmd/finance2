@@ -71,36 +71,56 @@ export async function queueAppReset(input: {
   return payload
 }
 
-export async function consumeAppReset(userKey: string) {
-  if (hasTursoConfig()) {
-    await ensureTursoSchema()
-    const row = await getDb().select().from(appResets).where(eq(appResets.userKey, userKey)).get()
-    if (!row) return null
-    await getDb().delete(appResets).where(eq(appResets.userKey, userKey))
-    try {
-      return JSON.parse(row.payloadJson) as AppResetPayload
-    } catch {
-      return null
-    }
-  }
-
-  const raw = await kvRestGet(resetKey(userKey))
-  if (!raw) {
-    const snapshot = await readJsonDataFile(FILE_NAME, EMPTY_SNAPSHOT)
-    const payload = snapshot.byUserKey[userKey]
-    if (!payload) return null
-    delete snapshot.byUserKey[userKey]
-    await writeJsonDataFile(FILE_NAME, snapshot)
-    return payload
-  }
-
-  await kvRestSet(resetKey(userKey), "")
-
+function parseResetPayload(raw: string | null | undefined) {
+  if (!raw) return null
   try {
     return JSON.parse(raw) as AppResetPayload
   } catch {
     return null
   }
+}
+
+export async function peekAppReset(userKey: string) {
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    const row = await getDb().select().from(appResets).where(eq(appResets.userKey, userKey)).get()
+    return parseResetPayload(row?.payloadJson)
+  }
+
+  const raw = await kvRestGet(resetKey(userKey))
+  if (raw) return parseResetPayload(raw)
+
+  const snapshot = await readJsonDataFile(FILE_NAME, EMPTY_SNAPSHOT)
+  return snapshot.byUserKey[userKey] ?? null
+}
+
+export async function acknowledgeAppReset(userKey: string, resetId: string) {
+  const current = await peekAppReset(userKey)
+  if (!current || current.resetId !== resetId) return false
+
+  if (hasTursoConfig()) {
+    await ensureTursoSchema()
+    await getDb().delete(appResets).where(eq(appResets.userKey, userKey))
+    return true
+  }
+
+  const wrote = await kvRestSet(resetKey(userKey), "")
+  if (!wrote) {
+    const snapshot = await readJsonDataFile(FILE_NAME, EMPTY_SNAPSHOT)
+    if (snapshot.byUserKey[userKey]?.resetId === resetId) {
+      delete snapshot.byUserKey[userKey]
+      await writeJsonDataFile(FILE_NAME, snapshot)
+    }
+  }
+
+  return true
+}
+
+export async function consumeAppReset(userKey: string) {
+  const payload = await peekAppReset(userKey)
+  if (!payload) return null
+  await acknowledgeAppReset(userKey, payload.resetId)
+  return payload
 }
 
 export function applyAppReset(data: AppData, reset: AppResetPayload): AppData {

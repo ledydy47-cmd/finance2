@@ -47,6 +47,15 @@ export function applyRemoteAppReset(data: AppData, reset: RemoteAppResetPayload)
   }
 }
 
+export async function acknowledgeAppReset(userKey: string, resetId: string) {
+  await fetch("/api/user/app-reset", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userKey, resetId }),
+    cache: "no-store",
+  })
+}
+
 export async function fetchPendingAppReset(userKey: string) {
   const response = await fetch(
     `/api/user/app-reset?userKey=${encodeURIComponent(userKey)}`,
@@ -63,7 +72,10 @@ export async function fetchPendingAppReset(userKey: string) {
   }
 
   if (!payload.apply || !payload.resetId) return null
-  if (getAppliedResetId() === payload.resetId) return null
+  if (getAppliedResetId() === payload.resetId) {
+    await acknowledgeAppReset(userKey, payload.resetId)
+    return null
+  }
 
   return {
     resetId: payload.resetId,

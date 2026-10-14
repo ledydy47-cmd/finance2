@@ -30,6 +30,8 @@ export interface UserAnalyticsRecord {
   onboardingReoffer1hSentAt: string | null
   onboardingCompletedAt: string | null
   walkthroughCompletedAt: string | null
+  firstExpenseNudgeScheduledAt: string | null
+  firstExpenseNudgeSentAt: string | null
   homeWalkthroughCompleted: boolean | null
   firstExpenseAdded: boolean | null
   paywallShownAt: string | null

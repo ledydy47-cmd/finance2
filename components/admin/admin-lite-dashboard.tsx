@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import type { UserAnalyticsRecord } from "@/lib/server/user-analytics-types"
 import type { SupportTicket } from "@/lib/server/support-types"
+import { PaywallExperimentCard } from "@/components/admin/paywall-experiment-card"
 
 const SESSION_KEY = "kopilka-admin-support-key"
 
@@ -56,6 +57,11 @@ export function AdminLiteDashboard() {
   const [summary, setSummary] = useState<{
     allTime?: { totalUsers?: number; subscribedMonthly?: number; subscribedYearly?: number }
     daily?: { newUsers?: number; paywallShown?: number }
+    paywallExperiment?: {
+      baselineDays: number
+      before: { opened: number; paywallShown: number; percent: number | null }
+      after: { opened: number; paywallShown: number; percent: number | null }
+    }
   } | null>(null)
 
   const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) ?? null
@@ -387,6 +393,9 @@ export function AdminLiteDashboard() {
                 <StatCard label="Новых за день" value={summary.daily?.newUsers ?? 0} />
                 <StatCard label="Paywall за день" value={summary.daily?.paywallShown ?? 0} />
               </div>
+            )}
+            {summary?.paywallExperiment && (
+              <PaywallExperimentCard experiment={summary.paywallExperiment} />
             )}
           </div>
         )}

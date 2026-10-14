@@ -5,24 +5,46 @@ import {
 } from "@/lib/server/ensure-flash-sale-reoffer"
 import { getFlashSaleStartedAt, setFlashSaleStartedAt } from "@/lib/server/flash-sale-store"
 import { getServerSubscriptionStatus } from "@/lib/server/subscription-service"
+import { formatDateInAnalyticsTimezone } from "@/lib/server/user-analytics-service"
 import { readAnalyticsStore } from "@/lib/server/user-analytics-store"
 import { parseTelegramUserId } from "@/lib/server/subscription-store"
 
 type EnsureResult = Awaited<ReturnType<typeof ensureFlashSaleReoffer>>
 
+function matchesPaywallDateRange(
+  paywallShownAt: string,
+  fromYmd?: string,
+  toYmd?: string,
+) {
+  const paywallYmd = formatDateInAnalyticsTimezone(new Date(paywallShownAt))
+  if (fromYmd && paywallYmd < fromYmd) return false
+  if (toYmd && paywallYmd > toYmd) return false
+  return true
+}
+
 export async function backfillFlashSaleReoffers(input?: {
   offset?: number
   limit?: number
   offers?: FlashSaleReofferType[]
+  paywallDateFrom?: string
+  paywallDateTo?: string
 }) {
   const offset = Math.max(0, input?.offset ?? 0)
   const limit = input?.limit && input.limit > 0 ? Math.floor(input.limit) : 40
   const offers = input?.offers?.length ? input.offers : (["4h", "24h"] as const)
+  const paywallDateFrom = input?.paywallDateFrom?.trim()
+  const paywallDateTo = input?.paywallDateTo?.trim()
 
   const allCandidates = Object.values((await readAnalyticsStore()).users).filter((user) => {
     if (!user.paywallShownAt) return false
     if (user.subscriptionPlan !== "none") return false
     if (!user.telegramUserId && !parseTelegramUserId(user.userKey)) return false
+    if (
+      (paywallDateFrom || paywallDateTo) &&
+      !matchesPaywallDateRange(user.paywallShownAt, paywallDateFrom, paywallDateTo)
+    ) {
+      return false
+    }
     return true
   })
 

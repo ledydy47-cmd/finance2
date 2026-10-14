@@ -1,4 +1,4 @@
-export const APP_CURRENCIES = ["RUB", "KZT", "BYN", "USD", "EUR"] as const
+export const APP_CURRENCIES = ["RUB", "KZT", "BYN", "AMD", "USD", "EUR"] as const
 
 export type AppCurrency = (typeof APP_CURRENCIES)[number]
 
@@ -12,6 +12,7 @@ export const CURRENCY_OPTIONS: ReadonlyArray<{
   { id: "RUB", label: "₽ Рубль", locale: "ru-RU" },
   { id: "KZT", label: "₸ Тенге", locale: "kk-KZ" },
   { id: "BYN", label: "Br Белорусский рубль", locale: "be-BY" },
+  { id: "AMD", label: "֏ Армянский драм", locale: "hy-AM" },
   { id: "USD", label: "$ Доллар", locale: "en-US" },
   { id: "EUR", label: "€ Евро", locale: "de-DE" },
 ]
@@ -20,6 +21,7 @@ const SAVINGS_PRESETS: Record<AppCurrency, readonly number[]> = {
   RUB: [3_000, 5_000, 10_000, 15_000, 20_000],
   KZT: [15_000, 25_000, 50_000, 75_000, 100_000],
   BYN: [100, 200, 400, 600, 800],
+  AMD: [10_000, 20_000, 50_000, 100_000, 150_000],
   USD: [50, 100, 200, 300, 400],
   EUR: [50, 100, 200, 300, 400],
 }
@@ -45,6 +47,7 @@ export function getCurrencyAmountPlaceholder(currency: AppCurrency) {
     RUB: "Целевая сумма, ₽",
     KZT: "Целевая сумма, ₸",
     BYN: "Целевая сумма, Br",
+    AMD: "Целевая сумма, ֏",
     USD: "Целевая сумма, $",
     EUR: "Целевая сумма, €",
   }
@@ -71,4 +74,17 @@ export function getPaywallPaymentNote(currency: AppCurrency) {
 
   const label = getCurrencyLabel(currency)
   return `Суммы в приложении — в ${label.split(" ").slice(1).join(" ") || "выбранной валюте"}. Оплата подписки проходит в рублях (1490 ₽ / 299 ₽). Подходят карты «Мир» (KZ/BY), Belkart, ЮMoney и карты российских банков.`
+}
+
+export function getPaywallAutoRenewalNote(
+  plan: "yearly" | "monthly",
+  monthlyPriceRub: number,
+) {
+  const priceLabel = `${Math.round(monthlyPriceRub).toLocaleString("ru-RU")} ₽`
+
+  if (plan === "yearly") {
+    return "Годовая подписка — разовый платёж на 12 месяцев. Карта не сохраняется для автоматических списаний."
+  }
+
+  return `Месячная подписка: при оплате карта сохраняется для автопродления. Далее — безакцептные списания ${priceLabel} каждые 30 дней, пока вы не отключите автопродление в настройках приложения.`
 }

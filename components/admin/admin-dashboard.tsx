@@ -7,6 +7,7 @@ import type {
   UserAnalyticsRecord,
 } from "@/lib/server/user-analytics-types"
 import type { SupportTicket } from "@/lib/server/support-types"
+import { PaywallExperimentCard } from "@/components/admin/paywall-experiment-card"
 
 const SESSION_KEY = "kopilka-admin-support-key"
 
@@ -54,6 +55,12 @@ type AnalyticsBucket = {
   totalUsers?: number
 }
 
+type PaywallCohort = {
+  opened: number
+  paywallShown: number
+  percent: number | null
+}
+
 type SummaryState = {
   period?: "day" | "month"
   selectedDate?: string
@@ -65,6 +72,23 @@ type SummaryState = {
   monthly?: AnalyticsBucket
   allTime?: AnalyticsBucket
   newUsersOnDate?: number
+  paywallExperiment?: {
+    disabledAt: string
+    baselineDays: number
+    before: PaywallCohort
+    after: PaywallCohort
+  }
+} | null
+
+type PromoStatsState = {
+  promotionId: string
+  messagesSent: number
+  openedApp: number
+  pendingOpen: number
+  paywallShown: number
+  subscribedYearly: number
+  openRate: number
+  updatedAt: string
 } | null
 
 type StatsPeriod = "day" | "month"
@@ -198,6 +222,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
   const [inputKey, setInputKey] = useState("")
   const [tab, setTab] = useState<TabId>(defaultTab)
   const [summary, setSummary] = useState<SummaryState>(null)
+  const [promoStats, setPromoStats] = useState<PromoStatsState>(null)
   const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>("month")
   const [statsDate, setStatsDate] = useState(todayYmdMoscow)
   const [statsMonth, setStatsMonth] = useState(currentMonthYmdMoscow)
@@ -259,6 +284,17 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
     setSummary(data.summary)
   }, [authHeaders, statsDate, statsMonth, statsPeriod])
 
+  const loadPromoStats = useCallback(async () => {
+    const response = await fetch("/api/admin/promotion-stats?promotionId=sept1_2026", {
+      headers: authHeaders(),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error ?? "PROMO_STATS_FAILED")
+    }
+    setPromoStats(data.stats ?? null)
+  }, [authHeaders])
+
   const loadUsers = useCallback(async () => {
     const query = userFilter === "all" ? "" : `?filter=${userFilter}`
     const response = await fetch(`/api/admin/analytics/users${query}`, { headers: authHeaders() })
@@ -289,7 +325,7 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
     setLoading(true)
     setError(null)
     try {
-      await Promise.all([loadSummary(), loadUsers(), loadCampaigns(), loadTickets()])
+      await Promise.all([loadSummary(), loadPromoStats(), loadUsers(), loadCampaigns(), loadTickets()])
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -299,7 +335,15 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
     } finally {
       setLoading(false)
     }
-  }, [adminKey, loadSummary, loadUsers, loadCampaigns, loadTickets])
+  }, [adminKey, loadSummary, loadPromoStats, loadUsers, loadCampaigns, loadTickets])
+
+  useEffect(() => {
+    if (!adminKey || tab !== "stats") return
+    const timerId = window.setInterval(() => {
+      void loadPromoStats().catch(() => {})
+    }, 60_000)
+    return () => window.clearInterval(timerId)
+  }, [adminKey, tab, loadPromoStats])
 
   function switchTab(nextTab: TabId) {
     setTab(nextTab)
@@ -578,7 +622,12 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-serif text-2xl font-bold">Админ-панель</h1>
-            <p className="text-sm text-muted-foreground">Аналитика, пользователи, рассылки, поддержка</p>
+            <p className="text-sm text-muted-foreground">
+              Аналитика, пользователи, рассылки, поддержка ·{" "}
+              <a href="/admin/lite" className="font-semibold text-primary underline-offset-2 hover:underline">
+                lite
+              </a>
+            </p>
           </div>
           <button
             type="button"
@@ -616,6 +665,54 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
 
         {tab === "stats" && (
           <div className="space-y-6">
+            {promoStats && (
+              <div className="rounded-block border border-primary/25 bg-primary/5 p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="font-serif text-lg font-bold text-foreground">
+                      Акция 1 сентября · 999 ₽/год
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Обновлено {formatDateTime(promoStats.updatedAt)} · автообновление каждую минуту
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void loadPromoStats()}
+                    className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+                  >
+                    Обновить
+                  </button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    { label: "Получили сообщение", value: promoStats.messagesSent, highlight: true },
+                    {
+                      label: "Открыли приложение после",
+                      value: promoStats.openedApp,
+                      hint: `${promoStats.openRate}% от рассылки`,
+                    },
+                    { label: "Ещё не открыли", value: promoStats.pendingOpen },
+                    { label: "Увидели paywall", value: promoStats.paywallShown },
+                    { label: "Оплатили год", value: promoStats.subscribedYearly },
+                  ].map((card) => (
+                    <div
+                      key={card.label}
+                      className={`rounded-block-sm border border-border/70 bg-card px-4 py-3 ${
+                        card.highlight ? "ring-1 ring-primary/20" : ""
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-muted-foreground">{card.label}</p>
+                      <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{card.value}</p>
+                      {"hint" in card && card.hint ? (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">{card.hint}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4 rounded-block border border-border bg-card p-4">
               <div className="flex flex-wrap gap-2">
                 {(
@@ -699,6 +796,10 @@ export function AdminDashboard({ defaultTab = "stats" }: { defaultTab?: TabId })
                 </p>
               </div>
             </div>
+
+            {summary?.paywallExperiment && (
+              <PaywallExperimentCard experiment={summary.paywallExperiment} />
+            )}
 
             {statSections.map((section) => (
               <section key={section.title}>

@@ -19,6 +19,10 @@ export interface FlashSaleLifecycle {
   pendingOffer: FlashSalePendingOffer | null
   promotionId: string | null
   pendingPromotionId: string | null
+  /** Set when a promotion broadcast is delivered; used for funnel stats. */
+  broadcastPromotionId: string | null
+  /** First app open that activated the pending promotion broadcast. */
+  promoOpenedAt: string | null
   offer4hSentAt: string | null
   offer24hSentAt: string | null
 }
@@ -46,6 +50,8 @@ function emptyLifecycle(userKey: string, startedAt: string): FlashSaleLifecycle 
     pendingOffer: null,
     promotionId: null,
     pendingPromotionId: null,
+    broadcastPromotionId: null,
+    promoOpenedAt: null,
     offer4hSentAt: null,
     offer24hSentAt: null,
   }

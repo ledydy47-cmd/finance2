@@ -101,6 +101,8 @@ export async function POST(request: Request) {
           )
         }
         record.walkthroughCompletedAt = null
+        record.firstExpenseNudgeScheduledAt = null
+        record.firstExpenseNudgeSentAt = null
         record.homeWalkthroughCompleted = false
         record.firstExpenseAdded = false
         record.paywallShownAt = null

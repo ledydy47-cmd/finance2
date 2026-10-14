@@ -20,7 +20,7 @@ import {
   type SubscriptionPlan,
 } from "@/lib/subscription"
 
-import { getPaywallPaymentNote } from "@/lib/currency"
+import { getPaywallAutoRenewalNote, getPaywallPaymentNote } from "@/lib/currency"
 
 const TESTIMONIAL_LAYOUT = [
   { className: "-rotate-1 mr-5" },
@@ -287,6 +287,10 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
   const { yearly, monthly } = pricing
   const yearlyTotalLabel = yearly.total ? formatRub(yearly.total) : null
   const yearlyListTotalLabel = yearly.listTotal ? formatRub(yearly.listTotal) : null
+  const autoRenewalNote = getPaywallAutoRenewalNote(
+    plan,
+    monthly.total ?? monthly.perMonth ?? 598,
+  )
 
   return (
     <div className="absolute inset-0 z-[80] flex flex-col bg-background">
@@ -443,13 +447,17 @@ export function SubscriptionPaywallModal({ onClose }: SubscriptionPaywallModalPr
             {getPaywallPaymentNote(data.settings.currency)}
           </p>
 
+          <p className="rounded-block-sm border border-primary/15 bg-primary/5 px-3 py-2.5 text-[11px] leading-relaxed text-foreground">
+            {autoRenewalNote}
+          </p>
+
           <label className="flex items-start justify-between gap-3 rounded-block-sm border border-border/70 bg-card px-3 py-3">
             <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted-foreground">
               Нажимая «Оплатить», вы соглашаетесь с{" "}
               <Link href="/terms" className="font-semibold text-primary underline-offset-2 hover:underline">
                 Условиями использования
               </Link>{" "}
-              и{" "}
+              (в т.ч. п. 3.4–3.5 об автопродлении) и{" "}
               <Link href="/privacy" className="font-semibold text-primary underline-offset-2 hover:underline">
                 Политикой конфиденциальности
               </Link>

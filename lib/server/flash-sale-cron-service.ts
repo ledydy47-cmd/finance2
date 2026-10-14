@@ -367,6 +367,9 @@ export async function activatePendingFlashSaleOffer(userKey: string, now = new D
   lifecycle.pendingPromotionId = null
   if (promotionId) {
     lifecycle.promotionId = promotionId
+    if (!lifecycle.promoOpenedAt) {
+      lifecycle.promoOpenedAt = startedAt
+    }
   }
   await saveFlashSaleLifecycle(lifecycle)
 

@@ -29,11 +29,13 @@ import {
   mergeServerProgressIntoAppData,
 } from "@/lib/user-progress-client"
 import {
+  acknowledgeAppReset,
   applyRemoteAppReset,
   fetchPendingAppReset,
   markResetApplied,
 } from "@/lib/app-reset-client"
 import { trackClientAnalytics } from "@/lib/analytics-client"
+import { ONBOARDING_ENABLED } from "@/lib/onboarding-switch"
 import { getClientUserKey } from "@/lib/client-id"
 import {
   clearFlashSaleReminderWatch,
@@ -174,11 +176,14 @@ async function syncHydrationFromServer(input: {
 }) {
   let loaded = input.loaded
 
-  const pendingReset = await withTimeout(fetchPendingAppReset(input.userKey), 4000, null)
+  const pendingReset = await fetchPendingAppReset(input.userKey)
   if (pendingReset) {
     loaded = applyRemoteAppReset(loaded, pendingReset)
-    markResetApplied(pendingReset.resetId)
-    saveAppData(loaded)
+    const saved = saveAppData(loaded)
+    if (saved.ok) {
+      markResetApplied(pendingReset.resetId)
+      await acknowledgeAppReset(input.userKey, pendingReset.resetId)
+    }
     if (pendingReset.resetToOnboarding) {
       return { loaded, appliedOnboardingReset: true }
     }
@@ -291,11 +296,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
+    let snapshot = createDefaultData()
+    let revealed = false
     const safetyTimer = window.setTimeout(() => {
-      if (!cancelled) setHydrated(true)
-    }, 3000)
+      if (!cancelled && !revealed) {
+        setData(snapshot)
+        applyTheme(snapshot.settings.themeId ?? DEFAULT_THEME_ID)
+        setHydrated(true)
+      }
+    }, 12000)
 
     const revealLoadedData = (loaded: AppData) => {
+      revealed = true
+      snapshot = loaded
       setData(loaded)
       applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
       const goalToCelebrate = findGoalToCelebrate(loaded)
@@ -317,31 +330,31 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
 
         loaded = loadAppData()
+        snapshot = loaded
         if (cancelled) return
-
-        revealLoadedData(loaded)
 
         const webAppUser = getWebApp()?.initDataUnsafe?.user
         const userKey = getClientUserKey(webAppUser?.id)
 
         if (userKey.startsWith("tg-")) {
-          const synced = await withTimeout(
-            syncHydrationFromServer({
-              userKey,
-              loaded,
-              appliedOnboardingReset: false,
-            }),
-            8000,
-            { loaded, appliedOnboardingReset: false },
-          )
+          const synced = await syncHydrationFromServer({
+            userKey,
+            loaded,
+            appliedOnboardingReset: false,
+          })
           loaded = synced.loaded
+          snapshot = loaded
         } else {
           try {
-            const pendingReset = await withTimeout(fetchPendingAppReset(userKey), 4000, null)
+            const pendingReset = await fetchPendingAppReset(userKey)
             if (pendingReset) {
               loaded = applyRemoteAppReset(loaded, pendingReset)
-              markResetApplied(pendingReset.resetId)
-              saveAppData(loaded)
+              const saved = saveAppData(loaded)
+              if (saved.ok) {
+                markResetApplied(pendingReset.resetId)
+                await acknowledgeAppReset(userKey, pendingReset.resetId)
+              }
+              snapshot = loaded
             }
           } catch {
             // ignore remote reset errors
@@ -367,14 +380,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      setData(loaded)
-      applyTheme(loaded.settings.themeId ?? DEFAULT_THEME_ID)
+      revealLoadedData(loaded)
       if (isNewPeriodPending(loaded)) {
         setShowNewMonthModal(true)
-      }
-      const goalToCelebrate = findGoalToCelebrate(loaded)
-      if (goalToCelebrate) {
-        setCelebratingGoal(goalToCelebrate)
       }
     }
 
@@ -393,6 +401,39 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setPersistError(getSaveErrorMessage(result))
     }
   }, [data, hydrated])
+
+  useEffect(() => {
+    if (!hydrated) return
+    let cancelled = false
+
+    const applyIfPending = async () => {
+      const userKey = getClientUserKey(getWebApp()?.initDataUnsafe?.user?.id)
+      try {
+        const pendingReset = await fetchPendingAppReset(userKey)
+        if (!pendingReset || cancelled) return
+        const next = applyRemoteAppReset(dataRef.current, pendingReset)
+        const saved = saveAppData(next)
+        if (!saved.ok) return
+        markResetApplied(pendingReset.resetId)
+        await acknowledgeAppReset(userKey, pendingReset.resetId)
+        if (!cancelled) setData(next)
+      } catch {
+        // Сброс остаётся на сервере до следующего открытия.
+      }
+    }
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void applyIfPending()
+    }
+
+    document.addEventListener("visibilitychange", onVisible)
+    window.addEventListener("focus", applyIfPending)
+    return () => {
+      cancelled = true
+      document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("focus", applyIfPending)
+    }
+  }, [hydrated])
 
   const clearPersistError = useCallback(() => setPersistError(null), [])
 
@@ -422,7 +463,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   )
 
   const isHomeSetupActive =
-    data.settings.onboardingCompleted && !data.settings.homeWalkthroughCompleted
+    (ONBOARDING_ENABLED ? data.settings.onboardingCompleted : true) &&
+    !data.settings.homeWalkthroughCompleted
 
   const update = useCallback(
     (updater: (prev: AppData) => AppData): boolean => {

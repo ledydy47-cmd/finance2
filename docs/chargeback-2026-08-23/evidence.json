@@ -1,0 +1,251 @@
+{
+  "dispute": {
+    "transactionDate": "23.08.2026 9:00:47",
+    "transactionNumber": "6403094423324",
+    "claimAmount": 299,
+    "currency": "643",
+    "reasonCode": "Fraud",
+    "orderId": "321ca04e-000f-5001-9000-170baad2a845",
+    "orderNumber": "01a02d35-0e10-79d3-9655-f00fd9750b71"
+  },
+  "customer": {
+    "userKey": "tg-647381604",
+    "telegramUserId": 647381604,
+    "telegramUsername": "aarmagedoon",
+    "userName": "𝗆𝖺𝗋𝗀𝗈𝗌𝗁𝖺",
+    "age": 24,
+    "appOpenedAt": "2026-07-24T19:42:42.588Z",
+    "onboardingStartedAt": "2026-07-24T19:42:47.462Z",
+    "onboardingReoffer1hScheduledAt": null,
+    "onboardingReoffer1hSentAt": null,
+    "onboardingCompletedAt": "2026-07-24T19:43:55.663Z",
+    "walkthroughCompletedAt": "2026-07-24T19:44:42.416Z",
+    "homeWalkthroughCompleted": true,
+    "firstExpenseAdded": true,
+    "paywallShownAt": "2026-07-24T19:48:33.750Z",
+    "subscribedMonthlyAt": "2026-07-24T19:48:03.904Z",
+    "subscribedYearlyAt": null,
+    "autoRenewCanceledAt": null,
+    "subscriptionPlan": "monthly",
+    "lastVisitAt": "2026-08-23T06:00:49.121Z",
+    "events": [
+      {
+        "type": "app_opened",
+        "at": "2026-07-24T19:42:42.588Z"
+      },
+      {
+        "type": "onboarding_started",
+        "at": "2026-07-24T19:42:47.462Z"
+      },
+      {
+        "type": "onboarding_completed",
+        "at": "2026-07-24T19:43:55.663Z"
+      },
+      {
+        "type": "app_opened",
+        "at": "2026-07-24T19:43:55.724Z"
+      },
+      {
+        "type": "walkthrough_completed",
+        "at": "2026-07-24T19:44:42.416Z"
+      },
+      {
+        "type": "subscription_paid_monthly",
+        "at": "2026-07-24T19:48:03.904Z"
+      },
+      {
+        "type": "app_opened",
+        "at": "2026-07-24T19:48:33.135Z"
+      },
+      {
+        "type": "paywall_shown",
+        "at": "2026-07-24T19:48:33.750Z"
+      },
+      {
+        "type": "subscription_paid_monthly",
+        "at": "2026-08-23T06:00:49.121Z"
+      }
+    ]
+  },
+  "subscription": {
+    "subscription": {
+      "subscriptionType": "monthly",
+      "currentPeriodEnd": "2026-09-22T19:48:03.848Z",
+      "autoRenew": true,
+      "status": "active",
+      "active": true,
+      "lastPaymentId": "321ca04e-000f-5001-9000-170baad2a845"
+    }
+  },
+  "payments": [
+    {
+      "id": "31f5d4e3-000f-5001-9000-16ec1aa0ad6c",
+      "status": "succeeded",
+      "amount": {
+        "value": "299.00",
+        "currency": "RUB"
+      },
+      "income_amount": {
+        "value": "283.84",
+        "currency": "RUB"
+      },
+      "description": "Копилка — месячная подписка",
+      "recipient": {
+        "account_id": "1372897",
+        "gateway_id": "2744613"
+      },
+      "payment_method": {
+        "type": "bank_card",
+        "id": "31f5d4e3-000f-5001-9000-16ec1aa0ad6c",
+        "saved": true,
+        "status": "active",
+        "title": "Bank card *5235",
+        "card": {
+          "first6": "220070",
+          "last4": "5235",
+          "expiry_year": "2035",
+          "expiry_month": "11",
+          "card_type": "Mir",
+          "card_product": {
+            "code": "MSA",
+            "name": "Mir Supreme"
+          },
+          "issuer_country": "RU",
+          "issuer_name": "Tinkoff Bank"
+        }
+      },
+      "captured_at": "2026-07-24T19:48:02.409Z",
+      "created_at": "2026-07-24T19:46:43.837Z",
+      "test": false,
+      "refunded_amount": {
+        "value": "0.00",
+        "currency": "RUB"
+      },
+      "paid": true,
+      "refundable": true,
+      "receipt_registration": "succeeded",
+      "metadata": {
+        "orderId": "797cecc2-29c6-4f0d-8539-45df2125be7d",
+        "plan": "monthly",
+        "userKey": "tg-647381604"
+      },
+      "authorization_details": {
+        "rrn": "620519929946",
+        "auth_code": "201653",
+        "three_d_secure": {
+          "applied": true,
+          "protocol": "v2",
+          "method_completed": true,
+          "challenge_completed": true
+        }
+      }
+    },
+    {
+      "id": "321ca04e-000f-5001-9000-170baad2a845",
+      "status": "succeeded",
+      "amount": {
+        "value": "299.00",
+        "currency": "RUB"
+      },
+      "income_amount": {
+        "value": "283.84",
+        "currency": "RUB"
+      },
+      "description": "Копилка — месячная подписка — автопродление",
+      "recipient": {
+        "account_id": "1372897",
+        "gateway_id": "2744613"
+      },
+      "payment_method": {
+        "type": "bank_card",
+        "id": "31f5d4e3-000f-5001-9000-16ec1aa0ad6c",
+        "saved": true,
+        "status": "active",
+        "title": "Bank card *5235",
+        "card": {
+          "first6": "220070",
+          "last4": "5235",
+          "expiry_year": "2035",
+          "expiry_month": "11",
+          "card_type": "Mir",
+          "card_product": {
+            "code": "MSA",
+            "name": "Mir Supreme"
+          },
+          "issuer_country": "RU",
+          "issuer_name": "Tinkoff Bank"
+        }
+      },
+      "captured_at": "2026-08-23T06:00:48.145Z",
+      "created_at": "2026-08-23T06:00:46.924Z",
+      "test": false,
+      "refunded_amount": {
+        "value": "0.00",
+        "currency": "RUB"
+      },
+      "paid": true,
+      "refundable": false,
+      "receipt_registration": "succeeded",
+      "metadata": {
+        "orderId": "ee6fe4f3-4319-4491-9a06-07e07794a20d",
+        "plan": "monthly",
+        "userKey": "tg-647381604"
+      },
+      "authorization_details": {
+        "rrn": "623549248610",
+        "auth_code": "279078",
+        "three_d_secure": {
+          "applied": false,
+          "method_completed": false,
+          "challenge_completed": false
+        }
+      }
+    }
+  ],
+  "summary": {
+    "telegramId": 647381604,
+    "username": "aarmagedoon",
+    "firstPayment": {
+      "id": "31f5d4e3-000f-5001-9000-16ec1aa0ad6c",
+      "dateMsk": "24.07.2026 22:46:43",
+      "amount": "299.00",
+      "description": "Копилка — месячная подписка",
+      "orderId": "797cecc2-29c6-4f0d-8539-45df2125be7d",
+      "card": {
+        "first6": "220070",
+        "last4": "5235",
+        "expiry_year": "2035",
+        "expiry_month": "11",
+        "card_type": "Mir",
+        "card_product": {
+          "code": "MSA",
+          "name": "Mir Supreme"
+        },
+        "issuer_country": "RU",
+        "issuer_name": "Tinkoff Bank"
+      }
+    },
+    "renewalPayment": {
+      "id": "321ca04e-000f-5001-9000-170baad2a845",
+      "dateMsk": "23.08.2026 09:00:46",
+      "amount": "299.00",
+      "description": "Копилка — месячная подписка — автопродление",
+      "orderId": "ee6fe4f3-4319-4491-9a06-07e07794a20d",
+      "card": {
+        "first6": "220070",
+        "last4": "5235",
+        "expiry_year": "2035",
+        "expiry_month": "11",
+        "card_type": "Mir",
+        "card_product": {
+          "code": "MSA",
+          "name": "Mir Supreme"
+        },
+        "issuer_country": "RU",
+        "issuer_name": "Tinkoff Bank"
+      }
+    },
+    "paymentMethodId": "31f5d4e3-000f-5001-9000-16ec1aa0ad6c",
+    "appOpenedAfterRenewalMsk": "23.08.2026 09:00:49"
+  }
+}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { scheduleFirstExpenseNudgeIfNeeded } from "@/lib/server/first-expense-nudge-service"
 import { scheduleOnboardingReoffer1hIfNeeded } from "@/lib/server/onboarding-reoffer-service"
 import { getUserAnalyticsRecord } from "@/lib/server/user-analytics-store"
 import { recordAnalyticsEvent } from "@/lib/server/user-analytics-service"
@@ -28,7 +29,9 @@ export async function POST(request: Request) {
     }
 
     const userKey = body.userKey.trim()
-    const hadOnboardingStarted = Boolean((await getUserAnalyticsRecord(userKey))?.onboardingStartedAt)
+    const existing = await getUserAnalyticsRecord(userKey)
+    const hadOnboardingStarted = Boolean(existing?.onboardingStartedAt)
+    const hadWalkthrough = Boolean(existing?.walkthroughCompletedAt)
 
     await recordAnalyticsEvent({
       event: body.event,
@@ -43,6 +46,13 @@ export async function POST(request: Request) {
       const user = await getUserAnalyticsRecord(userKey)
       if (user?.onboardingStartedAt) {
         await scheduleOnboardingReoffer1hIfNeeded(userKey, user.onboardingStartedAt)
+      }
+    }
+
+    if (body.event === "walkthrough_completed" && !hadWalkthrough) {
+      const user = await getUserAnalyticsRecord(userKey)
+      if (user?.walkthroughCompletedAt) {
+        await scheduleFirstExpenseNudgeIfNeeded(userKey, user.walkthroughCompletedAt)
       }
     }
 

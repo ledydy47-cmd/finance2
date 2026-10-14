@@ -53,6 +53,8 @@ export function userAnalyticsToRecord(row: UserAnalyticsRow): UserAnalyticsRecor
     onboardingReoffer1hSentAt: row.onboardingReoffer1hSentAt,
     onboardingCompletedAt: row.onboardingCompletedAt,
     walkthroughCompletedAt: row.walkthroughCompletedAt,
+    firstExpenseNudgeScheduledAt: row.firstExpenseNudgeScheduledAt,
+    firstExpenseNudgeSentAt: row.firstExpenseNudgeSentAt,
     homeWalkthroughCompleted: row.homeWalkthroughCompleted,
     firstExpenseAdded: row.firstExpenseAdded,
     paywallShownAt: row.paywallShownAt,
@@ -78,6 +80,8 @@ export function userAnalyticsToRow(record: UserAnalyticsRecord): UserAnalyticsIn
     onboardingReoffer1hSentAt: record.onboardingReoffer1hSentAt,
     onboardingCompletedAt: record.onboardingCompletedAt,
     walkthroughCompletedAt: record.walkthroughCompletedAt,
+    firstExpenseNudgeScheduledAt: record.firstExpenseNudgeScheduledAt,
+    firstExpenseNudgeSentAt: record.firstExpenseNudgeSentAt,
     homeWalkthroughCompleted: record.homeWalkthroughCompleted,
     firstExpenseAdded: record.firstExpenseAdded,
     paywallShownAt: record.paywallShownAt,
@@ -191,6 +195,8 @@ export function flashSaleLifecycleToRecord(row: FlashSaleLifecycleRow): FlashSal
     offer24hSentAt: row.offer24hSentAt,
     promotionId: row.promotionId ?? null,
     pendingPromotionId: row.pendingPromotionId ?? null,
+    broadcastPromotionId: row.broadcastPromotionId ?? null,
+    promoOpenedAt: row.promoOpenedAt ?? null,
   }
 }
 
@@ -204,6 +210,8 @@ export function flashSaleLifecycleToRow(lifecycle: FlashSaleLifecycle) {
     offer24hSentAt: lifecycle.offer24hSentAt,
     promotionId: lifecycle.promotionId,
     pendingPromotionId: lifecycle.pendingPromotionId,
+    broadcastPromotionId: lifecycle.broadcastPromotionId,
+    promoOpenedAt: lifecycle.promoOpenedAt,
   }
 }
 

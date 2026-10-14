@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, ...result }, { status: 503 })
     }
 
+    // Permanent skips (NO_PENDING, STALE, EXPIRED, …) ack 200 so QStash stops retrying.
     return NextResponse.json({ ok: true, ...result })
   } catch (error) {
     console.error("[subscription/flash-sale-reminder-deliver]", error)

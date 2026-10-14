@@ -23,6 +23,7 @@ import { trackClientAnalytics } from "@/lib/analytics-client"
 import { getClientUserKey } from "@/lib/client-id"
 import { resumeFlashSaleReminderWatch, scheduleFlashSaleReminderChecks } from "@/lib/client/flash-sale-reminder-client"
 import { isUserSubscribed } from "@/lib/paywall-experiment"
+import { ONBOARDING_ENABLED } from "@/lib/onboarding-switch"
 import { getWebApp } from "@/lib/telegram"
 
 export function AppShell() {
@@ -55,8 +56,8 @@ export function AppShell() {
     prepareFlashSaleOnAppOpen,
   } = useFinance()
 
-  const showOnboarding = !data.settings.onboardingCompleted
-  const showMainApp = data.settings.onboardingCompleted
+  const showOnboarding = ONBOARDING_ENABLED && !data.settings.onboardingCompleted
+  const showMainApp = !showOnboarding
   const showHomeWalkthrough =
     isHomeSetupActive &&
     activeTab === "home" &&
@@ -151,7 +152,7 @@ export function AppShell() {
   }, [user?.id, data.settings.paywallFlashSaleStartedAt])
 
   useEffect(() => {
-    if (!user?.id) return
+    if (!hydrated || !user?.id) return
 
     void fetch("/api/analytics/sync", {
       method: "POST",
@@ -175,6 +176,7 @@ export function AppShell() {
     data.settings.firstExpenseAdded,
     data.settings.paywallShown,
     data.settings.userName,
+    hydrated,
   ])
 
   useEffect(() => {
