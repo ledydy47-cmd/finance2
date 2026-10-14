@@ -35,7 +35,7 @@ export async function broadcastFirstExpenseNudge(input?: {
   const limit = input?.limit && input.limit > 0 ? Math.floor(input.limit) : null
   const dates = new Set(input?.datesYmd?.length ? input.datesYmd : ["2026-08-08", "2026-08-09"])
 
-  const allCandidates = Object.values((await readAnalyticsStore()).users).filter((user) => {
+  const allCandidates = Object.values((await readAnalyticsStore()).users).filter(Boolean).filter((user) => {
     if (!user.telegramUserId && !parseTelegramUserId(user.userKey)) return false
     if (!firstOpenedOnDates(user, dates)) return false
     if (hasAddedFirstExpense(user)) return false

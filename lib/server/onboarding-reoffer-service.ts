@@ -146,7 +146,7 @@ function isEligibleForCron(user: UserAnalyticsRecord, nowMs: number) {
 }
 
 export async function processPendingOnboardingReoffers1h(now = new Date()) {
-  const users = Object.values((await readAnalyticsStore()).users)
+  const users = Object.values((await readAnalyticsStore()).users).filter(Boolean)
   const nowMs = now.getTime()
   let sent = 0
   let pending = 0
@@ -206,7 +206,7 @@ export async function broadcastOnboardingReofferToNewUsers(input?: {
   const defaultDates = getYesterdayAndTodayYmdMoscow()
   const dates = new Set(input?.datesYmd?.length ? input.datesYmd : defaultDates.dates)
 
-  const allCandidates = Object.values((await readAnalyticsStore()).users).filter((user) => {
+  const allCandidates = Object.values((await readAnalyticsStore()).users).filter(Boolean).filter((user) => {
     if (!user.telegramUserId && !user.userKey.startsWith("tg-")) return false
     if (!isNewUserOnDates(user, dates)) return false
     if (skipAlreadySent && user.onboardingReoffer1hSentAt) return false

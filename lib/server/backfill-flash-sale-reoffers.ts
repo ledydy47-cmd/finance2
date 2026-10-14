@@ -35,7 +35,7 @@ export async function backfillFlashSaleReoffers(input?: {
   const paywallDateFrom = input?.paywallDateFrom?.trim()
   const paywallDateTo = input?.paywallDateTo?.trim()
 
-  const allCandidates = Object.values((await readAnalyticsStore()).users).filter((user) => {
+  const allCandidates = Object.values((await readAnalyticsStore()).users).filter(Boolean).filter((user) => {
     if (!user.paywallShownAt) return false
     if (user.subscriptionPlan !== "none") return false
     if (!user.telegramUserId && !parseTelegramUserId(user.userKey)) return false

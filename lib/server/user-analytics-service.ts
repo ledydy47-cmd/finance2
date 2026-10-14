@@ -436,7 +436,7 @@ export async function getAnalyticsSummary(input?: {
   dateYmd?: string | null
   monthYmd?: string | null
 }) {
-  const users = Object.values((await readAnalyticsStore()).users)
+  const users = Object.values((await readAnalyticsStore()).users).filter(Boolean)
   const allTime = {
     totalUsers: users.length,
     appOpened: users.filter((u) => u.appOpenedAt).length,
@@ -525,7 +525,7 @@ function toAdminListUser(user: UserAnalyticsRecord): UserAnalyticsRecord {
 }
 
 export async function listAnalyticsUsers(filter?: UserSubscriptionFilter) {
-  const users = Object.values((await readAnalyticsStore()).users).sort(
+  const users = Object.values((await readAnalyticsStore()).users).filter(Boolean).sort(
     (a, b) => new Date(b.lastVisitAt).getTime() - new Date(a.lastVisitAt).getTime(),
   )
   const mapped = users.map(toAdminListUser)
@@ -539,7 +539,7 @@ export async function listAnalyticsUsersPage(input: {
   offset: number
   query?: string
 }) {
-  let users = Object.values((await readAnalyticsStore()).users).sort(
+  let users = Object.values((await readAnalyticsStore()).users).filter(Boolean).sort(
     (a, b) => new Date(b.lastVisitAt).getTime() - new Date(a.lastVisitAt).getTime(),
   )
 
